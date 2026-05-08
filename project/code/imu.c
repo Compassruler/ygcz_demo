@@ -1,57 +1,68 @@
-/*********************************************************************************************************************
-* CYT4BB Opensourec Library 即（ CYT4BB 开源库）是一个基于官方 SDK 接口的第三方开源库
-* Copyright (c) 2022 SEEKFREE 逐飞科技
-*
-* 本文件是 CYT4BB 开源库的一部分
-*
-* CYT4BB 开源库 是免费软件
-* 您可以根据自由软件基金会发布的 GPL（GNU General Public License，即 GNU通用公共许可证）的条款
-* 即 GPL 的第3版（即 GPL3.0）或（您选择的）任何后来的版本，重新发布和/或修改它
-*
-* 本开源库的发布是希望它能发挥作用，但并未对其作任何的保证
-* 甚至没有隐含的适销性或适合特定用途的保证
-* 更多细节请参见 GPL
-*
-* 您应该在收到本开源库的同时收到一份 GPL 的副本
-* 如果没有，请参阅<https://www.gnu.org/licenses/>
-*
-* 额外注明：
-* 本开源库使用 GPL3.0 开源许可证协议 以上许可申明为译文版本
-* 许可申明英文版在 libraries/doc 文件夹下的 GPL3_permission_statement.txt 文件中
-* 许可证副本在 libraries 文件夹下 即该文件夹下的 LICENSE 文件
-* 欢迎各位使用并传播本程序 但修改内容时必须保留逐飞科技的版权声明（即本声明）
-*
-* 文件名称          main_cm7_0
-* 公司名称          成都逐飞科技有限公司
-* 版本信息          查看 libraries/doc 文件夹内 version 文件 版本说明
-* 开发环境          IAR 9.40.1
-* 适用平台          CYT4BB
-* 店铺链接          https://seekfree.taobao.com/
-*
-* 修改记录
-* 日期              作者                备注
-* 2024-1-4       pudding            first version
-********************************************************************************************************************/
-
 #include "zf_common_headfile.h"
-// 打开新的工程或者工程移动了位置务必执行以下操作
-// 第一步 关闭上面所有打开的文件
-// 第二步 project->clean  等待下方进度条走完
 
-// 本例程是开源库空工程 可用作移植或者测试各类内外设
-// 本例程是开源库空工程 可用作移植或者测试各类内外设
-// 本例程是开源库空工程 可用作移植或者测试各类内外设
+// 2026.5.8 明天把数值转换为角度，接着做一节互补滤波
+void imu_data_get()
+{
+  imu660rb_get_acc();                                                     // 获取 imu660rb 的加速度测量数值
+  imu660rb_get_gyro();  
+  imu660rb_acc_x -= 166;
+  imu660rb_acc_y -= 426;
+  imu660rb_acc_z += 4028;
+  imu660rb_gyro_x-= 5;
+  imu660rb_gyro_y+= 6;
+  imu660rb_gyro_z+= 5;
+  
+  if(func_abs(imu660rb_acc_x) <= 5)
+  {
+    imu660rb_acc_x = 0;
+  }
+  if(func_abs(imu660rb_acc_y) <= 5)
+  {
+    imu660rb_acc_y = 0;
+  }
+  if(func_abs(imu660rb_acc_z) <= 5)
+  {
+    imu660rb_acc_z = 0;
+  }
+  if(func_abs(imu660rb_gyro_x) <= 5)
+  {
+    imu660rb_gyro_x = 0;
+  }
+  if(func_abs(imu660rb_gyro_y) <= 5)
+  {
+    imu660rb_gyro_y = 0;
+  }
+  if(func_abs(imu660rb_gyro_z) <= 5)
+  {
+    imu660rb_gyro_z = 0;
+  }
+}
 
-// **************************** 代码区域 ****************************
-#define LED1                    (P19_0)                                         // SPI 串口 SPI 两寸屏 这里宏定义填写 IPS200_TYPE_SPI
+//void first_order_complementary_filtering (cascade_common_value_struct *filter_value, int16 gyro_raw_data, int16 acc_raw_data)
+//{
+//    float gyro_temp;          // 角速度计算临时变量
+//    
+//    float acc_temp;           // 加速度计算临时变量
+//
+//    gyro_temp = gyro_raw_data * filter_value->gyro_ration;                              // 角速度数据 * 角速度置信度(一般给4)
+//
+//    acc_temp = (acc_raw_data - filter_value->angle_temp) * filter_value->acc_ration;    // 加速度微分数据 * 加速度置信度(一般给4)
+//
+//    filter_value->angle_temp += ((gyro_temp + acc_temp) * filter_value->call_cycle);    // 两数之和 * 调用周期 并积分到角度输出
+//
+//    filter_value->filtering_angle = filter_value->angle_temp + filter_value->mechanical_zero;  // 最终滤波角度减去零点位置即可
+//}
 
-char txt[128];
 
-
+// 调试代码
+//#define LED1                    (P19_0)                                         // SPI 串口 SPI 两寸屏 这里宏定义填写 IPS200_TYPE_SPI
+//char txt[128];
+//
 //int main(void)
 //{
 //    clock_init(SYSTEM_CLOCK_250M); 	// 时钟配置及系统初始化<务必保留>
 //    debug_init();                          // 调试串口信息初始化
+//    servo_init();
 //    
 //    // 此处编写用户代码 例如外设初始化代码等
 //    gpio_init(LED1, GPO, GPIO_HIGH, GPO_PUSH_PULL);                             // 初始化 LED1 输出 默认高电平 推挽输出模式
@@ -86,8 +97,7 @@ char txt[128];
 //    while(true)
 //    {
 //        // 此处编写需要循环执行的代码
-//        imu660rb_get_acc();                                                     // 获取 imu660rb 的加速度测量数值
-//        imu660rb_get_gyro();                                                    // 获取 imu660rb 的角速度测量数值
+//        imu_data_get();
 //        sprintf(txt,
 //                "ACCandGYRO:%d,%d,%d,%d,%d,%d\n",
 //                imu660rb_acc_x,
@@ -104,5 +114,3 @@ char txt[128];
 //        // 此处编写需要循环执行的代码
 //    }
 //}
-
-// **************************** 代码区域 *****************************

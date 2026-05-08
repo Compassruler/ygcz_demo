@@ -1,0 +1,37 @@
+# IAR
+*.dep
+*.ewd
+*.ewt
+*.log
+*.tmp
+
+# Debug/Release
+Debug/
+Release/
+settings/
+
+# Object files
+*.o
+*.obj
+
+# List files
+*.lst
+
+# Executables
+*.out
+*.hex
+*.bin
+
+# Browsing
+*.pbd
+*.pbi
+
+# Auto generated
+project/Debug/
+project/Release/
+
+# VSCode
+.vscode/
+
+# Windows
+Thumbs.db

@@ -34,7 +34,6 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
-
 #include "small_driver_uart_control.h"
 
 // 打开新的工程或者工程移动了位置务必执行以下操作
@@ -48,96 +47,98 @@
 //      TX          查看 small_driver_uart_control.h 中 SMALL_DRIVER_RX  宏定义 默认 P10_0
 //      GND         GND
 
-
-// *************************** 例程测试说明 ***************************
-// 1.核心板烧录完成本例程 主板电池供电 连接 CYT2BL3 FOC 双驱
-// 2.如果初次使用 请先点击双驱上的MODE按键 以矫正零点位置 矫正时 电机会发出音乐
-// 3.可以在逐飞助手上位机上看到如下串口信息：
-//      left speed:xxxx, right speed:xxxx
-// 如果发现现象与说明严重不符 请参照本文件最下方 例程常见问题说明 进行排查
-
-// **************************** 代码区域 ****************************
-
-#define MAX_DUTY            (30)                                               // 最大 MAX_DUTY% 占空比
-
-uint8 communication_count = 0;
-
-int8  duty = 0;
-
-bool  dir = true;
-
-
-//int main(void)
-//{
-//    clock_init(SYSTEM_CLOCK_250M); 	// 时钟配置及系统初始化<务必保留>
-//    debug_init();                       // 调试串口信息初始化
-//    // 此处编写用户代码 例如外设初始化代码等
-//    
-//
-//    small_driver_uart_init();		// 初始化驱动通讯功能
-//    
-//    
-//    // 此处编写用户代码 例如外设初始化代码等
-//    while(true)
-//    {
-//        // 此处编写需要循环执行的代码
-//
-//        system_delay_ms(50);
-//        
-//        small_driver_set_duty(&small_driver_value, duty * (PWM_DUTY_MAX / 100), -duty * (PWM_DUTY_MAX / 100));   // 计算占空比输出
-//
-//        if(dir)                                                                 // 根据方向判断计数方向 本例程仅作参考
-//        {
-//            duty ++;                                                            // 正向计数
-//            if(duty >= MAX_DUTY)                                                // 达到最大值
-//            {
-//                dir = false;                                                    // 变更计数方向
-//            }
-//        }
-//        else
-//        {
-//            duty --;                                                            // 反向计数
-//            if(duty <= -MAX_DUTY)                                               // 达到最小值
-//            {
-//                dir = true;                                                     // 变更计数方向
-//            }
-//        }
-//        
-//        printf("left speed:%d, right speed:%d, rx count:%d\r\n", small_driver_value.receive_left_speed_data, 
-//                                                                 small_driver_value.receive_right_speed_data, 
-//                                                                 communication_count);
-//
-//        if(communication_count == 0)                                            // 未收到来自驱动的数据 发送获取数据指令
-//        {
-//            printf("No driver board data received!!!\r\n");
-//            
-//            small_driver_get_speed(&small_driver_value);                        // 获取实时速度数据
-//        }
-//        else
-//        {
-//            communication_count = 0;                                            // 清除当前通讯计数
-//        }
-//        
-//        // 此处编写需要循环执行的代码
-//    }
-//}
-
-
-void uart4_isr (void)
+// ======================
+// PID 初始化函数
+// ======================
+void PID_Init(PID_t *pid,
+              float kp, float ki, float kd,
+              float kp3, float kd3,
+              float max_integral, float max_output,
+              float K)
 {
-    if(uart_isr_mask(UART_4))           // 串口4接收中断
-    {
-        communication_count ++;                                                 // 收到来自驱动的通讯数据 变量自增
-        
-        small_driver_control_callback(&small_driver_value);                     // 无刷双驱通讯回调函数
-        
-    }
-    else                                // 串口4发送中断
-    {
-      
-        
-        
-    }
+    if (!pid) return;
+
+    pid->kp = kp;
+    pid->ki = ki;
+    pid->kd = kd;
+    pid->kp3 = kp3;
+    pid->kd3 = kd3;
+
+    // 清零历史误差
+    pid->error = 0.0f;
+    pid->last_error = 0.0f;
+    pid->last_last_error = 0.0f;
+    pid->error1 = 0.0f;
+    pid->error2 = 0.0f;
+    pid->last_error2 = 0.0f;
+
+    // 积分清零并设置上限
+    pid->integral = 0.0f;
+    pid->max_integral = max_integral;
+
+    // 输出清零并设置上限
+    pid->output = 0.0f;
+    pid->max_output = max_output;
+
+    // 反馈值清零
+    pid->now_feedback = 0.0f;
+    pid->last_feedback = 0.0f;
+
+    pid->K = K;
+}
+
+// ======================
+// PID 计算函数
+// ======================
+float PID_Calc(PID_t *pid, float setpoint, float feedback)
+{
+    pid->now_feedback = feedback;
+    pid->error = setpoint - feedback;
+
+    // 积分累加
+    pid->integral += pid->error;
+    if (pid->integral > pid->max_integral) pid->integral = pid->max_integral;
+    if (pid->integral < -pid->max_integral) pid->integral = -pid->max_integral;
+
+    // PID 输出
+    pid->output = pid->kp * pid->error + pid->ki * pid->integral + pid->kd * (pid->error - pid->last_error);
+
+    // 高阶 PID 可选
+    pid->output += pid->kp3 * pid->error + pid->kd3 * (pid->error - 2*pid->last_error + pid->last_last_error);
+
+    // 输出限幅
+    if (pid->output > pid->max_output) pid->output = pid->max_output;
+    if (pid->output < -pid->max_output) pid->output = -pid->max_output;
+
+    // 更新历史误差
+    pid->last_last_error = pid->last_error;
+    pid->last_error = pid->error;
+    pid->last_feedback = feedback;
+
+    return pid->output;
+}
+
+// ======================
+// 串级 PID 控制函数（使用滤波后的 IMU 数据）
+// ======================
+void PID_Cascade_Update(PID_t *speed_pid, PID_t *angle_pid, PID_t *gyro_pid,
+                        float speed_ref, float speed_fb,
+                        float angle_fb, float gyro_fb,
+                        int16_t *PWM_left, int16_t *PWM_right,
+                        float PWM_base)
+{
+    // 1. 外环：速度 PID → 输出目标角度
+    float angle_ref = PID_Calc(speed_pid, speed_ref, speed_fb);
+
+    // 2. 中环：角度 PID → 输出目标角速度
+    float omega_ref = PID_Calc(angle_pid, angle_ref, angle_fb);
+
+    // 3. 内环：角速度 PID → 输出 PWM 调整量
+    float PWM_delta = PID_Calc(gyro_pid, omega_ref, gyro_fb);
+
+    // 4. 左右轮 PWM 分配
+    *PWM_left  = (int16_t)(PWM_base - PWM_delta);
+    *PWM_right = (int16_t)(PWM_base + PWM_delta);
 }
 
 // **************************** 代码区域 ****************************

@@ -9,7 +9,6 @@
 
 // ================= 舵机参数 =================
 #define SERVO_FREQ     (50)
-
 #define SERVO_LEFT     (0)
 #define SERVO_RIGHT    (180)
 
@@ -17,49 +16,17 @@
 #define SERVO_DUTY(x) \
 ((float)PWM_DUTY_MAX/(1000.0/(float)SERVO_FREQ)*(0.5+(float)(x)/90.0))
 
-float angle = 90;
-uint8 dir = 1;
-
-//int main(void)
-//{
-//    // 系统初始化
-//    clock_init(SYSTEM_CLOCK_250M);
-//    debug_init();
-//
-//    // PWM初始化
-////    pwm_init(SERVO1_PWM, SERVO_FREQ, 0);
-////    pwm_init(SERVO2_PWM, SERVO_FREQ, 0);
-////    pwm_init(SERVO3_PWM, SERVO_FREQ, 0);
-//    pwm_init(SERVO4_PWM, SERVO_FREQ, 0);
-//
-//    while(true)
-//    {
-//        // 来回摆动
-//        if(dir)
-//        {
-//            angle++;
-//
-//            if(angle >= SERVO_RIGHT)
-//            {
-//                dir = 0;
-//            }
-//        }
-//        else
-//        {
-//            angle--;
-//
-//            if(angle <= SERVO_LEFT)
-//            {
-//                dir = 1;
-//            }
-//        }
-//
-//        // 输出PWM
-////        pwm_set_duty(SERVO1_PWM, (uint16)SERVO_DUTY(angle));
-////        pwm_set_duty(SERVO2_PWM, (uint16)SERVO_DUTY(angle));
-////        pwm_set_duty(SERVO3_PWM, (uint16)SERVO_DUTY(angle));
-//        pwm_set_duty(SERVO4_PWM, (uint16)SERVO_DUTY(angle));
-//
-//        system_delay_ms(10);
-//    }
-//}
+void servo_init()
+{
+  // pwm初始化
+  pwm_init(SERVO1_PWM, SERVO_FREQ, 0);
+  pwm_init(SERVO2_PWM, SERVO_FREQ, 0);
+  pwm_init(SERVO3_PWM, SERVO_FREQ, 0);
+  pwm_init(SERVO4_PWM, SERVO_FREQ, 0); 
+  
+  // 舵机为0°
+  pwm_set_duty(SERVO1_PWM, (uint16)SERVO_DUTY(90));
+  pwm_set_duty(SERVO2_PWM, (uint16)SERVO_DUTY(90));
+  pwm_set_duty(SERVO3_PWM, (uint16)SERVO_DUTY(90));
+  pwm_set_duty(SERVO4_PWM, (uint16)SERVO_DUTY(90));
+}

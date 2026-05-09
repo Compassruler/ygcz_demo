@@ -40,13 +40,13 @@
 
 
 // **************************** PIT中断函数 ****************************
-void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
-{
-    pit_isr_flag_clear(PIT_CH0);
-  
-    
-    
-}
+//void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
+//{
+//    pit_isr_flag_clear(PIT_CH0);
+//  
+//    
+//    
+//}
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
 {
@@ -202,21 +202,21 @@ void uart3_isr (void)
     }
 }
 
-//void uart4_isr (void)
-//{
-//    if(uart_isr_mask(UART_4))            // 串口4接收中断
-//    {
-//
-//        uart_receiver_handler();                                                                // 串口接收机回调函数
-//       
-//    }
-//    else                                // 串口4发送中断
-//    {
-//      
-//        
-//        
-//    }
-//}
+void uart4_isr (void)
+{
+    if(uart_isr_mask(UART_4))            // 串口4接收中断
+    {
+
+        uart_receiver_handler();                                                                // 串口接收机回调函数
+       
+    }
+    else                                // 串口4发送中断
+    {
+      
+        
+        
+    }
+}
 
 void uart5_isr (void)
 {

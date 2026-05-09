@@ -47,14 +47,15 @@
 
 char txt[128];
 uint8 communication_count = 0;
-
+PID_t angle_speed_cycle;   
 int main(void)
 {
   clock_init(SYSTEM_CLOCK_250M); 	   // 时钟配置及系统初始化<务必保留>
   debug_init();                          // 调试串口信息初始化
   servo_init();
   parameter_init();                      // 姿态解算参数初始化
-  PID_Init_All();
+  PID_Init(&angle_speed_cycle, 1.2f, 0.0f, 0.0f, 0, 0, 10, 60, 1.0f);
+  small_driver_uart_init();              //电机初始化
   
     
     // 此处编写用户代码 例如外设初始化代码等
@@ -88,9 +89,16 @@ int main(void)
    // 此处编写用户代码 例如外设初始化代码等
    while(true)
     {
+      
+       
        // 此处编写需要循环执行的代码
-       imu_update();
-       sprintf(txt,"gyro_y|acc_x|pitch:%f,%f,%f\n",imu_data.gyro_y, pitch_acc2angle,pitch);
+//       imu_update();
+       imu_data_get();
+       PID_Calc(&angle_speed_cycle,0,imu660rb_gyro_y);
+       small_driver_set_duty(&small_driver_value,(int16)angle_speed_cycle.output,-(int16)angle_speed_cycle.output);
+       sprintf(txt,
+               "imu660rb_gyro_y:%d\r\n",imu660rb_gyro_y);
+//       sprintf(txt,"gyro_y|acc_x|pitch:%f,%f,%f\n",imu_data.gyro_y, pitch_acc2angle,pitch);
        wireless_uart_send_string(txt);
        gpio_toggle_level(LED1);                                                // 翻转 LED 引脚输出电平 控制 LED 亮灭
        system_delay_ms(50);
@@ -98,20 +106,14 @@ int main(void)
     }
 }
 
-void uart4_isr (void)
+
+void pit0_ch0_isr()                     // 定时器通道 0 周期中断服务函数      
 {
-    if(uart_isr_mask(UART_4))           // 串口4接收中断
-    {
-        communication_count ++;                                                 // 收到来自驱动的通讯数据 变量自增
-        
-        small_driver_control_callback(&small_driver_value);                     // 无刷双驱通讯回调函数
-        
-    }
-    else                                // 串口4发送中断
-    {
-      
-        
-        
-    }
+    pit_isr_flag_clear(PIT_CH0);
+//    imu_data_get();
+//    PID_Calc(&angle_speed_cycle,0,imu660rb_gyro_y);
+//    small_driver_set_duty(&small_driver_value,(int16)angle_speed_cycle.output,-(int16)angle_speed_cycle.output);
+    
 }
+
 // **************************** 代码区域 *****************************

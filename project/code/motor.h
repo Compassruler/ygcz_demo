@@ -46,8 +46,8 @@ void PID_Init(PID_t *pid,float kp, float ki, float kd,
               float max_integral, float max_output,
               float K);
 
-float PID_Calc(PID_t *pid, float setpoint, float feedback);
+void PID_Calc(PID_t *pid, float setpoint, float feedback);
 
-void Balance_Control(float angle_ref, float angle_fb, float gyro_fb);
+//void Balance_Control(float angle_ref, float angle_fb, float gyro_fb);
 void PID_Init_All(void);
 #endif

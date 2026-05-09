@@ -91,12 +91,12 @@ void PID_Init_All()
     PID_Init(&angle_pid, 5.0f, 0.05f, 0.2f, 0, 0, 20, 40, 1.0f);
 
     // 内环角速度 PID
-    PID_Init(&gyro_pid, 1.2f, 0.0f, 0.05f, 0, 0, 10, 60, 1.0f);
+    PID_Init(&gyro_pid, 1.2f, 0.0f, 0.0f, 0, 0, 10, 10000, 1.0f);
 }
 // ======================
 // PID 计算函数
 // ======================
-float PID_Calc(PID_t *pid, float setpoint, float feedback)
+void PID_Calc(PID_t *pid, float setpoint, float feedback)
 {
     pid->now_feedback = feedback;
     pid->error = setpoint - feedback;
@@ -121,29 +121,22 @@ float PID_Calc(PID_t *pid, float setpoint, float feedback)
     pid->last_error = pid->error;
     pid->last_feedback = feedback;
     
-    return pid->output;
 }
 
 
-// 两级 PID 更新函数
-void Balance_Control(float angle_ref, float angle_fb, float gyro_fb)
-{
-    int16_t PWM_left, PWM_right;
-    float PWM_base = 50.0f; // 基础前进量，可根据需求调整
-
-    // 1. 外环角度 PID → 输出目标角速度
-    float omega_ref = PID_Calc(&angle_pid, angle_ref, angle_fb);
-
-    // 2. 内环角速度 PID → 输出 PWM 调整量
-    float PWM_delta = PID_Calc(&gyro_pid, omega_ref, gyro_fb);
-
-    // 3. 分配左右轮 PWM
-    PWM_left  = (int16_t)(PWM_base - PWM_delta);
-    PWM_right = (int16_t)(PWM_base + PWM_delta);
-
-    // 4. 设置轮子占空比
-    small_driver_set_duty(&small_driver_value, PWM_left, PWM_right);
-}
+//// 两级 PID 更新函数
+//void Balance_Control(float angle_ref, float angle_fb, float gyro_fb)
+//{
+//    int16_t PWM_left, PWM_right;
+//
+//    // 1. 外环角度 PID → 输出目标角速度
+////    float omega_ref = PID_Calc(&angle_pid, angle_ref, angle_fb);
+//
+//    // 2. 内环角速度 PID → 输出 PWM 调整量
+////    float PWM_delta = PID_Calc(&gyro_pid, angle_fb, gyro_fb);
+//    // 4. 设置轮子占空比
+//    small_driver_set_duty(&small_driver_value, PWM_left, PWM_right);
+//}
 
 // **************************** 代码区域 ****************************
 // *************************** 例程常见问题说明 ***************************

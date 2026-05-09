@@ -16,14 +16,10 @@ void parameter_init(void)
 
 void first_order_complementary_filtering(cascade_common_value_struct *filter_value, float gyro_data, float acc_data)
 {
-  
   float gyro_temp;    // 角速度计算临时变量
   float acc_temp;     // 加速度计算临时变量
-
   gyro_temp = gyro_data * filter_value->gyro_ration;      // 角速度数据 * 角速度置信度（一般给4）
   acc_temp = (acc_data - filter_value->angle_temp) * filter_value->acc_ration;    // 加速度误差 * 加速度置信度（一般给4）
-
   filter_value->angle_temp += ((gyro_temp + acc_temp) * filter_value->call_cycle);    // 积分得到角度输出
-
   filter_value->filtering_angle = filter_value->angle_temp + filter_value->mechanical_zero; // 最终滤波角度 + 机械零点补偿
 }

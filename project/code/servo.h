@@ -4,6 +4,6 @@
 /**
  * @brief 舵机初始化
  */
-void servo_init();
+void servo_init(void);
 
 #endif

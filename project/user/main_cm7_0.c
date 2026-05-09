@@ -87,14 +87,15 @@ int main(void)
     {
         // 此处编写需要循环执行的代码
         imu_data_get();
+        imu_data_transition();
         sprintf(txt,
-                "ACCandGYRO:%d,%d,%d,%d,%d,%d\n",
-                imu660rb_acc_x,
-                imu660rb_acc_y,
-                imu660rb_acc_z,
-                imu660rb_gyro_x,
-                imu660rb_gyro_y,
-                imu660rb_gyro_z);
+                "ACCandGYRO:%f,%f,%f,%f,%f,%f\n",
+                imu_data.acc_x,
+                imu_data.acc_y,
+                imu_data.acc_z,
+                imu_data.gyro_x,
+                imu_data.gyro_y,
+                imu_data.gyro_z);
 
         wireless_uart_send_string(txt);
 

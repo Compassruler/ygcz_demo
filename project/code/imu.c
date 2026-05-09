@@ -1,41 +1,49 @@
 #include "zf_common_headfile.h"
 
-// 2026.5.8 明天把数值转换为角度，接着做一节互补滤波
-void imu_data_get()
+imu_raw_data_t imu_raw;
+imu_data_t imu_data;
+
+void imu_data_get(void)
 {
-  imu660rb_get_acc();                                                     // 获取 imu660rb 的加速度测量数值
-  imu660rb_get_gyro();  
-  imu660rb_acc_x -= 166;
-  imu660rb_acc_y -= 426;
-  imu660rb_acc_z += 4028;
-  imu660rb_gyro_x-= 5;
-  imu660rb_gyro_y+= 6;
-  imu660rb_gyro_z+= 5;
-  
-  if(func_abs(imu660rb_acc_x) <= 5)
-  {
-    imu660rb_acc_x = 0;
-  }
-  if(func_abs(imu660rb_acc_y) <= 5)
-  {
-    imu660rb_acc_y = 0;
-  }
-  if(func_abs(imu660rb_acc_z) <= 5)
-  {
-    imu660rb_acc_z = 0;
-  }
-  if(func_abs(imu660rb_gyro_x) <= 5)
-  {
-    imu660rb_gyro_x = 0;
-  }
-  if(func_abs(imu660rb_gyro_y) <= 5)
-  {
-    imu660rb_gyro_y = 0;
-  }
-  if(func_abs(imu660rb_gyro_z) <= 5)
-  {
-    imu660rb_gyro_z = 0;
-  }
+    imu660rb_get_acc(); // 加速度数据
+    imu660rb_get_gyro();// 陀螺仪数据
+
+    imu_raw.acc_x = imu660rb_acc_x-160; // 偏移处理
+    imu_raw.acc_y = imu660rb_acc_y-440;
+    imu_raw.acc_z = imu660rb_acc_z;
+    imu_raw.gyro_x = imu660rb_gyro_x - 5;
+    imu_raw.gyro_y = imu660rb_gyro_y + 6;
+    imu_raw.gyro_z = imu660rb_gyro_z + 5;
+
+    if(func_abs(imu_raw.acc_x) <= 5)    // 死区处理
+        imu_raw.acc_x = 0;
+
+    if(func_abs(imu_raw.acc_y) <= 5)
+        imu_raw.acc_y = 0;
+
+    if(func_abs(imu_raw.acc_z) <= 5)
+        imu_raw.acc_z = 0;
+
+    if(func_abs(imu_raw.gyro_x) <= 5)
+        imu_raw.gyro_x = 0;
+
+    if(func_abs(imu_raw.gyro_y) <= 5)
+        imu_raw.gyro_y = 0;
+
+    if(func_abs(imu_raw.gyro_z) <= 5)
+        imu_raw.gyro_z = 0;
+}
+
+
+void imu_data_transition(void)
+{
+    imu_data.acc_x = imu660rb_acc_transition(imu_raw.acc_x);    // 测量数据转化为物理角加速度数据
+    imu_data.acc_y = imu660rb_acc_transition(imu_raw.acc_y);
+    imu_data.acc_z = imu660rb_acc_transition(imu_raw.acc_z);
+
+    imu_data.gyro_x = imu660rb_gyro_transition(imu_raw.gyro_x);   // 测量数据转化为物理陀螺仪数据
+    imu_data.gyro_y = imu660rb_gyro_transition(imu_raw.gyro_y);
+    imu_data.gyro_z = imu660rb_gyro_transition(imu_raw.gyro_z);
 }
 
 //void first_order_complementary_filtering (cascade_common_value_struct *filter_value, int16 gyro_raw_data, int16 acc_raw_data)

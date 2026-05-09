@@ -34,7 +34,6 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
-#include "small_driver_uart_control.h"
 
 // 打开新的工程或者工程移动了位置务必执行以下操作
 // 第一步 关闭上面所有打开的文件
@@ -47,6 +46,8 @@
 //      TX          查看 small_driver_uart_control.h 中 SMALL_DRIVER_RX  宏定义 默认 P10_0
 //      GND         GND
 
+extern small_device_value_struct small_driver_value;
+PID_t angle_pid, gyro_pid;
 // ======================
 // PID 初始化函数
 // ======================
@@ -64,7 +65,6 @@ void PID_Init(PID_t *pid,
     pid->kp3 = kp3;
     pid->kd3 = kd3;
 
-    // 清零历史误差
     pid->error = 0.0f;
     pid->last_error = 0.0f;
     pid->last_last_error = 0.0f;
@@ -72,21 +72,27 @@ void PID_Init(PID_t *pid,
     pid->error2 = 0.0f;
     pid->last_error2 = 0.0f;
 
-    // 积分清零并设置上限
     pid->integral = 0.0f;
     pid->max_integral = max_integral;
 
-    // 输出清零并设置上限
     pid->output = 0.0f;
     pid->max_output = max_output;
 
-    // 反馈值清零
     pid->now_feedback = 0.0f;
     pid->last_feedback = 0.0f;
-
+    
     pid->K = K;
 }
 
+// 初始化所有 PID
+void PID_Init_All()
+{
+    // 外环角度 PID
+    PID_Init(&angle_pid, 5.0f, 0.05f, 0.2f, 0, 0, 20, 40, 1.0f);
+
+    // 内环角速度 PID
+    PID_Init(&gyro_pid, 1.2f, 0.0f, 0.05f, 0, 0, 10, 60, 1.0f);
+}
 // ======================
 // PID 计算函数
 // ======================
@@ -103,7 +109,7 @@ float PID_Calc(PID_t *pid, float setpoint, float feedback)
     // PID 输出
     pid->output = pid->kp * pid->error + pid->ki * pid->integral + pid->kd * (pid->error - pid->last_error);
 
-    // 高阶 PID 可选
+    // 可选高阶 PID
     pid->output += pid->kp3 * pid->error + pid->kd3 * (pid->error - 2*pid->last_error + pid->last_last_error);
 
     // 输出限幅
@@ -114,31 +120,29 @@ float PID_Calc(PID_t *pid, float setpoint, float feedback)
     pid->last_last_error = pid->last_error;
     pid->last_error = pid->error;
     pid->last_feedback = feedback;
-
+    
     return pid->output;
 }
 
-// ======================
-// 串级 PID 控制函数（使用滤波后的 IMU 数据）
-// ======================
-void PID_Cascade_Update(PID_t *speed_pid, PID_t *angle_pid, PID_t *gyro_pid,
-                        float speed_ref, float speed_fb,
-                        float angle_fb, float gyro_fb,
-                        int16_t *PWM_left, int16_t *PWM_right,
-                        float PWM_base)
+
+// 两级 PID 更新函数
+void Balance_Control(float angle_ref, float angle_fb, float gyro_fb)
 {
-    // 1. 外环：速度 PID → 输出目标角度
-    float angle_ref = PID_Calc(speed_pid, speed_ref, speed_fb);
+    int16_t PWM_left, PWM_right;
+    float PWM_base = 50.0f; // 基础前进量，可根据需求调整
 
-    // 2. 中环：角度 PID → 输出目标角速度
-    float omega_ref = PID_Calc(angle_pid, angle_ref, angle_fb);
+    // 1. 外环角度 PID → 输出目标角速度
+    float omega_ref = PID_Calc(&angle_pid, angle_ref, angle_fb);
 
-    // 3. 内环：角速度 PID → 输出 PWM 调整量
-    float PWM_delta = PID_Calc(gyro_pid, omega_ref, gyro_fb);
+    // 2. 内环角速度 PID → 输出 PWM 调整量
+    float PWM_delta = PID_Calc(&gyro_pid, omega_ref, gyro_fb);
 
-    // 4. 左右轮 PWM 分配
-    *PWM_left  = (int16_t)(PWM_base - PWM_delta);
-    *PWM_right = (int16_t)(PWM_base + PWM_delta);
+    // 3. 分配左右轮 PWM
+    PWM_left  = (int16_t)(PWM_base - PWM_delta);
+    PWM_right = (int16_t)(PWM_base + PWM_delta);
+
+    // 4. 设置轮子占空比
+    small_driver_set_duty(&small_driver_value, PWM_left, PWM_right);
 }
 
 // **************************** 代码区域 ****************************

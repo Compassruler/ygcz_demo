@@ -48,9 +48,6 @@ void PID_Init(PID_t *pid,float kp, float ki, float kd,
 
 float PID_Calc(PID_t *pid, float setpoint, float feedback);
 
-void PID_cascade_Update(PID_t *speed_pid, PID_t *angle_pid, PID_t *gyro_pid,
-                        float speed_ref, float speed_fb,
-                        float angle_fb, float gyro_fb,
-                        int16_t *PWM_left, int16_t *PWM_right,
-                        float PWM_base);
+void Balance_Control(float angle_ref, float angle_fb, float gyro_fb);
+void PID_Init_All(void);
 #endif

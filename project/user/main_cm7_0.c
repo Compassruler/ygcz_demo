@@ -46,12 +46,13 @@
 #define LED1                    (P19_0)                                         // SPI 串口 SPI 两寸屏 这里宏定义填写 IPS200_TYPE_SPI
 
 char txt[128];
-
+uint8 communication_count = 0;
 int main(void)
 {
     clock_init(SYSTEM_CLOCK_250M); 	// 时钟配置及系统初始化<务必保留>
     debug_init();                          // 调试串口信息初始化
     servo_init();
+    PID_Init_All();
     
     // 此处编写用户代码 例如外设初始化代码等
     gpio_init(LED1, GPO, GPIO_HIGH, GPO_PUSH_PULL);                             // 初始化 LED1 输出 默认高电平 推挽输出模式
@@ -88,21 +89,41 @@ int main(void)
         // 此处编写需要循环执行的代码
         imu_data_get();
         imu_data_transition();
-        sprintf(txt,
-                "ACCandGYRO:%f,%f,%f,%f,%f,%f\n",
-                imu_data.acc_x,
-                imu_data.acc_y,
-                imu_data.acc_z,
-                imu_data.gyro_x,
-                imu_data.gyro_y,
-                imu_data.gyro_z);
-
-        wireless_uart_send_string(txt);
-
+//        sprintf(txt,
+//                "ACCandGYRO:%d,%d,%d,%d,%d,%d\n",
+//                imu660rb_acc_x,
+//                imu660rb_acc_y,
+//                imu660rb_acc_z,
+//                imu660rb_gyro_x,
+//                imu660rb_gyro_y,
+//                imu660rb_gyro_z);
+        
+//        wireless_uart_send_string(txt);
+         float angle_ref = 0.0f; // 平衡目标角度（0 表示竖直）
+         float angle_fb = imu660rb_acc_y;
+        float gyro_fb = imu660rb_gyro_y;
+        Balance_Control(angle_ref, angle_fb, gyro_fb);
         gpio_toggle_level(LED1);                                                // 翻转 LED 引脚输出电平 控制 LED 亮灭
-        system_delay_ms(20);
+        system_delay_ms(50);
         // 此处编写需要循环执行的代码
     }
 }
 
+
+void uart4_isr (void)
+{
+    if(uart_isr_mask(UART_4))           // 串口4接收中断
+    {
+        communication_count ++;                                                 // 收到来自驱动的通讯数据 变量自增
+        
+        small_driver_control_callback(&small_driver_value);                     // 无刷双驱通讯回调函数
+        
+    }
+    else                                // 串口4发送中断
+    {
+      
+        
+        
+    }
+}
 // **************************** 代码区域 *****************************

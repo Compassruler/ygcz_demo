@@ -202,21 +202,21 @@ void uart3_isr (void)
     }
 }
 
-void uart4_isr (void)
-{
-    if(uart_isr_mask(UART_4))            // 串口4接收中断
-    {
-
-        uart_receiver_handler();                                                                // 串口接收机回调函数
-       
-    }
-    else                                // 串口4发送中断
-    {
-      
-        
-        
-    }
-}
+//void uart4_isr (void)
+//{
+//    if(uart_isr_mask(UART_4))            // 串口4接收中断
+//    {
+//
+//        uart_receiver_handler();                                                                // 串口接收机回调函数
+//       
+//    }
+//    else                                // 串口4发送中断
+//    {
+//      
+//        
+//        
+//    }
+//}
 
 void uart5_isr (void)
 {

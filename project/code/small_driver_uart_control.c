@@ -1,5 +1,5 @@
-#include "small_driver_uart_control.h"
-
+//#include "small_driver_uart_control.h"  //原来只引入了该头文件
+#include "zf_common_headfile.h"
 small_device_value_struct small_driver_value;      // 定义通讯参数结构体
 
 

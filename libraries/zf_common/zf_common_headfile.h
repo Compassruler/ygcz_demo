@@ -44,7 +44,7 @@
 #include "servo.h"
 #include "imu.h"
 #include "motor.h"
-#include "small_driver_uart_controll.h"
+#include "small_driver_uart_control.h"
 //===================================================Ð¾Æ¬ SDK µ×²ã===================================================
 #include "cy_project.h"
 #include "cy_device_headers.h"

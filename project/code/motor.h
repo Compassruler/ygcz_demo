@@ -55,6 +55,6 @@ void pid_init(PID *pid, float p, float i, float d, float maxI, float maxOut, flo
 // 参数说明：       reference   目标值
 // 参数说明：       feedback    当前反馈值
 // 返回值：         void
-void pid_calc(PID *pid, float reference, float feedback);
-
+void pid_pos_calc(PID *pid, float reference, float feedback);
+void pid_inc_calc(PID *pid, float reference, float feedback);
 #endif

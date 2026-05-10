@@ -49,7 +49,6 @@
 char txt[128];
 uint8 communication_count = 0; 
 PID gyro_pid;
-//uint32 safety_pad[100];
 int main(void)
 {
   
@@ -85,7 +84,7 @@ void pit0_ch0_isr()
     pit_isr_flag_clear(PIT_CH0);
     imu_data_get();
     imu_data_transition();
-    pid_calc(&gyro_pid, 0, imu_data.gyro_y);
+    pid_pos_calc(&gyro_pid, 0, imu_data.gyro_y);
     small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
 }
 // **************************** ´úÂëÇøÓò *****************************

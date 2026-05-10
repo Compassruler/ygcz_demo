@@ -1,6 +1,13 @@
 #include "zf_common_headfile.h"
 
+PID gyro_pid;
+PID angle_pid;
 
+void banlance_init(void)
+{
+  
+  // 后续所有参数放着里面，先不管
+}
 
 void pid_init(PID *pid, float p, float i, float d, float maxI, float maxOut, float K)
 {

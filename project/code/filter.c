@@ -9,7 +9,7 @@ void parameter_init(void)
   pitch_filter.gyro_ration = 4.0f;
   pitch_filter.acc_ration  = 4.0f;
   pitch_filter.angle_temp  = 0.0f;
-  pitch_filter.call_cycle  = 0.005f; // 5ms
+  pitch_filter.call_cycle  = 0.001f; // 5ms
   pitch_filter.mechanical_zero = 0.0f;
   pitch_filter.filtering_angle = 0.0f;
 }

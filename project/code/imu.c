@@ -65,6 +65,5 @@ void imu_update(void)
   imu_data_get();               // 原始数据
   imu_data_transition();        // 转换后数据
   pitch_acc2angle = get_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);
-  first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);        // 一阶互补滤波处理，这里输出pitch角
-  pitch = pitch_filter.filtering_angle;
+  first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);        // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle角
 }

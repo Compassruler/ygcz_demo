@@ -6,7 +6,6 @@
 
 #define SERVO_MOTOR_DUTY(x) \ ((float)10000 / (1000.0f / 300.0f) * (0.5f + (float)(x) / 90.0f)) // 舵机PWM占空比换算
 
-
 // PID结构体
 typedef struct
 {
@@ -37,7 +36,22 @@ typedef struct
 
 } PID;
 
-extern PID gyro_pid;
+typedef struct
+{
+    PID gyro_cycle;          // 角速度环
+    PID angle_cycle;         // 角度环
+    PID speed_cycle;         // 速度环
+
+    float call_cycle;
+
+} BANLANCE;
+
+extern BANLANCE banlance;     // 三环集合结构体
+extern PID gyro_pid;         // 角速度环pid结构体
+extern PID angle_pid;        // 角度环pid结构体
+
+// 函数简介：  三串级pid参数初始化
+void banlance_init(void);
 
 // 函数简介：   PID初始化
 // 参数说明：   pid         PID结构体指针

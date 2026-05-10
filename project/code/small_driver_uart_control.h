@@ -2,7 +2,7 @@
 #define SMALL_DRIVER_UART_CONTROL_H_
 
 #include "zf_common_headfile.h"
-#include "zf_driver_uart.h" //É¾³ýºó±àÒë±¨´í
+#include "zf_driver_uart.h"
 
 #define SMALL_DRIVER_UART                       (UART_4        )
 

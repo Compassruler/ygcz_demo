@@ -25,8 +25,8 @@ void servo_init()
   pwm_init(SERVO4_PWM, SERVO_FREQ, 0); 
   
   // 舵机为0°
-  pwm_set_duty(SERVO1_PWM, (uint16)SERVO_DUTY(90));
-  pwm_set_duty(SERVO2_PWM, (uint16)SERVO_DUTY(90));
-  pwm_set_duty(SERVO3_PWM, (uint16)SERVO_DUTY(90));
-  pwm_set_duty(SERVO4_PWM, (uint16)SERVO_DUTY(90));
+  pwm_set_duty(SERVO1_PWM, (uint16)SERVO_DUTY(100));// 右前
+  pwm_set_duty(SERVO2_PWM, (uint16)SERVO_DUTY(80)); // 左前
+  pwm_set_duty(SERVO3_PWM, (uint16)SERVO_DUTY(80)); // 右后
+  pwm_set_duty(SERVO4_PWM, (uint16)SERVO_DUTY(100)); // 左后
 }

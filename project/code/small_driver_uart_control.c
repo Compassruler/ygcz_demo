@@ -1,5 +1,5 @@
-//#include "small_driver_uart_control.h"  //原来只引入了该头文件
-#include "zf_common_headfile.h"
+#include "small_driver_uart_control.h"
+
 small_device_value_struct small_driver_value;      // 定义通讯参数结构体
 
 
@@ -236,7 +236,7 @@ void small_driver_uart_init(void)
 
     small_driver_set_duty(&small_driver_value, 0, 0);                                           // 设置0占空比
 
-    small_driver_get_speed(&small_driver_value);                                                // 获取实时速度数据
+    small_driver_get_angle(&small_driver_value);                                                // 获取实时转速数据
 }
 
 

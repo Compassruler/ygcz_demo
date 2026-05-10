@@ -34,6 +34,7 @@
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
+
 // 打开新的工程或者工程移动了位置务必执行以下操作
 // 第一步 关闭上面所有打开的文件
 // 第二步 project->clean  等待下方进度条走完
@@ -45,61 +46,34 @@
 // **************************** 代码区域 ****************************
 #define LED1                    (P19_0)                                         // SPI 串口 SPI 两寸屏 这里宏定义填写 IPS200_TYPE_SPI
 
-char txt[256];
+char txt[128];
 uint8 communication_count = 0; 
+PID gyro_pid;
+//uint32 safety_pad[100];
 int main(void)
 {
+  
   clock_init(SYSTEM_CLOCK_250M); 	                        // 时钟配置及系统初始化<务必保留>
   debug_init();                                                    // 调试串口信息初始化
+  wireless_uart_init();
   servo_init();                                                    // 舵机初始化
   parameter_init();                                               // 姿态解算参数初始化
-  pid_init(&gyro_pid, 5.0f, 0.0f, 0.0f, 0, 1000, 1.0f);      // 角速度pid初始化
+  imu660rb_init();
   small_driver_uart_init();                                      // 电机初始化
+  pid_init(&gyro_pid, 30.0f, 0.0f, 6.0f, 0, 10000, 1.0f);        // 角速度pid初始化
+  pit_ms_init(PIT_CH0,1);
   
-  // 此处编写用户代码 例如外设初始化代码等
-  
-  if(wireless_uart_init())                                                     // 判断是否通过初始化
-   {
-      
-    while(1)                                                                   // 初始化失败就在这进入死循环
-      {
-          gpio_toggle_level(LED1);                                            // 翻转 LED 引脚输出电平 控制 LED 亮灭
-          system_delay_ms(100);                                               // 短延时快速闪灯表示异常
-      }
-   }
-
-   wireless_uart_send_byte('\r');
-   wireless_uart_send_byte('\n');
-   wireless_uart_send_string(" WirelessUart is ok.\r\n");                 // 初始化正常 输出测试信息
-//   
-   while(1)
-   {
-       if(imu660rb_init())
-       {
-          wireless_uart_send_string("imu660rb init error.\r\n");         // imu660rb 初始化失败
-       }
-       else
-       {
-          break;
-       }
-       gpio_toggle_level(LED1);                                            // 翻转 LED 引脚输出电平 控制 LED 亮灭 初始化出错这个灯会闪的很慢
-   }
-
-   // 此处编写用户代码 例如外设初始化代码等
    while(true)
     {
       
        // 此处编写需要循环执行的代码
       
 //       imu_update();
-       imu_data_get();
-       imu_data_transition();
-       pid_calc(&gyro_pid, 0, imu_data.gyro_y);
-       small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output);
-       sprintf(txt,"gyro_y|output:%f, %f\r\n", imu_data.gyro_y, gyro_pid.output);
+       sprintf(txt,
+         "gyro_y|output:%f, %f\r\n",imu_data.gyro_y,gyro_pid.output);
 //       sprintf(txt,"gyro_y|acc_x|pitch:%f,%f,%f\n",imu_data.gyro_y, pitch_acc2angle,pitch);
        wireless_uart_send_string(txt);
-       system_delay_ms(10);
+       system_delay_ms(200);
        
        // 此处编写需要循环执行的代码
     }
@@ -109,10 +83,9 @@ int main(void)
 void pit0_ch0_isr()
 {
     pit_isr_flag_clear(PIT_CH0);
-//
-//    imu_data_get();
-////    imu_data_transition();
-//    pid_calc(&gyro_pid, 0, imu_data.gyro_y);
-//    small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
+    imu_data_get();
+    imu_data_transition();
+    pid_calc(&gyro_pid, 0, imu_data.gyro_y);
+    small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
 }
 // **************************** 代码区域 *****************************

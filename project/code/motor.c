@@ -1,6 +1,6 @@
 #include "zf_common_headfile.h"
 
-PID gyro_pid;
+
 
 void pid_init(PID *pid, float p, float i, float d, float maxI, float maxOut, float K)
 {

@@ -1,5 +1,7 @@
 #include "camera_wireless.h"
+#include "zf_device_mt9v03x.h"
 #include <string.h>
+#define LED1                    (P19_0)
 
 static uint8 image_copy[MT9V03X_H][MT9V03X_W];
 static uint32 camera_frame_count = 0;

@@ -2,7 +2,6 @@
 #define _IMU_H_
 
 #include "zf_common_headfile.h"
-#include <stdint.h>
 
 // IMU原始数据
 typedef struct

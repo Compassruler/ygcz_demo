@@ -2,6 +2,7 @@
 
 PID gyro_pid;
 PID angle_pid;
+PID speed_pid;
 
 void banlance_init(void)
 {

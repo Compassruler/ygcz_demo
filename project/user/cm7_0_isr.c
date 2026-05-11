@@ -1,17 +1,35 @@
 #include "zf_common_headfile.h"
+#include "imu.h"
 
+#define LED1                    (P19_0)                                         // SPI 串口 SPI 两寸屏 这里宏定义填写 IPS200_TYPE_SP
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()
 {
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
+    int16 car_speed;
     system_time ++;
-    imu_update();
-    if(system_time % 5 ==0)
+    imu_data_get();               // 原始数据
+    imu_data_transition();        // 转换后数据
+    
+     // 速度环 
+    if(system_time % 20 == 0)
     {
-      pid_pos_calc(&angle_pid, 0-pitch_filter.mechanical_zero, pitch_filter.filtering_angle);        // 角度环
+      small_driver_get_speed(&small_driver_value);
+      car_speed = (small_driver_value.receive_left_speed_data + small_driver_value.receive_right_speed_data) / 2;
+      pid_pos_calc(&speed_pid, 0 , car_speed);
     }
-    pid_pos_calc(&gyro_pid,angle_pid.output, imu_data.gyro_y);     // 角速度环
+    
+    // 角度环
+    if(system_time % 5 == 0)
+    {
+      pitch_acc2angle =  imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);            // 角速度转角度
+      first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);        // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle角
+      pid_pos_calc(&angle_pid, -speed_pid.output, pitch_filter.filtering_angle);
+    }
+    
+    // 角速度环
+    pid_pos_calc(&gyro_pid,angle_pid.output, imu_data.gyro_y);
     small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
 }
 
@@ -173,8 +191,9 @@ void uart4_isr (void)
 {
     if(uart_isr_mask(UART_4))            // 串口4接收中断
     {
-
-        uart_receiver_handler();                                                                // 串口接收机回调函数
+//      gpio_toggle_level(LED1);
+      small_driver_control_callback(&small_driver_value);
+//        uart_receiver_handler();                                                                // 串口接收机回调函数
        
     }
     else                                // 串口4发送中断
@@ -189,9 +208,9 @@ void uart5_isr (void)
 {
     if(uart_isr_mask(UART_5))            // 串口5接收中断
     {
-        
-        
-       
+     
+      
+      
     }
     else                                // 串口5发送中断
     {

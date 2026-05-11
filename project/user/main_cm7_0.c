@@ -13,16 +13,16 @@ int main(void)
   parameter_init();                                              // 姿态解算参数初始化
   imu660rb_init();
   small_driver_uart_init();                                      // 电机初始化
-  pid_init(&gyro_pid, 1.0f, 0.0f, 0.0f, 0, 10000, 1.0f);     // 角速度pid初始化
-  pid_init(&angle_pid, 10.0f, 0.0f, 0.0f, 0, 10000, 1.0f);    // 角度pid初始化
-  pit_ms_init(PIT_CH0,1);                                       // 角速度中断，周期1ms
+  pid_init(&gyro_pid, 30.0f, 0.0f, 0.0f, 0, 10000, 1.0f);      // 角速度pid初始化//30
+  pid_init(&angle_pid, 17.0f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 角度pid初始化//17
+  pid_init(&speed_pid, 0.01f, 0.0f, 0.0f, 0, 10000, 1.0f);    // 速度pid初始化
+  pit_ms_init(PIT_CH0,1);                                      // 角速度中断，周期1ms
   
    while(true)
     { 
-//       imu_update();
-       sprintf(txt,"gyro_y|output|angle|output:%f, %f,%f,%f\r\n",imu_data.gyro_y,gyro_pid.output ,pitch_filter.filtering_angle,angle_pid.output);
-//       sprintf(txt,"gyro_y|acc_x|pitch:%f,%f,%f\n",imu_data.gyro_y, pitch_acc2angle,pitch);
+//       sprintf(txt,"gyro_y|output|angle|output:%f, %f,%f,%f\r\n",imu_data.gyro_y,gyro_pid.output ,pitch_filter.filtering_angle,angle_pid.output);
+       sprintf(txt,"t_speed|r_speed: %d, %d,%f\r\n",10,(small_driver_value.receive_left_speed_data + small_driver_value.receive_right_speed_data) / 2,-speed_pid.output);
        wireless_uart_send_string(txt);
-       system_delay_ms(200);
+       system_delay_ms(20);
     }
 }

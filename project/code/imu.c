@@ -52,7 +52,7 @@ void imu_data_transition(void)
     imu_data.gyro_z = imu660rb_gyro_transition(imu_raw.gyro_z);
 }
 
-float get_acc2angle(float acc_main, float acc_oth1, float acc_oth2)
+float imu_acc2angle(float acc_main, float acc_oth1, float acc_oth2)
 {
   float angle;
   angle = 0;
@@ -62,8 +62,8 @@ float get_acc2angle(float acc_main, float acc_oth1, float acc_oth2)
 
 void imu_update(void)
 {
-  imu_data_get();               // 原始数据
-  imu_data_transition();        // 转换后数据
-  pitch_acc2angle = get_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);
+//  imu_data_get();               // 原始数据
+//  imu_data_transition();        // 转换后数据
+  pitch_acc2angle = imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);
   first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);        // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle角
 }

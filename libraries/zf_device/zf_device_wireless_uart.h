@@ -51,7 +51,7 @@
 #include "zf_common_typedef.h"
 //================================================定义 无线串口 基本配置===================================================
 #define WIRELESS_UART_INDEX         (UART_1		   )                    // 无线串口对应使用的串口号
-#define WIRELESS_UART_BUAD_RATE     (115200		   )                    // 无线串口对应使用的串口波特率
+#define WIRELESS_UART_BUAD_RATE     (460800		   )                    // 无线串口对应使用的串口波特率
 #define WIRELESS_UART_TX_PIN        (UART1_RX_P04_0        )                    // 无线串口对应模块的 TX 要接到单片机的 RX
 #define WIRELESS_UART_RX_PIN        (UART1_TX_P04_1        )                    // 无线串口对应模块的 RX 要接到单片机的 TX
 #define WIRELESS_UART_RTS_PIN       (P22_6		   )                    // 无线串口对应模块的 RTS 引脚
@@ -67,7 +67,7 @@
 // 0：关闭自动波特率  
 // 1：开启自动波特率 自动波特率的作用是修改 WIRELESS_UART_BAUD 之后不需要对模块进行配置 模块会自动设置为对应的波特率
 
-#define WIRELESS_UART_AUTO_BAUD_RATE    ( 0 )
+#define WIRELESS_UART_AUTO_BAUD_RATE    ( 1 )
 //====================================================自动波特率====================================================
 #if (1 == WIRELESS_UART_AUTO_BAUD_RATE)
 typedef enum

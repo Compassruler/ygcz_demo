@@ -46,6 +46,7 @@
 #include "motor.h"
 #include "filter.h"
 #include "small_driver_uart_control.h"
+#include "screen.h"
 //===================================================Ð¾Æ¬ SDK µ×²ã===================================================
 #include "cy_project.h"
 #include "cy_device_headers.h"

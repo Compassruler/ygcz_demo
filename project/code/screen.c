@@ -16,7 +16,7 @@ typedef struct
 
 static uint8 screen_initialized = 0;
 static uint8 screen_data_table_first_draw = 1;
-static tft180_font_size_enum screen_data_table_font = TFT180_6X8_FONT;
+static ips200_font_size_enum screen_data_table_font = IPS200_8X16_FONT;
 
 // ========================= 内部辅助函数 =========================
 
@@ -24,7 +24,7 @@ static screen_data_layout_t screen_get_data_layout(void)
 {
     screen_data_layout_t layout;
 
-    if(TFT180_8X16_FONT == screen_data_table_font)
+    if(IPS200_8X16_FONT == screen_data_table_font)
     {
         layout.max_count   = SCREEN_DATA_MAX_COUNT_8x16;
         layout.name_width  = SCREEN_NAME_WIDTH_8x16;
@@ -156,10 +156,10 @@ void screen_init(void)
         return;
     }
 
-    tft180_set_dir(TFT180_CROSSWISE);
-    tft180_set_font(TFT180_6X8_FONT);
-    tft180_set_color(RGB565_BLUE, RGB565_BLACK);
-    tft180_init();
+    ips200_set_dir(IPS200_CROSSWISE);
+    ips200_set_font(IPS200_8X16_FONT);
+    ips200_set_color(RGB565_WHITE, RGB565_BLACK);
+    ips200_init(SCREEN_IPS200_TYPE);
 
     screen_initialized = 1;
 }
@@ -167,13 +167,13 @@ void screen_init(void)
 void screen_clear(void)
 {
     screen_init();
-    tft180_clear();
+    ips200_clear();
 }
 
 void screen_set_color(uint16 pen_color, uint16 bg_color)
 {
     screen_init();
-    tft180_set_color(pen_color, bg_color);
+    ips200_set_color(pen_color, bg_color);
 }
 
 void screen_show_string(uint16 x, uint16 y, const char *text)
@@ -185,18 +185,18 @@ void screen_show_string(uint16 x, uint16 y, const char *text)
         return;
     }
 
-    tft180_show_string(x, y, text);
+    ips200_show_string(x, y, text);
 }
 
 void show_string_demo(void)
 {
     screen_init();
-    tft180_set_font(TFT180_6X8_FONT);
-    tft180_clear();
+    ips200_set_font(IPS200_6X8_FONT);
+    ips200_clear();
 
-    tft180_show_string(0, 0,  "hello world!");
-    tft180_show_string(0, 12, "abcdefghijklmnopqrstuvwxyz");
-    tft180_show_string(0, 24, "0123456789");
+    ips200_show_string(0, 0,  "hello world!");
+    ips200_show_string(0, 12, "abcdefghijklmnopqrstuvwxyz");
+    ips200_show_string(0, 24, "0123456789");
 }
 
 // ========================= 通用数据表显示函数 =========================
@@ -206,20 +206,20 @@ void screen_data_table_reset(void)
     screen_data_table_first_draw = 1;
 }
 
-void screen_data_table_set_font(tft180_font_size_enum font)
+void screen_data_table_set_font(ips200_font_size_enum font)
 {
     screen_init();
 
-    if(TFT180_8X16_FONT == font)
+    if(IPS200_8X16_FONT == font)
     {
-        screen_data_table_font = TFT180_8X16_FONT;
+        screen_data_table_font = IPS200_8X16_FONT;
     }
     else
     {
-        screen_data_table_font = TFT180_6X8_FONT;
+        screen_data_table_font = IPS200_6X8_FONT;
     }
 
-    tft180_set_font(screen_data_table_font);
+    ips200_set_font(screen_data_table_font);
     screen_data_table_reset();
 }
 
@@ -239,7 +239,7 @@ void screen_show_data_table(const screen_data_item_t *items, uint8 count)
     }
 
     screen_init();
-    tft180_set_font(screen_data_table_font);
+    ips200_set_font(screen_data_table_font);
 
     layout = screen_get_data_layout();
     draw_count = count;
@@ -248,17 +248,17 @@ void screen_show_data_table(const screen_data_item_t *items, uint8 count)
         draw_count = layout.max_count;
     }
 
-    value_x = (uint16)(layout.name_width * layout.font_width);
+    value_x = (uint16)((layout.name_width + SCREEN_NAME_VALUE_SPACE_WIDTH) * layout.font_width);
 
     if(screen_data_table_first_draw)
     {
-        tft180_clear();
+        ips200_clear();
 
         for(index = 0; index < draw_count; index++)
         {
             y = (uint16)(index * layout.row_height);
             screen_format_text_field(name_buf, items[index].name, layout.name_width);
-            tft180_show_string(0, y, name_buf);
+            ips200_show_string(0, y, name_buf);
         }
 
         screen_data_table_first_draw = 0;
@@ -268,6 +268,6 @@ void screen_show_data_table(const screen_data_item_t *items, uint8 count)
     {
         y = (uint16)(index * layout.row_height);
         screen_format_value(value_buf, &items[index], layout.value_width);
-        tft180_show_string(value_x, y, value_buf);
+        ips200_show_string(value_x, y, value_buf);
     }
 }

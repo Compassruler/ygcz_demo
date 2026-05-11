@@ -16,7 +16,8 @@ int main(void)
   pid_init(&gyro_pid, 1.0f, 0.0f, 0.0f, 0, 10000, 1.0f);     // 角速度pid初始化
   pid_init(&angle_pid, 10.0f, 0.0f, 0.0f, 0, 10000, 1.0f);    // 角度pid初始化
   pit_ms_init(PIT_CH0,1);                                       // 角速度中断，周期1ms
-  
+  camera_wireless_init();                               // 无线图传初始化
+
    while(true)
     { 
 //       imu_update();
@@ -24,5 +25,9 @@ int main(void)
 //       sprintf(txt,"gyro_y|acc_x|pitch:%f,%f,%f\n",imu_data.gyro_y, pitch_acc2angle,pitch);
        wireless_uart_send_string(txt);
        system_delay_ms(200);
+       camera_wireless_send_frame();
+
+        // 以后屏幕显示、自定义状态显示，放这里
+        // display_task();
     }
 }

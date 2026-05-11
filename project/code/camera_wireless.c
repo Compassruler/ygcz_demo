@@ -1,0 +1,65 @@
+#include "camera_wireless.h"
+#include <string.h>
+
+static uint8 image_copy[MT9V03X_H][MT9V03X_W];
+static uint32 camera_frame_count = 0;
+
+void camera_wireless_init(void)
+{
+    gpio_init(LED1, GPO, GPIO_HIGH, GPO_PUSH_PULL);
+
+    if(wireless_uart_init())
+    {
+        while(1)
+        {
+            gpio_toggle_level(LED1);
+            system_delay_ms(100);
+        }
+    }
+
+    seekfree_assistant_interface_init(SEEKFREE_ASSISTANT_WIRELESS_UART);
+
+    while(mt9v03x_init())
+    {
+        gpio_toggle_level(LED1);
+        system_delay_ms(500);
+    }
+
+    seekfree_assistant_camera_information_config(
+        SEEKFREE_ASSISTANT_MT9V03X,
+        image_copy[0],
+        MT9V03X_W,
+        MT9V03X_H
+    );
+}
+
+uint8 camera_wireless_has_frame(void)
+{
+    return mt9v03x_finish_flag;
+}
+
+void camera_wireless_send_frame(void)
+{
+    if(mt9v03x_finish_flag)
+    {
+        mt9v03x_finish_flag = 0;
+
+        memcpy(image_copy[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
+
+        seekfree_assistant_camera_send();
+
+        camera_frame_count++;
+    }
+}
+
+uint32 camera_wireless_get_frame_count(void)
+{
+    return camera_frame_count;
+}
+
+
+
+
+
+
+

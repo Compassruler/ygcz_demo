@@ -6,9 +6,9 @@ imu_data_t imu_data;
 float pitch = 0;
 float pitch_acc2angle = 0;
 
-// imu_raw.gyro_x 横滚角 左负右正
-// imu_raw.gyro_y 俯仰角 俯负仰正
-// imu_raw.gyro_z 偏航角 左负右正
+// imu_raw.gyro_x 横滚角 左正右负
+// imu_raw.gyro_y 俯仰角 前正后负
+// imu_raw.gyro_z 偏航角 左正右负
 
 void imu_data_get(void)
 {

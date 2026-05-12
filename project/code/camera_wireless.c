@@ -1,4 +1,5 @@
 #include "camera_wireless.h"
+#include "camera_image_processing.h"
 #include "zf_device_mt9v03x.h"
 #include <string.h>
 #define LED1                    (P19_0)
@@ -47,6 +48,7 @@ void camera_wireless_send_frame(void)
         mt9v03x_finish_flag = 0;
         memcpy(image_copy[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
         vision_binary_fixed(image_copy, 100);                            // 二值化处理,可以根据实际情况调整阈值(80/100/120/140/160)
+        camera_image_filter_isolated_black(image_copy);                  // 去除二值图中的孤立黑色噪点
         seekfree_assistant_camera_send();
         camera_frame_count++;
     }
@@ -56,10 +58,4 @@ uint32 camera_wireless_get_frame_count(void)
 {
     return camera_frame_count;
 }
-
-
-
-
-
-
 

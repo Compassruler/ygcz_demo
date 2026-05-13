@@ -169,32 +169,20 @@ uint8 camera_image_check_jump(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_ro
 {
     uint16 x = 0;
     int16 y = 0;
-    uint8 check_count = 0;
     uint16 current_black_count = 0;
-    uint16 previous_black_count = 0;
-    const uint16 jump_check_row = check_row;
-    const uint16 jump_black_threshold = black_count;
-    const uint8 jump_check_rows = check_row_count;
+    uint16 checked_rows = 0;
 
-    if(MT9V03X_H <= jump_check_row)
+    if(MT9V03X_H <= check_row)
     {
         return 0;
     }
 
-    for(x = 0; x < MT9V03X_W; x++)
-    {
-        if(image[jump_check_row][x] == 0)
-        {
-            previous_black_count++;
-        }
-    }
-
-    if(previous_black_count <= jump_black_threshold)
+    if(0 == check_row_count)
     {
         return 0;
     }
 
-    for(y = (int16)jump_check_row - 1; (0 <= y) && (check_count < jump_check_rows); y--)
+    for(y = (int16)check_row; (0 <= y) && (checked_rows < check_row_count); y--)
     {
         current_black_count = 0;
 
@@ -206,14 +194,13 @@ uint8 camera_image_check_jump(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_ro
             }
         }
 
-        if(current_black_count < previous_black_count)
+        if(current_black_count < black_count)
         {
             return 0;
         }
 
-        previous_black_count = current_black_count;
-        check_count++;
+        checked_rows++;
     }
 
-    return (check_count == jump_check_rows);
+    return (checked_rows == check_row_count);
 }

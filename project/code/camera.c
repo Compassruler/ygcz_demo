@@ -1,5 +1,6 @@
-#include "camera_wireless.h"
+#include "camera.h"
 #include "camera_image_processing.h"
+#include "screen.h"
 #include "zf_device_mt9v03x.h"
 #include <string.h>
 #define LED1                    (P19_0)
@@ -49,6 +50,7 @@ void camera_wireless_send_frame(void)
         memcpy(image_copy[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
         vision_binary_fixed(image_copy, 100);                            // 二值化处理,可以根据实际情况调整阈值(80/100/120/140/160)
         camera_image_filter_isolated_black(image_copy);                  // 去除二值图中的孤立黑色噪点
+        camera_image_filter_isolated_white(image_copy);
         seekfree_assistant_camera_send();
         camera_frame_count++;
     }
@@ -57,5 +59,34 @@ void camera_wireless_send_frame(void)
 uint32 camera_wireless_get_frame_count(void)
 {
     return camera_frame_count;
+}
+
+void camera_wireless_screen_init(void)
+{
+    gpio_init(LED1, GPO, GPIO_HIGH, GPO_PUSH_PULL);
+    screen_init();
+
+    while(mt9v03x_init())
+    {
+        gpio_toggle_level(LED1);
+        system_delay_ms(500);
+    }
+}
+
+uint8 camera_wireless_show_processed_frame_on_screen(uint16 x, uint16 y, uint16 display_width, uint16 display_height, uint8 threshold)
+{
+    if(!mt9v03x_finish_flag)
+    {
+        return 0;
+    }
+
+    mt9v03x_finish_flag = 0;
+    memcpy(image_copy[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
+    vision_binary_fixed(image_copy, threshold);
+    camera_image_filter_isolated_black(image_copy);
+    camera_image_filter_isolated_white(image_copy);
+    screen_show_camera_image(x, y, image_copy[0], display_width, display_height);
+
+    return 1;
 }
 

@@ -1,9 +1,10 @@
-#include "screen.h"
+ï»¿#include "screen.h"
+#include "zf_device_mt9v03x.h"
 
 #include <stdio.h>
 #include <string.h>
 
-// ========================= ÄÚ²¿ÀàÐÍÓë×´Ì¬ =========================
+// ========================= å†…éƒ¨ç±»åž‹ä¸ŽçŠ¶æ€ =========================
 
 typedef struct
 {
@@ -18,7 +19,7 @@ static uint8 screen_initialized = 0;
 static uint8 screen_data_table_first_draw = 1;
 static ips200_font_size_enum screen_data_table_font = IPS200_8X16_FONT;
 
-// ========================= ÄÚ²¿¸¨Öúº¯Êý =========================
+// ========================= å†…éƒ¨è¾…åŠ©å‡½æ•° =========================
 
 static screen_data_layout_t screen_get_data_layout(void)
 {
@@ -147,7 +148,7 @@ static void screen_format_value(char *out, const screen_data_item_t *item, uint8
     screen_format_text_field(out, temp, width);
 }
 
-// ========================= ÆÁÄ»»ù´¡·â×°º¯Êý =========================
+// ========================= å±å¹•åŸºç¡€å°è£…å‡½æ•° =========================
 
 void screen_init(void)
 {
@@ -188,6 +189,41 @@ void screen_show_string(uint16 x, uint16 y, const char *text)
     ips200_show_string(x, y, text);
 }
 
+void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 display_width, uint16 display_height)
+{
+    screen_init();
+
+    if((0 == image) || (0 == display_width) || (0 == display_height))
+    {
+        return;
+    }
+
+    if((x >= ips200_width_max) || (y >= ips200_height_max))
+    {
+        return;
+    }
+
+    if(display_width > (ips200_width_max - x))
+    {
+        display_width = ips200_width_max - x;
+    }
+
+    if(display_height > (ips200_height_max - y))
+    {
+        display_height = ips200_height_max - y;
+    }
+
+    ips200_show_gray_image(x, y, image, MT9V03X_W, MT9V03X_H, display_width, display_height, 0);
+}
+
+void screen_show_image_threshold_bar(uint16 y, uint16 length, uint8 width)
+{
+    for (uint8 i = 0; i < width; i++)
+    {
+        ips200_draw_line(0, y + i, length, y + i, RGB565_GREEN);
+    }
+}
+
 void show_string_demo(void)
 {
     screen_init();
@@ -199,7 +235,7 @@ void show_string_demo(void)
     ips200_show_string(0, 24, "0123456789");
 }
 
-// ========================= Í¨ÓÃÊý¾Ý±íÏÔÊ¾º¯Êý =========================
+// ========================= é€šç”¨æ•°æ®è¡¨æ˜¾ç¤ºå‡½æ•° =========================
 
 void screen_data_table_reset(void)
 {

@@ -18,20 +18,21 @@ void pit0_ch0_isr()
       small_driver_get_speed(&small_driver_value);
       car_speed = (small_driver_value.receive_left_speed_data + small_driver_value.receive_right_speed_data) / 2;
       pid_pos_calc(&speed_pid, 0 , (float)car_speed);
-      leg_control(50,50,50,50);
+    }
+    leg_control();
+    
+    // 角度环
+    if(system_time % 5 == 0)
+    {
+      pitch_acc2angle =  imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);            // 角速度转角度
+      first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);        // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle角
+      pid_pos_calc(&angle_pid, 0, pitch_filter.filtering_angle);
     }
     
-//    // 角度环
-//    if(system_time % 5 == 0)
-//    {
-//      pitch_acc2angle =  imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);            // 角速度转角度
-//      first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);        // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle角
-//      pid_pos_calc(&angle_pid, -speed_pid.output, pitch_filter.filtering_angle);
-//    }
-//    
-//    // 角速度环
-//    pid_pos_calc(&gyro_pid,angle_pid.output, imu_data.gyro_y);
-//    small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
+    // 角速度环
+    pid_pos_calc(&gyro_pid,angle_pid.output, imu_data.gyro_y);
+    small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
+    
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      

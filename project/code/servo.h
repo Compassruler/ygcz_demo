@@ -16,8 +16,11 @@
 #define SERVO_DUTY(x) ((float)PWM_DUTY_MAX/(1000.0/(float)SERVO_FREQ)*(0.5+(float)(x)/90.0))
 
 // 偏移量
-#define X_OFFSET    18.5f       // X轴偏移量
+#define X_OFFSET    0.0f       // X轴偏移量18.5f 
 #define Y_OFFSET    25.0f       // Y轴偏移量
+
+// 步进值
+#define SERVO_STEP   0.5f
 
 // 五连杆参数 （mm）
 extern float L1, L2, L3, L4, L5;
@@ -26,9 +29,23 @@ extern float L1, L2, L3, L4, L5;
 extern float X_L, Y_L;
 extern float X_R, Y_R;
 
+// 初始角度（第一次为90°，后续角度变量做为步进输出）
+extern float servoLeftFront_now;
+extern float servoLeftRear_now;
+extern float servoRightFront_now;
+extern float servoRightRear_now;
+
+// 动态偏移量（速度环输出）
+extern float speed_to_x_offset;
+extern float balance_to_y_offset;
+
+extern float X_left;
+extern float X_right;
+extern float Y_left;
+extern float Y_right;
+
 // 目标坐标
 extern float XLeft, YLeft;
-
 extern float XRight, YRight;
 
 // 逆运动学中间变量
@@ -36,17 +53,29 @@ extern float aLeft, bLeft, cLeft, dLeft, eLeft, fLeft;
 extern float aRight, bRight, cRight, dRight, eRight, fRight;
 
 // 关节角
-extern float alpha1, alpha2, beta1, beta2;
 extern float alphaLeft, betaLeft, alphaRight, betaRight;
+extern float alpha1, alpha2, beta1, beta2;
 
 // 舵机角度
 extern float servoLeftFront, servoLeftRear;
 extern float servoRightFront, servoRightRear;
 
-// 函数简介：舵机初始化
+// 滤波参数
+extern float leg_x_left_filter;
+extern float leg_y_left_filter;
+extern float leg_x_right_filter;
+extern float leg_y_right_filter;
+
+// 函数简介： 舵机初始化
 void servo_init(void);
 
-// 函数简介：设置舵机角度
+// 函数简介： 舵机步进
+// 参数说明：now    舵机当前角度
+// 参数说明：target 舵机目标角度
+// 参数说明：step   步进值
+float servo_step(float now, float target, float step);
+
+// 函数简介： 设置舵机角度
 // 参数说明：angle1  servoLeftFront
 // 参数说明：angle2  servoLeftRear
 // 参数说明：angle3  servoRightFront
@@ -82,6 +111,6 @@ void calculate_servo_angle(float alpha, float beta, float *front, float *rear);
 // 参数说明:  X_right     右侧X轴目标位置
 // 参数说明:  Y_left      左侧Y轴目标位置
 // 参数说明:  Y_right     右侧Y轴目标位置
-void leg_control(float X_left, float X_right, float Y_left, float Y_right);
+void leg_control(void);
 
 #endif

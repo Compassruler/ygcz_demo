@@ -47,8 +47,6 @@
 #include "filter.h"
 #include "small_driver_uart_control.h"
 #include "screen.h"
-#include "camera_wireless.h"
-#include "camera_image_processing.h"
 //===================================================Ð¾Æ¬ SDK µ×²ã===================================================
 #include "cy_project.h"
 #include "cy_device_headers.h"

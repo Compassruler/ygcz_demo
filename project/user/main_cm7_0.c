@@ -17,11 +17,11 @@ int main(void)
   small_driver_uart_init();                             // 电机驱动初始化
 
   pit_ms_init(PIT_CH0,1);                               // PIT中断初始化 周期1ms
-  
+
   while(true)
   { 
 //    sprintf(txt, "t_speed|r_speed: %d, %d,%f\r\n", 10, (small_driver_value.receive_left_speed_data + small_driver_value.receive_right_speed_data) / 2, -speed_pid.output); // 速度环输出
-    sprintf(txt,"1111:%f,%f,%f,%f\r\n",servoLeftFront, servoLeftRear, servoRightFront, servoRightRear);
+    sprintf(txt,"1111:%f,%f,%f,%f,%f,%f\r\n",servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now,XLeft, XRight);
     wireless_uart_send_string(txt);
     system_delay_ms(20);
   }

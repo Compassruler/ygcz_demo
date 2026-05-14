@@ -10,6 +10,21 @@ float L5 = 37.0f;
 float X_L = 0.0f, Y_L = 0.0f;    // 左侧当前位置
 float X_R = 0.0f, Y_R = 0.0f;    // 右侧当前位置
 
+// 初始舵机角度
+float servoLeftFront_now  = 90.0f;
+float servoLeftRear_now   = 90.0f;
+float servoRightFront_now = 90.0f;
+float servoRightRear_now  = 90.0f;
+
+float speed_to_x_offset;
+float balance_to_y_offset;
+
+// 初始末端位姿
+float X_left = 0.0f;
+float Y_left = 20.0f;
+float X_right = 0.0f;
+float Y_right = 10.0f;
+
 // 目标位置
 float XLeft = 0.0f, YLeft = 0.0f;
 float XRight = 0.0f, YRight = 0.0f;
@@ -24,7 +39,7 @@ float alphaLeft, betaLeft, alphaRight, betaRight;
 float alphaLeftToAngle, betaLeftToAngle;
 float alphaRightToAngle, betaRightToAngle;
 float servoLeftFront, servoLeftRear;    // 左前 左后
-float servoRightFront, servoRightRear;  // 右前 右后        对应后删除这个
+float servoRightFront, servoRightRear;  // 右前 右后 
 
 void servo_init()
 {
@@ -34,8 +49,25 @@ void servo_init()
   pwm_init(SERVO3_PWM, SERVO_FREQ, 0);
   pwm_init(SERVO4_PWM, SERVO_FREQ, 0); 
   
-  // 舵机为0°
-//  Set_angle(113, 113, 113, 113);
+  Set_angle(servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now);
+}
+
+float servo_step(float now, float target, float step)
+{
+    if(target > now + step)
+    {
+        now += step;
+    }
+    else if(target < now - step)
+    {
+        now -= step;
+    }
+    else
+    {
+        now = target;
+    }
+
+    return now;
 }
 
 void Set_angle(float angle1, float angle2, float angle3, float angle4)
@@ -121,8 +153,12 @@ void solve_inverse_kinematics(float x, float y, float *a, float *b, float *c, fl
       return;
     }
     
-    beta1 = 2.0f * atan(((*e) + sqrt(discriminant_beta)) / ((*d) + (*f)));
-    beta2 = 2.0f * atan(((*e) - sqrt(discriminant_beta)) / ((*d) + (*f)));
+    float denominator2 = (*d) + (*f);
+
+    if(fabs(denominator2) < 0.0001f) denominator2 = 0.0001f;
+    
+    beta1 = 2.0f * atan(((*e) + sqrt(discriminant_beta)) / denominator2);
+    beta2 = 2.0f * atan(((*e) - sqrt(discriminant_beta)) / denominator2);
     
     *beta = (beta1 >= 0 && beta1 <= PI / 4.0f) ? beta1 : beta2;         // 选择合适的解（角度在[0, π/4]范围内）
 }
@@ -141,8 +177,15 @@ void calculate_servo_angle(float alpha, float beta, float *front, float *rear)
     *rear = 180.0f - (90.0f - beta_deg);
 }
 
-void leg_control(float X_left, float X_right, float Y_left, float Y_right)
+// 注意：足端得和初始位置对应        Y轴偏差暂时没有
+void leg_control(void)
 {
+  static float speed_offset_filter = 0;
+  float target_offset = speed_pid.output * 0.1f;       // 0.05f 是换算系数，根据调试效果增大或减小
+  speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;        // 滤波
+  speed_to_x_offset = func_limit_ab(speed_offset_filter, -35.0f, 35.0f);        // 限幅：限制脚部前后移动的最大物理范围 (例如 +/- 35mm)
+  balance_to_y_offset = 0.0f;         // 暂时锁定 Y 轴偏差为 0 (等以后加了横滚角再启用)
+  
   // 输入限幅 
   if(Y_left<10)Y_left=10;
   if(Y_right<10)Y_right=10;
@@ -151,31 +194,17 @@ void leg_control(float X_left, float X_right, float Y_left, float Y_right)
   if(Y_right>130)Y_right=130;
      
   // 目标位置
-  float target_X_left = X_left + X_OFFSET;
-  float target_Y_left = Y_left + Y_OFFSET;
-  float target_X_right = X_right + X_OFFSET;
-  float target_Y_right = Y_right + Y_OFFSET;
+  float target_X_left = X_left + X_OFFSET + speed_to_x_offset;
+  float target_Y_left = Y_left + Y_OFFSET + balance_to_y_offset;
+  float target_X_right = X_right + X_OFFSET + speed_to_x_offset;
+  float target_Y_right = Y_right + Y_OFFSET + balance_to_y_offset;
   
- // 左腿PID
-  pid_pos_calc(&leg_x_left_pid, target_X_left, X_L);
-  pid_pos_calc(&leg_y_left_pid, target_Y_left, Y_L);
-
-  // 右腿PID
-  pid_pos_calc(&leg_x_right_pid, target_X_right, X_R);
-  pid_pos_calc(&leg_y_right_pid, target_Y_right, Y_R);
-
   // 更新目标位置
-  XLeft = X_L + leg_x_left_pid.output;
-  YLeft = Y_L + leg_y_left_pid.output;
-  XRight = X_R + leg_x_right_pid.output;
-  YRight = Y_R + leg_y_right_pid.output;
+  XLeft  = target_X_left;
+  YLeft  = target_Y_left;
+  XRight = target_X_right;
+  YRight = target_Y_right;
   
-  // 更新当前位置
-  X_L = XLeft;
-  Y_L = YLeft;
-  X_R = XRight;
-  Y_R = YRight;
-    
   // 左侧逆运动学求解
   solve_inverse_kinematics(XLeft, YLeft, &aLeft, &bLeft, &cLeft, &dLeft, &eLeft, &fLeft, &alphaLeft, &betaLeft);
     
@@ -185,8 +214,13 @@ void leg_control(float X_left, float X_right, float Y_left, float Y_right)
   // 计算舵机角度
   calculate_servo_angle(alphaLeft, betaLeft, &servoLeftFront, &servoLeftRear);
   calculate_servo_angle(alphaRight, betaRight, &servoRightFront, &servoRightRear);
-    
-  // 设置舵机角度
-  Set_angle(servoLeftFront, servoLeftRear, servoRightFront, servoRightRear);
+  
+  // 舵机步进
+  servoLeftFront_now  = servo_step(servoLeftFront_now, servoLeftFront,  SERVO_STEP);
+  servoLeftRear_now   = servo_step(servoLeftRear_now, servoLeftRear,   SERVO_STEP);
+  servoRightFront_now = servo_step(servoRightFront_now, servoRightFront, SERVO_STEP);
+  servoRightRear_now  = servo_step(servoRightRear_now, servoRightRear,  SERVO_STEP);
 
+  // 输出舵机
+  Set_angle(servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now);
 }

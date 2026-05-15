@@ -4,19 +4,15 @@ PID gyro_pid;
 PID pitch_angle_pid;
 PID roll_angle_pid;
 PID speed_pid;
-
-// 这个是在servo.c里的pd控制，后续整合到一起
-PID leg_x_left_pid;
-PID leg_y_left_pid;
-PID leg_x_right_pid;
-PID leg_y_right_pid;
+PID yaw_angle_pid;
 
 void banlance_init(void)
 {
-  pid_init(&gyro_pid, 2.5f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 角速度环PID初始化
-  pid_init(&pitch_angle_pid, 61.0f, 0.4f, 5.0f, 0, 10000, 1.0f); // 角度环PID初始化
-  pid_init(&roll_angle_pid, 0.8f, 0.0f, 0.0f, 0, 10000, 1.0f); // 角度环PID初始化
-  pid_init(&speed_pid, 1.0f, 0.0f, 0.3f, 0, 10000, 1.0f); // 速度环PID初始化1.0 0.0 0.3
+  pid_init(&gyro_pid, 2.5f, 0.0f, 0.0f, 0, 10000, 1.0f);         // 角速度环PID初始化
+  pid_init(&pitch_angle_pid, 61.0f, 0.4f, 5.0f, 0, 10000, 1.0f); // 俯仰角度环PID初始化
+  pid_init(&roll_angle_pid, 0.3f, 0.0f, 0.0f, 0, 10000, 1.0f);  // 横滚角度环PID初始化
+  pid_init(&yaw_angle_pid, 0.1f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 航向角度环PID初始化
+  pid_init(&speed_pid, 0.5f, 0.0f, 0.1f, 0, 10000, 1.0f);       // 速度环PID初始化1.0 0.0 0.3
   
 }
 

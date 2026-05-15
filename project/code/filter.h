@@ -19,9 +19,10 @@ typedef struct
 
 extern cascade_common_value_struct pitch_filter;
 extern cascade_common_value_struct roll_filter;
+extern cascade_common_value_struct yaw_filter; 
 
 // 函数简介：参数初始化
-void parameter_init();
+void filter_init();
 
 // 函数简介：一阶互补滤波
 // 参数说明：filter_value   滤波参数结构体

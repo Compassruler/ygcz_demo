@@ -66,7 +66,6 @@ float servo_step(float now, float target, float step)
     {
         now = target;
     }
-
     return now;
 }
 
@@ -76,8 +75,7 @@ void Set_angle(float angle1, float angle2, float angle3, float angle4)
     angle2 = 180.0f - angle2;
     angle3 = 180.0f - angle3;
 
-    // ================= 舵机限幅 =================
-
+    //舵机限幅
     if(angle1 > 175) angle1 = 175;
     if(angle1 < 5)   angle1 = 5;
 
@@ -89,20 +87,12 @@ void Set_angle(float angle1, float angle2, float angle3, float angle4)
 
     if(angle4 > 175) angle4 = 175;
     if(angle4 < 5)   angle4 = 5;
-
-    // ================= PWM输出 =================
-
-    pwm_set_duty(SERVO1_PWM,
-                 (uint16)SERVO_DUTY(angle1));
-
-    pwm_set_duty(SERVO3_PWM,
-                 (uint16)SERVO_DUTY(angle2));
-
-    pwm_set_duty(SERVO4_PWM,
-                 (uint16)SERVO_DUTY(angle3));
-
-    pwm_set_duty(SERVO2_PWM,
-                 (uint16)SERVO_DUTY(angle4));
+    
+    // PWM输出
+    pwm_set_duty(SERVO1_PWM, (uint16)SERVO_DUTY(angle1));
+    pwm_set_duty(SERVO3_PWM, (uint16)SERVO_DUTY(angle2));
+    pwm_set_duty(SERVO4_PWM, (uint16)SERVO_DUTY(angle3));
+    pwm_set_duty(SERVO2_PWM, (uint16)SERVO_DUTY(angle4));
 }
 
 void leg_disable(void)
@@ -177,19 +167,20 @@ void calculate_servo_angle(float alpha, float beta, float *front, float *rear)
     *rear = 180.0f - (90.0f - beta_deg);
 }
 
-// 注意：足端得和初始位置对应        Y轴偏差暂时没有
+// 注意：足端得和初始位置对应
 void leg_control(void)
 {
   static float speed_offset_filter = 0;
   static float roll_offset_filter  = 0;
 
   // X方向（俯仰）
-  float target_offset = speed_pid.output * 0.08f;
+  float target_offset = speed_pid.output * 0.1f;
   speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;
   speed_to_x_offset = func_limit_ab(speed_offset_filter, -45.0f, 45.0f);
 
   // Y方向（横滚）
   float roll_target_offset = roll_angle_pid.output * 0.8f;
+  if(fabs(roll_filter.filtering_angle) < 1.0f) roll_target_offset = 0;
   roll_offset_filter =(roll_offset_filter * 19.0f + roll_target_offset) / 20.0f;
   balance_to_y_offset = func_limit_ab(roll_offset_filter, -60.0f, 60.0f);
   
@@ -201,9 +192,10 @@ void leg_control(void)
   if(Y_right>130)Y_right=130;
      
   // 目标位置
-  float target_X_left = X_left + X_OFFSET - speed_to_x_offset;
-  float target_Y_left = Y_left + Y_OFFSET - balance_to_y_offset;
+  float target_X_left = X_left + X_OFFSET - speed_to_x_offset;            // 俯仰
   float target_X_right = X_right + X_OFFSET - speed_to_x_offset;
+  
+  float target_Y_left = Y_left + Y_OFFSET - balance_to_y_offset;          // 横滚 一边伸长一边缩短
   float target_Y_right = Y_right + Y_OFFSET + balance_to_y_offset;
   
   // 更新目标位置

@@ -11,12 +11,13 @@ void pit0_ch0_isr()
     system_time ++;
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
-    
+
      // 速度环 
     if(system_time % 20 == 0)
     {
       small_driver_get_speed(&small_driver_value);
-      car_speed = (small_driver_value.receive_left_speed_data + small_driver_value.receive_right_speed_data) / 2;
+      // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
+      car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
       pid_pos_calc(&speed_pid, 0 , (float)car_speed);
     }
     leg_control();

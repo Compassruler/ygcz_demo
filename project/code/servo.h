@@ -16,11 +16,11 @@
 #define SERVO_DUTY(x) ((float)PWM_DUTY_MAX/(1000.0/(float)SERVO_FREQ)*(0.5+(float)(x)/90.0))
 
 // 偏移量
-#define X_OFFSET    0.0f       // X轴偏移量18.5f 
+#define X_OFFSET    18.5f       // X轴偏移量18.5f 
 #define Y_OFFSET    25.0f       // Y轴偏移量
 
 // 步进值
-#define SERVO_STEP   0.5f
+#define SERVO_STEP   2.0f
 
 // 五连杆参数 （mm）
 extern float L1, L2, L3, L4, L5;

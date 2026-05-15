@@ -21,7 +21,7 @@ float balance_to_y_offset;
 
 // 初始末端位姿
 float X_left = 0.0f;
-float Y_left = 20.0f;
+float Y_left = 10.0f;
 float X_right = 0.0f;
 float Y_right = 10.0f;
 
@@ -181,9 +181,9 @@ void calculate_servo_angle(float alpha, float beta, float *front, float *rear)
 void leg_control(void)
 {
   static float speed_offset_filter = 0;
-  float target_offset = speed_pid.output * 0.1f;       // 0.05f 是换算系数，根据调试效果增大或减小
+  float target_offset = speed_pid.output * 0.05f;       // 0.05f 是换算系数，根据调试效果增大或减小
   speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;        // 滤波
-  speed_to_x_offset = func_limit_ab(speed_offset_filter, -35.0f, 35.0f);        // 限幅：限制脚部前后移动的最大物理范围 (例如 +/- 35mm)
+  speed_to_x_offset = func_limit_ab(speed_offset_filter, -20.0f, 20.0f);        // 限幅：限制脚部前后移动的最大物理范围 (例如 +/- 35mm)
   balance_to_y_offset = 0.0f;         // 暂时锁定 Y 轴偏差为 0 (等以后加了横滚角再启用)
   
   // 输入限幅 
@@ -194,9 +194,9 @@ void leg_control(void)
   if(Y_right>130)Y_right=130;
      
   // 目标位置
-  float target_X_left = X_left + X_OFFSET + speed_to_x_offset;
+  float target_X_left = X_left + X_OFFSET - speed_to_x_offset;
   float target_Y_left = Y_left + Y_OFFSET + balance_to_y_offset;
-  float target_X_right = X_right + X_OFFSET + speed_to_x_offset;
+  float target_X_right = X_right + X_OFFSET - speed_to_x_offset;
   float target_Y_right = Y_right + Y_OFFSET + balance_to_y_offset;
   
   // 更新目标位置

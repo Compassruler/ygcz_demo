@@ -12,14 +12,10 @@ PID leg_y_right_pid;
 
 void banlance_init(void)
 {
-  pid_init(&gyro_pid, 3.0f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 角速度环PID初始化
+  pid_init(&gyro_pid, 2.5f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 角速度环PID初始化
   pid_init(&angle_pid, 61.0f, 0.4f, 5.0f, 0, 10000, 1.0f); // 角度环PID初始化
-  pid_init(&speed_pid, 3.0f, 0.0f, 0.0f, 0, 10000, 1.0f); // 速度环PID初始化
+  pid_init(&speed_pid, 1.0f, 0.0f, 0.3f, 0, 10000, 1.0f); // 速度环PID初始化
   
-  pid_init(&leg_x_left_pid, 0.8f, 0.0f, 0.0f, 0, 10000, 1.0f); 
-  pid_init(&leg_x_right_pid, 1.0f, 0.0f, 0.0f, 0, 10000, 1.0f); 
-  pid_init(&leg_y_left_pid, 1.0f, 0.0f, 0.0f, 0, 10000, 1.0f); 
-  pid_init(&leg_y_right_pid, 1.0f, 0.0f, 0.0f, 0, 10000, 1.0f); 
 }
 
 void pid_init(PID *pid, float p, float i, float d, float maxI, float maxOut, float K)

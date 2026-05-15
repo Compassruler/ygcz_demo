@@ -32,7 +32,7 @@ typedef struct
 extern imu_raw_data_t imu_raw;
 extern imu_data_t imu_data;    
 extern float pitch_acc2angle;   // 俯仰加速度转角度数据
-extern float pitch;             // 滤波后的俯仰角
+extern float roll_acc2angle;    // 横滚加速度转角度数据
 
 // 函数简介：获取imu数据（初步偏移处理后的数据）
 void imu_data_get(void);

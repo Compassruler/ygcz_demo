@@ -12,6 +12,14 @@ void parameter_init(void)
   pitch_filter.call_cycle  = 0.005f; // 5ms
   pitch_filter.mechanical_zero = -5.0f;         // 机械零点（重要！）-4.0
   pitch_filter.filtering_angle = 0.0f;
+  
+  roll_filter.gyro_ration = 4.0f;
+  roll_filter.acc_ration  = 4.0f;
+  roll_filter.angle_temp  = 0.0f;
+  roll_filter.call_cycle  = 0.005f; // 5ms
+  roll_filter.mechanical_zero = 0.0f;
+  roll_filter.filtering_angle = 0.0f;
+  
 }
 
 void first_order_complementary_filtering(cascade_common_value_struct *filter_value, float gyro_data, float acc_data)

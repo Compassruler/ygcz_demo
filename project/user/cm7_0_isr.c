@@ -19,19 +19,23 @@ void pit0_ch0_isr()
       // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
       pid_pos_calc(&speed_pid, 0 , (float)car_speed);
+      leg_control();
     }
-    leg_control();
     
     // 角度环
     if(system_time % 5 == 0)
     {
-      pitch_acc2angle =  imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);            // 角速度转角度
-      first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);        // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle角
-      pid_pos_calc(&angle_pid, 0, pitch_filter.filtering_angle);
+      pitch_acc2angle =  imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);            // 角速度转角度 俯仰角
+      roll_acc2angle  =  imu_acc2angle(imu_data.acc_y, imu_data.acc_x, imu_data.acc_z);            // 角速度转角度 横滚角
+      
+      first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);          // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle
+      first_order_complementary_filtering(&roll_filter, imu_data.gyro_x, roll_acc2angle);            // 输出roll_filter.filtering_angle
+      pid_pos_calc(&pitch_angle_pid, 0, pitch_filter.filtering_angle);
+      pid_inc_calc(&roll_angle_pid, 0, roll_filter.filtering_angle);
     }
     
     // 角速度环
-    pid_pos_calc(&gyro_pid,angle_pid.output, imu_data.gyro_y);
+    pid_pos_calc(&gyro_pid,pitch_angle_pid.output, imu_data.gyro_y);
     small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
     
 }

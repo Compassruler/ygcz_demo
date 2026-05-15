@@ -51,14 +51,11 @@ typedef struct // 暂时还没用
 } BANLANCE;
 
 extern BANLANCE banlance;     // 三环集合结构体
-extern PID gyro_pid;         // 角速度环pid结构体
-extern PID angle_pid;        // 角度环pid结构体
-extern PID speed_pid;      // 速度环pid结构体
+extern PID gyro_pid;          // 角速度环pid结构体
+extern PID pitch_angle_pid;  // 俯仰角度环pid结构体
+extern PID roll_angle_pid;   // 横滚角度环pid结构体
+extern PID speed_pid;       // 速度环pid结构体
 
-extern PID leg_x_left_pid;      //servo.c里的
-extern PID leg_y_left_pid;
-extern PID leg_x_right_pid;
-extern PID leg_y_right_pid;
 
 // 函数简介：  三串级pid参数初始化
 void banlance_init(void);

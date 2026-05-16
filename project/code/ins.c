@@ -1,10 +1,11 @@
 #include "zf_common_headfile.h"
 
 
-// ------------------ 静态变量 ------------------
-static INS_t ins;
 
+INS_t ins;
 
+#define PATH_FLASH_PAGE 10    // 你要写入的 Flash 页号
+#define BATCH_SIZE 100        // 每次批量写 100 个点
 // ------------------ 初始化 ------------------
 PathPoint_t path[MAX_PATH_POINTS];
 bool record_ins = true;

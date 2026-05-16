@@ -64,4 +64,7 @@ void pid_init(PID *pid, float p, float i, float d, float maxI, float maxOut, flo
 // 返回值：         void
 void pid_pos_calc(PID *pid, float reference, float feedback);
 void pid_inc_calc(PID *pid, float reference, float feedback);
+
+// rpm转为真实线速度单位 m/s
+float rpmtotrue(short int rpm);
 #endif

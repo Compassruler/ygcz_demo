@@ -1,5 +1,5 @@
 #include "zf_common_headfile.h"
-
+#define wheel_radius 0.03206    //轮子半径（m）
 PID gyro_pid;
 PID pitch_angle_pid;
 PID roll_angle_pid;
@@ -86,4 +86,12 @@ void pid_inc_calc(PID *pid, float reference, float feedback)
     // 输出限幅
     if(pid->output > pid->maxOutput) pid->output = pid->maxOutput;
     else if(pid->output < -pid->maxOutput) pid->output = -pid->maxOutput;
+}
+
+// rpm转为真实线速度单位 m/s
+float rpmtotrue(short int rpm)
+{
+    float omega = rpm * 2.0f * 3.14159265f / 60.0f;       //角速度 rad/s
+    float v = omega * wheel_radius;
+    return v;
 }

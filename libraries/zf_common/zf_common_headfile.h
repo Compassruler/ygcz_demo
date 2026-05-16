@@ -49,6 +49,7 @@
 #include "screen.h"
 #include "ins.h"
 #include "remote_control.h"
+#include "flash.h"
 //===================================================Ð¾Æ¬ SDK µ×²ã===================================================
 #include "cy_project.h"
 #include "cy_device_headers.h"

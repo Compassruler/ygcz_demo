@@ -20,11 +20,10 @@ typedef struct {
     float yaw;
 } PathPoint_t;
 
-// **只声明，不定义**
 extern PathPoint_t path[MAX_PATH_POINTS];
 extern bool record_ins;  // 是否记录 INS 数据
 extern int path_index;
-
+extern INS_t ins;
 // 初始化
 void ins_init(void);
 void ins_enable(bool on_off);

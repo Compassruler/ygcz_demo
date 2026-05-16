@@ -4,7 +4,12 @@
 // ------------------ 静态变量 ------------------
 static INS_t ins;
 
+
 // ------------------ 初始化 ------------------
+PathPoint_t path[MAX_PATH_POINTS];
+bool record_ins = true;
+int path_index = 0;
+
 void ins_init(void)
 {
     ins.enabled = false;
@@ -29,7 +34,6 @@ void ins_clear(void)
 void ins_update(float dt, float yaw, float v_enc)
 {
     if(!ins.enabled) return;
-
     ins.yaw = yaw;  // 姿态已滤波
 
     // 编码器速度投影到世界坐标系

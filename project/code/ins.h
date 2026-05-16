@@ -2,7 +2,7 @@
 #define _INS_H_
 
 #include "zf_common_headfile.h"
-
+#define MAX_PATH_POINTS 2000   // 最大记录点数，可根据 MCU 内存调整
 
 typedef struct {
     bool enabled;
@@ -13,6 +13,17 @@ typedef struct {
     float vx;   // 世界坐标速度 X
     float vy;   // 世界坐标速度 Y
 } INS_t;
+
+typedef struct {
+    float x;
+    float y;
+    float yaw;
+} PathPoint_t;
+
+// **只声明，不定义**
+extern PathPoint_t path[MAX_PATH_POINTS];
+extern bool record_ins;  // 是否记录 INS 数据
+extern int path_index;
 
 // 初始化
 void ins_init(void);

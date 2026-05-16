@@ -2,10 +2,9 @@
 
 cascade_common_value_struct pitch_filter;    //结构体变量 俯仰角
 cascade_common_value_struct roll_filter;     //结构体变量 横滚角
-cascade_common_value_struct yaw_filter;      //结构体变量 偏航角
+cascade_common_value_struct yaw_filter;     //结构体变量 航向角
 
-// 先放在这里，后续移到别的pid相关.c文件去
-void parameter_init(void)
+void filter_init(void)
 {
   pitch_filter.gyro_ration = 4.0f;
   pitch_filter.acc_ration  = 4.0f;

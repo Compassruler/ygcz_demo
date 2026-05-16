@@ -99,22 +99,37 @@ static void uart_receiver_analysis (uart_receiver_struct *remote_data,uint8 * bu
 //-------------------------------------------------------------------------------------------------------------------
 void uart_receiver_callback(void)
 {
-    static vuint8 length = 0;
+    static uint8 sbus_start = 0;
+    static uint8 length = 0;
+    uint8 data;
 
-    if (uart_receiver_interval_time() > 3000)
+    while(uart_query_byte(UART_RECEVIER_UART_INDEX, &data))
     {
-        length = 0;
-    }
-    
-    if(uart_query_byte(UART_RECEVIER_UART_INDEX, &uart_receiver_data[length]))
-    {
-        length ++;
-        if((REV_DATA_LEN == length) && (FRAME_STAR == uart_receiver_data[0]) && (FRAME_END == uart_receiver_data[24]))
+        if(0 == sbus_start)
         {
-            uart_receiver_analysis(&uart_receiver, uart_receiver_data);
+            if(FRAME_STAR == data)
+            {
+                sbus_start = 1;
+                length = 0;
+                uart_receiver_data[length++] = data;
+            }
+        }
+        else
+        {
+            uart_receiver_data[length++] = data;
+
+            if(length >= REV_DATA_LEN)
+            {
+                sbus_start = 0;
+                length = 0;
+
+                if(FRAME_END == uart_receiver_data[REV_DATA_LEN - 1])
+                {
+                    uart_receiver_analysis(&uart_receiver, uart_receiver_data);
+                }
+            }
         }
     }
-
 }
 
 //-------------------------------------------------------------------------------------------------------------------

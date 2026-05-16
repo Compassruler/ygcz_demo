@@ -583,7 +583,7 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
     uart_config_struct          uart_pin_config                 = {0};
     cy_stc_gpio_pin_config_t    gpio_pin_config                 = {0};
     cy_stc_scb_uart_config_t    g_stc_uart_config               = {0};
-    uint16                      oversample_num                  = 8;
+    uint16                      oversample_num                  = 16; // 修改内容
     uint32                      targetFreq                      = oversample_num * baud;
     uint32                      divSetting_int                  = UART_FREQ / targetFreq;
     uint32                      divSetting_float                = (uint32)((double)(UART_FREQ - divSetting_int * targetFreq) / (double)targetFreq * 32.0f);
@@ -597,13 +597,18 @@ void uart_sbus_init (uart_index_enum uart_n, uint32 baud, uart_tx_pin_enum tx_pi
     gpio_pin_config.driveMode           = CY_GPIO_DM_STRONG_IN_OFF;
     gpio_pin_config.hsiom               = uart_pin_config.tx_hsiom;
     Cy_GPIO_Pin_Init(uart_pin_config.tx_port, uart_pin_config.tx_pin, &gpio_pin_config);
-
+    
+    g_stc_uart_config.irdaInvertRx = true;  // 修改内容
     
     g_stc_uart_config.uartMode          = CY_SCB_UART_STANDARD;
-    g_stc_uart_config.oversample        = 8;
-    g_stc_uart_config.dataWidth         = 9;
-    g_stc_uart_config.stopBits          = CY_SCB_UART_STOP_BITS_1;
-    g_stc_uart_config.parity            = CY_SCB_UART_PARITY_EVEN;
+    
+    
+    g_stc_uart_config.oversample = 16;  // 修改内容
+    g_stc_uart_config.dataWidth  = 8;  // 修改内容
+    g_stc_uart_config.stopBits   = CY_SCB_UART_STOP_BITS_2;  // 修改内容
+    g_stc_uart_config.parity     = CY_SCB_UART_PARITY_EVEN;  // 修改内容
+    
+    
     g_stc_uart_config.ctsPolarity       = CY_SCB_UART_ACTIVE_LOW;  
     g_stc_uart_config.rtsPolarity       = CY_SCB_UART_ACTIVE_LOW;
    

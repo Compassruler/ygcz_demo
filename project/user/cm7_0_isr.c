@@ -18,7 +18,7 @@ void pit0_ch0_isr()
       small_driver_get_speed(&small_driver_value);
       // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
-      pid_pos_calc(&speed_pid, 0 , (float)car_speed);
+      pid_pos_calc(&speed_pid, remote_front_rear_ctrl(0, 500, -500, 10) , (float)car_speed);
     }
 
     // 角度环
@@ -33,7 +33,7 @@ void pit0_ch0_isr()
       
       pid_pos_calc(&pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&roll_angle_pid, 0, roll_filter.filtering_angle);
-      pid_pos_calc(&yaw_angle_pid, 0, yaw_angle);
+      pid_pos_calc(&yaw_angle_pid, remote_left_right_ctrl(0, 200, -200, 10), yaw_angle);
       
       leg_control(); // 5ms调用一次
     }
@@ -159,8 +159,8 @@ void uart1_isr (void)
     if(uart_isr_mask(UART_1))            // 串口1接收中断
     {
         
-         wireless_module_uart_handler();  // 无线模块统一回调函数
-//        uart_receiver_handler() ; // 遥控器
+         //wireless_module_uart_handler();  // 无线模块统一回调函数
+        uart_receiver_handler() ; // 遥控器
       
     }
     else                                // 串口1发送中断

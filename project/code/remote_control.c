@@ -1,4 +1,5 @@
 #include "remote_control.h"
+#include "zf_common_headfile.h"
 
 static uint16 remote_channel[REMOTE_CONTROL_CHANNEL_NUM];
 static uint8 remote_online = 0;
@@ -107,7 +108,13 @@ int8 remote_left_02_switch_ctrl(void)
 
     if(raw_data < REMOTE_CONTROL_SWITCH_LOW_RAW)
     {
-        return 1;
+      leg_disable();
+      small_driver_set_duty(&small_driver_value,0, 0);
+      pid_init(&gyro_pid, 0.0f, 0.0f, 0.0f, 0, 10000, 1.0f);         // 角速度环PID初始化
+      pid_init(&pitch_angle_pid, .0f, 0.0f, 0.0f, 0, 10000, 1.0f); // 俯仰角度环PID初始化
+      pid_init(&roll_angle_pid, 0.0f, 0.0f, 0.0f, 0, 10000, 1.0f);  // 横滚角度环PID初始化
+      pid_init(&yaw_angle_pid, 0.0f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 航向角度环PID初始化
+      pid_init(&speed_pid, 0.0f, 0.0f, 0.0f, 0, 10000, 1.0f);       // 速度环PID初始化1.0 0.0 0.3
     }
 
     return 0;

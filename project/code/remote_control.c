@@ -4,6 +4,8 @@
 static uint16 remote_channel[REMOTE_CONTROL_CHANNEL_NUM];
 static uint8 remote_online = 0;
 
+float yaw_target = 0.0f;     // ç›®æ ‡èˆªå‘è§’
+
 
 void remote_control_init(void)
 {
@@ -102,20 +104,10 @@ int8 remote_left_01_switch_ctrl(void)
 }
 
 
-int8 remote_left_02_switch_ctrl(void)
+void remote_left_02_switch_ctrl(void)
 {
     uint16 raw_data = remote_get_channel(REMOTE_CONTROL_LEFT_02_SWITCH_CH);
 
-    if(raw_data < REMOTE_CONTROL_SWITCH_LOW_RAW)
-    {
-      leg_disable();
-      small_driver_set_duty(&small_driver_value,0, 0);
-      pid_init(&gyro_pid, 0.0f, 0.0f, 0.0f, 0, 10000, 1.0f);         // ½ÇËÙ¶È»·PID³õÊ¼»¯
-      pid_init(&pitch_angle_pid, .0f, 0.0f, 0.0f, 0, 10000, 1.0f); // ¸©Ñö½Ç¶È»·PID³õÊ¼»¯
-      pid_init(&roll_angle_pid, 0.0f, 0.0f, 0.0f, 0, 10000, 1.0f);  // ºá¹ö½Ç¶È»·PID³õÊ¼»¯
-      pid_init(&yaw_angle_pid, 0.0f, 0.0f, 0.0f, 0, 10000, 1.0f);   // º½Ïò½Ç¶È»·PID³õÊ¼»¯
-      pid_init(&speed_pid, 0.0f, 0.0f, 0.0f, 0, 10000, 1.0f);       // ËÙ¶È»·PID³õÊ¼»¯1.0 0.0 0.3
-    }
-
-    return 0;
+    if(raw_data < 1500) protect_flag = 0;
+    else  protect_flag = 1;
 }

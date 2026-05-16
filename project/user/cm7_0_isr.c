@@ -20,21 +20,20 @@ void pit0_ch0_isr()
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
       pid_pos_calc(&speed_pid, 0 , (float)car_speed);
     }
-    
+
     // 角度环
     if(system_time % 5 == 0)
     {
       pitch_acc2angle =  imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);            // 角速度转角度 俯仰角
       roll_acc2angle  =  imu_acc2angle(imu_data.acc_y, imu_data.acc_x, imu_data.acc_z);            // 角速度转角度 横滚角
-      yaw_acc2angle   =  imu_acc2angle(imu_data.acc_z, imu_data.acc_x, imu_data.acc_y);            // 角速度转角度 航向角
+      yaw_angle += imu_data.gyro_z * 0.005f;                                                       // 直接对角速度做积分，yaw角的加速度不能得到yaw角
       
       first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);          // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle
       first_order_complementary_filtering(&roll_filter, imu_data.gyro_x, roll_acc2angle);            // 输出roll_filter.filtering_angle
-      first_order_complementary_filtering(&yaw_filter, imu_data.gyro_z, yaw_acc2angle);              // 输出yaw_filter.filtering_ang
       
       pid_pos_calc(&pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&roll_angle_pid, 0, roll_filter.filtering_angle);
-      pid_pos_calc(&yaw_angle_pid, 0, yaw_filter.filtering_angle);
+      pid_pos_calc(&yaw_angle_pid, 0, yaw_angle);
       
       leg_control(); // 5ms调用一次
     }
@@ -160,8 +159,8 @@ void uart1_isr (void)
     if(uart_isr_mask(UART_1))            // 串口1接收中断
     {
         
-        // wireless_module_uart_handler();  // 无线模块统一回调函数
-        remote_control_uart_isr_hook(); // 遥控器
+         wireless_module_uart_handler();  // 无线模块统一回调函数
+//        uart_receiver_handler() ; // 遥控器
       
     }
     else                                // 串口1发送中断

@@ -11,7 +11,7 @@ void banlance_init(void)
   pid_init(&gyro_pid, 2.5f, 0.0f, 0.0f, 0, 10000, 1.0f);         // 角速度环PID初始化
   pid_init(&pitch_angle_pid, 61.0f, 0.4f, 5.0f, 0, 10000, 1.0f); // 俯仰角度环PID初始化
   pid_init(&roll_angle_pid, 0.3f, 0.0f, 0.0f, 0, 10000, 1.0f);  // 横滚角度环PID初始化
-  pid_init(&yaw_angle_pid, 0.1f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 航向角度环PID初始化
+  pid_init(&yaw_angle_pid, 3.0f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 航向角度环PID初始化
   pid_init(&speed_pid, 0.5f, 0.0f, 0.1f, 0, 10000, 1.0f);       // 速度环PID初始化1.0 0.0 0.3
   
 }

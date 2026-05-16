@@ -17,8 +17,11 @@ int main(void)
 
   while(true)
   { 
+
+    sprintf(txt,"1111:%f,%f\r\n", yaw_angle, yaw_angle_pid.output);
+
 //    sprintf(txt, "t_speed|r_speed: %d, %d,%f\r\n", 10, (small_driver_value.receive_left_speed_data + small_driver_value.receive_right_speed_data) / 2, -speed_pid.output); // 速度环输出
-    sprintf(txt,"1111:%f,%f,%f,%f,%f\r\n",servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now,speed_to_x_offset);
+//    sprintf(txt,"1111:%f,%f,%f,%f,%f\r\n",servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now,speed_to_x_offset);
 //    sprintf(txt,"1111:%d,%d,%f\r\n",-small_driver_value.receive_left_speed_data, small_driver_value.receive_right_speed_data, (float)(-small_driver_value.receive_left_speed_data + small_driver_value.receive_right_speed_data) / 2);
     
     wireless_uart_send_string(txt);

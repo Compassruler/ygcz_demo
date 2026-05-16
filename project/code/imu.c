@@ -5,7 +5,7 @@ imu_data_t imu_data;
 
 float pitch_acc2angle = 0;
 float roll_acc2angle  = 0;
-float yaw_acc2angle   = 0;
+float yaw_angle = 0;
 
 // imu_raw.gyro_x 横滚角 左正右负
 // imu_raw.gyro_y 俯仰角 前正后负

@@ -119,4 +119,6 @@ void calculate_servo_angle(float alpha, float beta, float *front, float *rear);
 // 参数说明     Y_right     右腿目标 Y 坐标
 void leg_control(void);
 
+void jump(void);
+
 #endif

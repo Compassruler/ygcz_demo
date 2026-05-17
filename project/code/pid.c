@@ -1,32 +1,55 @@
 #include "zf_common_headfile.h"
 #define wheel_radius 0.03206    // 轮子半径，单位 m
+
 PID gyro_pid;
 PID pitch_angle_pid;
 PID roll_angle_pid;
 PID speed_pid;
 PID yaw_angle_pid;
 
+BANLANCE banlance;
+
 void banlance_init(void)
 {
-  pid_init(&gyro_pid, 2.5f, 0.0f, 0.0f, 0, 10000, 1.0f);         // 陀螺 PID 初始化
-  pid_init(&pitch_angle_pid, 61.0f, 0.4f, 5.0f, 0, 10000, 1.0f); // 俯仰角 PID 初始化
-  pid_init(&roll_angle_pid, 0.3f, 0.0f, 0.0f, 0, 10000, 1.0f);  // 横滚角 PID 初始化
-  pid_init(&yaw_angle_pid, 3.0f, 0.0f, 0.0f, 0, 10000, 1.0f);   // 偏航角 PID 初始化
-  pid_init(&speed_pid, 0.5f, 0.0f, 0.1f, 0, 10000, 1.0f);       // 速度 PID 初始化
-  
-}
+    // 角速度环 PID 初始化
+    banlance.gyro_pid.kp = 2.5f;           // 比例系数
+    banlance.gyro_pid.ki = 0.0f;           // 积分系数
+    banlance.gyro_pid.kd = 0.0f;           // 微分系数
+    banlance.gyro_pid.maxIntegral = 0.0f;  // 积分限幅
+    banlance.gyro_pid.maxOutput = 10000;   // 输出限幅
+    banlance.gyro_pid.K = 1.0f;            // 缩放系数
 
-void pid_init(PID *pid, float p, float i, float d, float maxI, float maxOut, float K)
-{
-    pid->kp = p;                    // 比例系数
-    pid->ki = i;                    // 积分系数
-    pid->kd = d;                    // 微分系数
-    pid->maxIntegral = maxI;        // 积分最大值限制
-    pid->maxOutput = maxOut;        // 输出最大值限制
-    pid->K = K;                     // PID 系数缩放
-    pid->error = 0;
-    pid->lastError = 0;  
-    pid->output = 0;
+    // 俯仰角度环 PID 初始化
+    banlance.pitch_angle_pid.kp = 61.0f;           // 比例系数
+    banlance.pitch_angle_pid.ki = 0.4f;           // 积分系数
+    banlance.pitch_angle_pid.kd = 5.0f;           // 微分系数
+    banlance.pitch_angle_pid.maxIntegral = 0;     // 积分限幅
+    banlance.pitch_angle_pid.maxOutput = 10000;   // 输出限幅
+    banlance.pitch_angle_pid.K = 1.0f;            // 缩放系数
+
+    // 横滚角度环 PID 初始化
+    banlance.roll_angle_pid.kp = 0.8f;            // 比例系数
+    banlance.roll_angle_pid.ki = 0.0f;            // 积分系数
+    banlance.roll_angle_pid.kd = 0.0f;            // 微分系数
+    banlance.roll_angle_pid.maxIntegral = 0;      // 积分限幅
+    banlance.roll_angle_pid.maxOutput = 10000;    // 输出限幅
+    banlance.roll_angle_pid.K = 1.0f;             // 缩放系数
+
+    // 偏航角度环 PID 初始化
+    banlance.yaw_angle_pid.kp = 3.0f;             // 比例系数
+    banlance.yaw_angle_pid.ki = 0.0f;             // 积分系数
+    banlance.yaw_angle_pid.kd = 0.0f;             // 微分系数
+    banlance.yaw_angle_pid.maxIntegral = 0;       // 积分限幅
+    banlance.yaw_angle_pid.maxOutput = 10000;     // 输出限幅
+    banlance.yaw_angle_pid.K = 1.0f;              // 缩放系数
+
+    // 速度环 PID 初始化
+    banlance.speed_pid.kp = 0.5f;            // 比例系数
+    banlance.speed_pid.ki = 0.0f;            // 积分系数
+    banlance.speed_pid.kd = 0.1f;            // 微分系数
+    banlance.speed_pid.maxIntegral = 0;      // 积分限幅
+    banlance.speed_pid.maxOutput = 10000;    // 输出限幅
+    banlance.speed_pid.K = 1.0f;             // 缩放系数
 }
 
 void pid_pos_calc(PID *pid, float reference, float feedback)

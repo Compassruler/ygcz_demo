@@ -3,7 +3,6 @@
 
 #include "zf_common_headfile.h"
 
-
 #define SERVO_MOTOR_DUTY(x) \ ((float)10000 / (1000.0f / 300.0f) * (0.5f + (float)(x) / 90.0f)) // 舵机PWM占空比换算
 
 // PID结构体
@@ -42,20 +41,19 @@ extern PID roll_angle_pid;   // 横滚角度环pid结构体
 extern PID yaw_angle_pid;    // 速度环
 extern PID speed_pid;       // 速度环pid结构体
 
+typedef struct
+{
+    PID gyro_pid;          // 角速度环pid结构体
+    PID pitch_angle_pid;  // 俯仰角度环pid结构体
+    PID roll_angle_pid;   // 横滚角度环pid结构体
+    PID yaw_angle_pid;    // 速度环
+    PID speed_pid;       // 速度环pid结构体
+} BANLANCE;
+
+extern BANLANCE banlance;
 
 // 函数简介：  pid参数初始化
 void banlance_init(void);
-
-// 函数简介：   PID初始化
-// 参数说明：   pid         PID结构体指针
-// 参数说明：   p           比例系数
-// 参数说明：   i           积分系数
-// 参数说明：   d           微分系数
-// 参数说明：   maxI        积分限幅
-// 参数说明：   maxOut      输出限幅
-// 参数说明：   K           缩放系数
-// 返回值：     void
-void pid_init(PID *pid, float p, float i, float d, float maxI, float maxOut, float K);
 
 // 函数简介：       PID计算
 // 参数说明：       pid         PID结构体指针

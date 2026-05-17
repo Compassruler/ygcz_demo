@@ -176,12 +176,12 @@ void leg_control(void)
     static float speed_offset_filter = 0;
     static float roll_offset_filter  = 0;
 
-    // X 方向：速度偏移计算
+    // X 方向：俯仰偏移计算
     float target_offset = speed_pid.output * 0.1f;
     speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;
     speed_to_x_offset = func_limit_ab(speed_offset_filter, -45.0f, 45.0f);
 
-    // Y 方向：平衡偏移计算
+    // Y 方向：横滚偏移计算
     float roll_target_offset = roll_angle_pid.output * 0.8f;
     if(fabs(roll_filter.filtering_angle) < 1.0f) roll_target_offset = 0;
     roll_offset_filter = (roll_offset_filter * 19.0f + roll_target_offset) / 20.0f;
@@ -198,8 +198,9 @@ void leg_control(void)
     float target_X_left = X_left + X_OFFSET - speed_to_x_offset;
     float target_X_right = X_right + X_OFFSET - speed_to_x_offset;
   
-    float target_Y_left = Y_left + Y_OFFSET - balance_to_y_offset;          // 左腿偏移
-    float target_Y_right = Y_right + Y_OFFSET + balance_to_y_offset;        // 右腿偏移
+    // Y 方向：只做伸长
+    float target_Y_left  = Y_left  + Y_OFFSET - (balance_to_y_offset > 0.0f ? 0.0f : balance_to_y_offset);
+    float target_Y_right = Y_right + Y_OFFSET + (balance_to_y_offset > 0.0f ? balance_to_y_offset : 0.0f);
   
     // 更新实际坐标
     XLeft  = target_X_left;
@@ -217,7 +218,7 @@ void leg_control(void)
     calculate_servo_angle(alphaLeft, betaLeft, &servoLeftFront, &servoLeftRear);
     calculate_servo_angle(alphaRight, betaRight, &servoRightFront, &servoRightRear);
   
-    // 舵机慢速过渡
+    // 舵机步进
     servoLeftFront_now  = servo_step(servoLeftFront_now, servoLeftFront,  SERVO_STEP);
     servoLeftRear_now   = servo_step(servoLeftRear_now, servoLeftRear,   SERVO_STEP);
     servoRightFront_now = servo_step(servoRightFront_now, servoRightFront, SERVO_STEP);
@@ -226,4 +227,10 @@ void leg_control(void)
     // 输出舵机角度
     Set_angle(servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now);
     }
+}
+
+void jump(void)
+{
+
+
 }

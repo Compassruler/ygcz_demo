@@ -9,7 +9,7 @@ INS_t ins;
 // ------------------ ≥ı ºªØ ------------------
 PathPoint_t path[MAX_PATH_POINTS];
 bool record_ins = true;
-int path_index = 0;
+int path_index;
 
 void ins_init(void)
 {

@@ -8,17 +8,18 @@ void pit0_ch0_isr()
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
     int16 car_speed;
+    float true_speed;
     system_time ++;
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
-
+    float dt = 0.005;            // ins调用周期（s）
      // 速度环 
     if(system_time % 20 == 0)
     {
       small_driver_get_speed(&small_driver_value);
       // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
-      pid_pos_calc(&speed_pid, remote_front_rear_ctrl(0, 500, -500, 10) , (float)car_speed);
+      pid_pos_calc(&speed_pid, 0 , (float)car_speed);
     }
 
     // 角度环
@@ -33,9 +34,21 @@ void pit0_ch0_isr()
       
       pid_pos_calc(&pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&roll_angle_pid, 0, roll_filter.filtering_angle);
-      pid_pos_calc(&yaw_angle_pid, remote_left_right_ctrl(0, 200, -200, 10), yaw_angle);
+      pid_pos_calc(&yaw_angle_pid, 0, yaw_angle);
       
       leg_control(); // 5ms调用一次
+      true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + 
+                    rpmtotrue(small_driver_value.receive_right_speed_data)) / 2;   
+      
+      if (record_ins&& path_index < MAX_PATH_POINTS)
+      {
+        ins_update(dt,yaw_angle,true_speed);  // ins数据更新
+        path[path_index].x = ins.x;
+        path[path_index].y = ins.y;
+        path[path_index].yaw = ins.yaw;
+        path_index++;
+      }
+        
     }
     
     // 角速度环
@@ -45,7 +58,6 @@ void pit0_ch0_isr()
 
     small_driver_set_duty(&small_driver_value,-(balance_out + yaw_out), (balance_out - yaw_out)); // 未测试
 //    small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
-    
 }
 
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
@@ -159,8 +171,8 @@ void uart1_isr (void)
     if(uart_isr_mask(UART_1))            // 串口1接收中断
     {
         
-         //wireless_module_uart_handler();  // 无线模块统一回调函数
-        uart_receiver_handler() ; // 遥控器
+         wireless_module_uart_handler();  // 无线模块统一回调函数
+//        uart_receiver_handler() ; // 遥控器
       
     }
     else                                // 串口1发送中断

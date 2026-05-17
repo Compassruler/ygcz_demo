@@ -97,10 +97,7 @@ void Set_angle(float angle1, float angle2, float angle3, float angle4)
 
 void leg_disable(void)
 {
-  pwm_set_duty(SERVO1_PWM, (uint16)SERVO_DUTY(0));
-  pwm_set_duty(SERVO2_PWM, (uint16)SERVO_DUTY(0));
-  pwm_set_duty(SERVO3_PWM, (uint16)SERVO_DUTY(0));
-  pwm_set_duty(SERVO4_PWM, (uint16)SERVO_DUTY(0));
+  Set_angle(0, 0, 0, 0);
 }
 
 void solve_inverse_kinematics(float x, float y, float *a, float *b, float *c, float *d, float *e, float *f, float *alpha, float *beta)
@@ -170,56 +167,63 @@ void calculate_servo_angle(float alpha, float beta, float *front, float *rear)
 // 注意：足端得和初始位置对应
 void leg_control(void)
 {
-  static float speed_offset_filter = 0;
-  static float roll_offset_filter  = 0;
+  if(protect_flag == 1)
+    {
+      leg_disable();
+    }
+  else
+    {
+    static float speed_offset_filter = 0;
+    static float roll_offset_filter  = 0;
 
-  // X方向（俯仰）
-  float target_offset = speed_pid.output * 0.1f;
-  speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;
-  speed_to_x_offset = func_limit_ab(speed_offset_filter, -45.0f, 45.0f);
+    // X方向（俯仰）
+    float target_offset = speed_pid.output * 0.1f;
+    speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;
+    speed_to_x_offset = func_limit_ab(speed_offset_filter, -45.0f, 45.0f);
 
-  // Y方向（横滚）
-  float roll_target_offset = roll_angle_pid.output * 0.8f;
-  if(fabs(roll_filter.filtering_angle) < 1.0f) roll_target_offset = 0;
-  roll_offset_filter =(roll_offset_filter * 19.0f + roll_target_offset) / 20.0f;
-  balance_to_y_offset = func_limit_ab(roll_offset_filter, -60.0f, 60.0f);
+    // Y方向（横滚）
+    float roll_target_offset = roll_angle_pid.output * 0.8f;
+    if(fabs(roll_filter.filtering_angle) < 1.0f) roll_target_offset = 0;
+    roll_offset_filter =(roll_offset_filter * 19.0f + roll_target_offset) / 20.0f;
+    balance_to_y_offset = func_limit_ab(roll_offset_filter, -60.0f, 60.0f);
   
-  // 输入限幅 
-  if(Y_left<10)Y_left=10;
-  if(Y_right<10)Y_right=10;
+    // 输入限幅 
+    if(Y_left<10)Y_left=10;
+    if(Y_right<10)Y_right=10;
 
-  if(Y_left>130)Y_left=130;
-  if(Y_right>130)Y_right=130;
+    if(Y_left>130)Y_left=130;
+    if(Y_right>130)Y_right=130;
      
-  // 目标位置
-  float target_X_left = X_left + X_OFFSET - speed_to_x_offset;            // 俯仰
-  float target_X_right = X_right + X_OFFSET - speed_to_x_offset;
+    // 目标位置
+    float target_X_left = X_left + X_OFFSET - speed_to_x_offset;            // 俯仰
+    float target_X_right = X_right + X_OFFSET - speed_to_x_offset;
   
-  float target_Y_left = Y_left + Y_OFFSET - balance_to_y_offset;          // 横滚 一边伸长一边缩短
-  float target_Y_right = Y_right + Y_OFFSET + balance_to_y_offset;
+    float target_Y_left = Y_left + Y_OFFSET - balance_to_y_offset;          // 横滚 一边伸长一边缩短
+    float target_Y_right = Y_right + Y_OFFSET + balance_to_y_offset;
   
-  // 更新目标位置
-  XLeft  = target_X_left;
-  YLeft  = target_Y_left;
-  XRight = target_X_right;
-  YRight = target_Y_right;
+    // 更新目标位置
+    XLeft  = target_X_left;
+    YLeft  = target_Y_left;
+    XRight = target_X_right;
+    YRight = target_Y_right;
   
-  // 左侧逆运动学求解
-  solve_inverse_kinematics(XLeft, YLeft, &aLeft, &bLeft, &cLeft, &dLeft, &eLeft, &fLeft, &alphaLeft, &betaLeft);
+    // 左侧逆运动学求解
+    solve_inverse_kinematics(XLeft, YLeft, &aLeft, &bLeft, &cLeft, &dLeft, &eLeft, &fLeft, &alphaLeft, &betaLeft);
     
-  // 右侧逆运动学求解 
-  solve_inverse_kinematics(XRight, YRight,&aRight, &bRight, &cRight, &dRight, &eRight, &fRight, &alphaRight, &betaRight);
+    // 右侧逆运动学求解 
+    solve_inverse_kinematics(XRight, YRight,&aRight, &bRight, &cRight, &dRight, &eRight, &fRight, &alphaRight, &betaRight);
     
-  // 计算舵机角度
-  calculate_servo_angle(alphaLeft, betaLeft, &servoLeftFront, &servoLeftRear);
-  calculate_servo_angle(alphaRight, betaRight, &servoRightFront, &servoRightRear);
+    // 计算舵机角度
+    calculate_servo_angle(alphaLeft, betaLeft, &servoLeftFront, &servoLeftRear);
+    calculate_servo_angle(alphaRight, betaRight, &servoRightFront, &servoRightRear);
   
-  // 舵机步进
-  servoLeftFront_now  = servo_step(servoLeftFront_now, servoLeftFront,  SERVO_STEP);
-  servoLeftRear_now   = servo_step(servoLeftRear_now, servoLeftRear,   SERVO_STEP);
-  servoRightFront_now = servo_step(servoRightFront_now, servoRightFront, SERVO_STEP);
-  servoRightRear_now  = servo_step(servoRightRear_now, servoRightRear,  SERVO_STEP);
+    // 舵机步进
+    servoLeftFront_now  = servo_step(servoLeftFront_now, servoLeftFront,  SERVO_STEP);
+    servoLeftRear_now   = servo_step(servoLeftRear_now, servoLeftRear,   SERVO_STEP);
+    servoRightFront_now = servo_step(servoRightFront_now, servoRightFront, SERVO_STEP);
+    servoRightRear_now  = servo_step(servoRightRear_now, servoRightRear,  SERVO_STEP);
 
-  // 输出舵机
-  Set_angle(servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now);
+    // 输出舵机
+    Set_angle(servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now);
+    }
 }

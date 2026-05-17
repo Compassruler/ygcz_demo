@@ -17,6 +17,8 @@
 #define REMOTE_CONTROL_SWITCH_LOW_RAW    (900)
 #define REMOTE_CONTROL_SWITCH_HIGH_RAW   (1750)
 
+extern float yaw_target;
+
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简�?     遥控器应用层初�?�化
 // 参数说明     void
@@ -94,6 +96,6 @@ int8 remote_left_01_switch_ctrl(void);
 // 使用示例     int8 switch_state = remote_left_02_switch_ctrl();
 // 备注信息     使用 REMOTE_CONTROL_SWITCH_LOW_RAW 作为分界，低位为 1，其余状态为 0�?
 //-------------------------------------------------------------------------------------------------------------------
-int8 remote_left_02_switch_ctrl(void);
+void remote_left_02_switch_ctrl(void);
 
 #endif

@@ -2,6 +2,7 @@
 #define _INS_H_
 
 #include "zf_common_headfile.h"
+#include "zf_driver_flash.h"
 #define MAX_PATH_POINTS 2000   // 最大记录点数，可根据 MCU 内存调整
 
 typedef struct {
@@ -15,15 +16,23 @@ typedef struct {
 } INS_t;
 
 typedef struct {
-    float x;
-    float y;
-    float yaw;
+    float x[FLASH_PAGE_LENGTH * 6];
+    float y[FLASH_PAGE_LENGTH * 6];
+    float yaw[FLASH_PAGE_LENGTH];
 } PathPoint_t;
 
-extern PathPoint_t path[MAX_PATH_POINTS];
-extern bool record_ins;  // 是否记录 INS 数据
-extern int path_index;
+
+
+extern float X_remenber[FLASH_PAGE_LENGTH * 6];
+extern float Y_remenber[FLASH_PAGE_LENGTH * 6];
+extern PathPoint_t path;
+extern uint8 road_memery_finish_flag;   // 路径记忆完成标志位
+extern uint8 road_memery_start_flag;    //路径记忆开始标志位
+extern uint8 road_recurrent_flag;       // 路径复现标志位
 extern INS_t ins;
+
+extern volatile uint16 safe_index;
+
 // 初始化
 void ins_init(void);
 void ins_enable(bool on_off);

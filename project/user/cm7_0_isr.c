@@ -8,11 +8,12 @@ void pit0_ch0_isr()
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
     int16 car_speed;
-    float true_speed;
+    float dt = 0.020;  // ins调用周期（s）
+  float true_speed;
     system_time ++;
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
-    float dt = 0.005;            // ins调用周期（s）
+    
      // 速度环 
     if(system_time % 20 == 0)
     {
@@ -20,6 +21,14 @@ void pit0_ch0_isr()
       // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
       pid_pos_calc(&speed_pid, 0 , (float)car_speed);
+      if (road_memery_start_flag&& !road_memery_finish_flag&& !road_recurrent_flag )
+      {
+        true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + 
+                    rpmtotrue(small_driver_value.receive_right_speed_data)) / 2;  
+        ins_update(dt,yaw_angle,true_speed);  // ins数据更新
+        
+      }
+      
     }
 
     // 角度环
@@ -37,17 +46,7 @@ void pit0_ch0_isr()
       pid_pos_calc(&yaw_angle_pid, 0, yaw_angle);
       
       leg_control(); // 5ms调用一次
-      true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + 
-                    rpmtotrue(small_driver_value.receive_right_speed_data)) / 2;   
       
-      if (record_ins&& path_index < MAX_PATH_POINTS)
-      {
-        ins_update(dt,yaw_angle,true_speed);  // ins数据更新
-        path[path_index].x = ins.x;
-        path[path_index].y = ins.y;
-        path[path_index].yaw = ins.yaw;
-        path_index++;
-      }
         
     }
 
@@ -70,7 +69,7 @@ void pit0_ch0_isr()
 void pit0_ch1_isr()                     // 定时器通道 1 周期中断服务函数      
 {
     pit_isr_flag_clear(PIT_CH1);
-    
+   
 }
 
 void pit0_ch2_isr()                     // 定时器通道 2 周期中断服务函数      

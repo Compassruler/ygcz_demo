@@ -142,7 +142,7 @@ void small_driver_set_location_zero(small_device_value_struct *driver_value)
 // 参数说明     driver_value   驱动对应的数据结构体
 // 返回参数     void
 // 使用示例     small_driver_get_speed(&small_driver_value);
-// 备注信息     获取电机当前转速数据 单位 RPM
+// 备注信息     获取电机当前转速数据 单位 RPM 每分钟多少转
 //-------------------------------------------------------------------------------------------------------------------
 void small_driver_get_speed(small_device_value_struct *driver_value)
 {

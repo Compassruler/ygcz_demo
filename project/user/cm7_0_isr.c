@@ -9,10 +9,15 @@ void pit0_ch0_isr()
     static uint32 system_time = 0;
     int16 car_speed;
     float dt = 0.020;  // ins调用周期（s）
-  float true_speed;
+    float true_speed;
     system_time ++;
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
+    
+//    if(system_time == 5000)
+//    {
+//      jump_flag = 1;
+//    }
     
      // 速度环 
     if(system_time % 20 == 0)
@@ -20,7 +25,7 @@ void pit0_ch0_isr()
       small_driver_get_speed(&small_driver_value);
       // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
-      pid_pos_calc(&speed_pid, 0 , (float)car_speed);
+      pid_pos_calc(&banlance.speed_pid, 0 , (float)car_speed);
       if (road_memery_start_flag&& !road_memery_finish_flag&& !road_recurrent_flag )
       {
         true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + 
@@ -41,19 +46,21 @@ void pit0_ch0_isr()
       first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);          // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle
       first_order_complementary_filtering(&roll_filter, imu_data.gyro_x, roll_acc2angle);            // 输出roll_filter.filtering_angle
       
-      pid_pos_calc(&pitch_angle_pid, 0, pitch_filter.filtering_angle);
-      pid_inc_calc(&roll_angle_pid, 0, roll_filter.filtering_angle);
-      pid_pos_calc(&yaw_angle_pid, 0, yaw_angle);
+      pid_pos_calc(&banlance.pitch_angle_pid, 0, pitch_filter.filtering_angle);
+      pid_inc_calc(&banlance.roll_angle_pid, 0, roll_filter.filtering_angle);
+      pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
       
       leg_control(); // 5ms调用一次
       
         
     }
+    
+    jump_control();
 
     // 角速度环
-    pid_pos_calc(&gyro_pid,pitch_angle_pid.output, imu_data.gyro_y);
-    int balance_out = (int)gyro_pid.output;
-    int yaw_out     = (int)yaw_angle_pid.output;
+    pid_pos_calc(&banlance.gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y);
+    int balance_out = (int)banlance.gyro_pid.output;
+    int yaw_out     = (int)banlance.yaw_angle_pid.output;
     
     if(protect_flag == 1)
       {

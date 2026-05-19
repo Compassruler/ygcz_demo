@@ -7,9 +7,7 @@ void pit0_ch0_isr()
 {
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
-    int16 car_speed;
     float dt = 0.020;  // ins调用周期（s）
-    float true_speed;
     system_time ++;
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
@@ -25,11 +23,10 @@ void pit0_ch0_isr()
       small_driver_get_speed(&small_driver_value);
       // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
-      pid_pos_calc(&banlance.speed_pid, 0 , (float)car_speed);
+      pid_pos_calc(&banlance.speed_pid, 0 , car_speed);
       if (road_memery_start_flag&& !road_memery_finish_flag&& !road_recurrent_flag )
       {
-        true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + 
-                    rpmtotrue(small_driver_value.receive_right_speed_data)) / 2;  
+        true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + rpmtotrue(small_driver_value.receive_right_speed_data)) / 2;  
         ins_update(dt,yaw_angle,true_speed);  // ins数据更新
         
       }
@@ -61,6 +58,11 @@ void pit0_ch0_isr()
     pid_pos_calc(&banlance.gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y);
     int balance_out = (int)banlance.gyro_pid.output;
     int yaw_out     = (int)banlance.yaw_angle_pid.output;
+    
+    if(fabs(pitch_filter.filtering_angle) > 40.0f || fabs(true_speed) >=8.0f)
+      {
+        protect_flag = 1;
+      }
     
     if(protect_flag == 1)
       {

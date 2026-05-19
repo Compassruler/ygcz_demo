@@ -1,11 +1,6 @@
 #include "zf_common_headfile.h"
 #define wheel_radius 0.03206    // ÂÖ×Ó°ë¾¶£¬µ¥Î» m
 
-PID gyro_pid;
-PID pitch_angle_pid;
-PID roll_angle_pid;
-PID speed_pid;
-PID yaw_angle_pid;
 
 BANLANCE banlance;
 

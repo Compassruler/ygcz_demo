@@ -35,11 +35,11 @@ typedef struct
 
 } PID;
 
-extern PID gyro_pid;          // 角速度环pid结构体
-extern PID pitch_angle_pid;  // 俯仰角度环pid结构体
-extern PID roll_angle_pid;   // 横滚角度环pid结构体
-extern PID yaw_angle_pid;    // 速度环
-extern PID speed_pid;       // 速度环pid结构体
+//extern PID gyro_pid;          // 角速度环pid结构体
+//extern PID pitch_angle_pid;  // 俯仰角度环pid结构体
+//extern PID roll_angle_pid;   // 横滚角度环pid结构体
+//extern PID yaw_angle_pid;    // 速度环
+//extern PID speed_pid;       // 速度环pid结构体
 
 typedef struct
 {

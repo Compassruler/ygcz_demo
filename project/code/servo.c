@@ -177,12 +177,12 @@ void leg_control(void)
     static float roll_offset_filter  = 0;
 
     // X 方向：俯仰偏移计算
-    float target_offset = speed_pid.output * 0.1f;
+    float target_offset = banlance.speed_pid.output * 0.1f;
     speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;
     speed_to_x_offset = func_limit_ab(speed_offset_filter, -45.0f, 45.0f);
 
     // Y 方向：横滚偏移计算
-    float roll_target_offset = roll_angle_pid.output * 0.8f;
+    float roll_target_offset = banlance.roll_angle_pid.output * 0.8f;
     if(fabs(roll_filter.filtering_angle) < 1.0f) roll_target_offset = 0;
     roll_offset_filter = (roll_offset_filter * 19.0f + roll_target_offset) / 20.0f;
     balance_to_y_offset = func_limit_ab(roll_offset_filter, -60.0f, 60.0f);

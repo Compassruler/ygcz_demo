@@ -9,10 +9,15 @@ void pit0_ch0_isr()
     static uint32 system_time = 0;
     int16 car_speed;
     float dt = 0.020;  // ins调用周期（s）
-  float true_speed;
+    float true_speed;
     system_time ++;
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
+    
+//    if(system_time == 5000)
+//    {
+//      jump_flag = 1;
+//    }
     
      // 速度环 
     if(system_time % 20 == 0)
@@ -49,6 +54,8 @@ void pit0_ch0_isr()
       
         
     }
+    
+    jump_control();
 
     // 角速度环
     pid_pos_calc(&banlance.gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y);

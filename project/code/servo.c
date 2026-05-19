@@ -11,21 +11,20 @@ float X_L = 0.0f, Y_L = 0.0f;    // 左腿当前坐标
 float X_R = 0.0f, Y_R = 0.0f;    // 右腿当前坐标
 
 // 当前舵机角度
-float servoLeftFront_now  = 90.0f;
-float servoLeftRear_now   = 90.0f;
-float servoRightFront_now = 90.0f;
-float servoRightRear_now  = 90.0f;
+float servoLeftFront_now  = 60.0f;
+float servoLeftRear_now   = 60.0f;
+float servoRightFront_now = 60.0f;
+float servoRightRear_now  = 60.0f;
 
-float speed_to_x_offset;
-float balance_to_y_offset;
+float speed_to_x_offset, balance_to_y_offset;
 
 // 目标舵机坐标
 float X_left = 0.0f;
-float Y_left = 30.0f;
+float Y_left = 20.0f;
 float X_right = 0.0f;
-float Y_right = 30.0f;
+float Y_right = 20.0f;
 
-// 当前实际坐标
+// 当前实际坐标（0为初始值）
 float XLeft = 0.0f, YLeft = 0.0f;
 float XRight = 0.0f, YRight = 0.0f;
 
@@ -38,8 +37,26 @@ float alphaLeft, betaLeft, alphaRight, betaRight;
 // 角度中间变量
 float alphaLeftToAngle, betaLeftToAngle;
 float alphaRightToAngle, betaRightToAngle;
-float servoLeftFront, servoLeftRear;    // 前后舵机角度
+float servoLeftFront, servoLeftRear;    // 左右舵机角度
 float servoRightFront, servoRightRear;  // 前后舵机角度
+
+
+// jump部分
+const jump_control_struct jump_control_config[] =
+{
+    {  0, 108, jump_step_a, "起跳"     },
+    {108, 250, jump_step_a, "收脚"     },
+    {250, 330, jump_step_a, "准备缓冲" },
+    {330, 430, jump_step_a, "执行缓冲" },
+};
+
+const uint8 jump_step = sizeof(jump_control_config) / sizeof(jump_control_struct);
+
+int jump_flag = 0;
+uint16 jump_time = 0;
+
+float servoLeftFront_jump = 0, servoLeftRear_jump = 0, servoRightFront_jump = 0, servoRightRear_jump = 0;
+float servoLeftFront_jump_now = 0, servoLeftRear_jump_now = 0, servoRightFront_jump_now = 0, servoRightRear_jump_now= 0;
 
 void servo_init()
 {
@@ -164,7 +181,7 @@ void calculate_servo_angle(float alpha, float beta, float *front, float *rear)
     *rear = 180.0f - (90.0f - beta_deg);
 }
 
-// 另外：速度偏移和舵机角度坐标对应
+// 速度偏移和舵机角度坐标对应
 void leg_control(void)
 {
   if(protect_flag == 1)
@@ -224,13 +241,72 @@ void leg_control(void)
     servoRightFront_now = servo_step(servoRightFront_now, servoRightFront, SERVO_STEP);
     servoRightRear_now  = servo_step(servoRightRear_now, servoRightRear,  SERVO_STEP);
 
-    // 输出舵机角度
-    Set_angle(servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now);
+    if(jump_flag == 0)
+    {
+      Set_angle(servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now);        // 输出舵机角度
+    }
     }
 }
 
-void jump(void)
+void jump_step_a(int step_num)
 {
+  switch(step_num)
+  {
+    case 0: // 起跳蓄力
+    {
+      Set_angle(170, 170, 170, 170);
+    }break;
 
+    case 1: // 收腿
+    {
+      Set_angle(30, 30, 30, 30);
+    }break;
 
+    case 2:  // 准备缓冲
+    {
+      Set_angle(90, 90, 90, 90);
+      // 初始化当前值
+      servoLeftFront_jump  = 90;
+      servoLeftRear_jump   = 90;
+      servoRightFront_jump = 90;
+      servoRightRear_jump  = 90;
+    }break;
+
+    case 3: // 执行缓冲（平滑）
+    {
+      servoLeftFront_jump_now  = servo_step(servoLeftFront_jump, 60, 2);
+      servoLeftRear_jump_now   = servo_step(servoLeftRear_jump, 60, 2);
+      servoRightFront_jump_now = servo_step(servoRightFront_jump, 60, 2);
+      servoRightRear_jump_now  = servo_step(servoRightRear_jump, 60, 2);
+
+      Set_angle(servoLeftFront_jump_now, servoLeftRear_jump_now, servoRightFront_jump_now, servoRightRear_jump_now);
+    }break;
+
+    default: break;
+  }
+}
+
+void jump_control(void)
+{
+  if (jump_flag)
+  {
+    jump_time++;
+
+    if (jump_time < jump_control_config[jump_step - 1].max)
+    {
+      for (int i = 0; i < jump_step; i++)
+      {
+        if (jump_time >= jump_control_config[i].min && jump_time <= jump_control_config[i].max)
+        {
+          jump_control_config[i].handler(i);
+          break;
+        }
+      }
+    }
+    else
+    {
+      jump_flag = 0;
+      jump_time = 0;
+    }
+  }
 }

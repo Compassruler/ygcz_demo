@@ -12,6 +12,7 @@ INS_t ins;
 uint8 road_memery_finish_flag = 0; // 路径记忆完成标志位
 uint8 road_memery_start_flag = 0;  // 路径记忆开始标志位
 uint8 road_recurrent_flag = 0;     // 路径复现标志位
+uint8 road_destination = 0;        // 记录路径的终点
 volatile int num_index = 0;
 // ------------------ 初始化 ------------------
 int path_index;

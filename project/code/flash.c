@@ -1,33 +1,7 @@
 #include "zf_common_headfile.h"
 
-#define FLASH_SECTION_INDEX (0)     // 存储数据用的扇区
-   
-//#define road_memery_page_INDEX_11 (11) // 路径存点专用扇区
-#define Yaw_memery_page_INDEX_11 (11)
-#define Yaw_memery_page_INDEX_14 (14)
-#define Yaw_memery_page_INDEX_15 (15)
-#define Yaw_memery_page_INDEX_16 (16)
-#define Yaw_memery_page_INDEX_17 (17)
-#define Yaw_memery_page_INDEX_18 (18)
-   
-#define X_memery_page_INDEX_1 (1) // x存点专用扇区
-#define X_memery_page_INDEX_3 (3) // x存点专用扇区
-#define X_memery_page_INDEX_5 (5) // x存点专用扇区
-
-#define Y_memery_page_INDEX_2 (2) // y存点专用扇区
-#define Y_memery_page_INDEX_4 (4) // y存点专用扇区
-#define Y_memery_page_INDEX_6 (6) // y存点专用扇区
-
-#define X_memery_page_INDEX_7 (7)   // 新增X轴存点专用扇区
-#define X_memery_page_INDEX_9 (9)   // 新增X轴存点专用扇区
-#define X_memery_page_INDEX_13 (13) // 新增X轴存点专用扇区
-
-#define Y_memery_page_INDEX_8 (8)   // 新增Y轴存点专用扇区
-#define Y_memery_page_INDEX_10 (10) // 新增Y轴存点专用扇区
-#define Y_memery_page_INDEX_12 (12) // 新增Y轴存点专用扇区
-
-uint8_t flash_flag = 0;      // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
-uint8_t flash_flag_Plus = 0; // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
+uint8_t flash_yaw_flag = 0;      // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
+uint8_t flash_xy_flag = 0; // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
 // 存路径数据
 void flash_road_memery_store(void)
 {
@@ -46,8 +20,99 @@ void flash_road_memery_store(void)
     } // 擦除这一页
     // 第四步存到FLASH指定扇区
     flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11, FLASH_PAGE_LENGTH - 1);
+    
+    
+    
+     // 第一步清除缓冲区
+    flash_buffer_clear();
+    // 第二步把数据存到缓冲区
+    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 2 * FLASH_PAGE_LENGTH; i++, j++)
+    {
+        flash_union_buffer[j].float_type = Yaw_remenber[i];
+    }
+
+    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14))
+    { // 判断是否有数据
+        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14);
+    } // 擦除这一页
+    // 第四步存到FLASH指定扇区
+    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14, FLASH_PAGE_LENGTH);
+    
+     
+     // 第一步清除缓冲区
+    flash_buffer_clear();
+    // 第二步把数据存到缓冲区
+    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 3 * FLASH_PAGE_LENGTH; i++, j++)
+    {
+        flash_union_buffer[j].float_type = Yaw_remenber[i];
+    }
+
+    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15))
+    { // 判断是否有数据
+        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15);
+    } // 擦除这一页
+    // 第四步存到FLASH指定扇区
+    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15, FLASH_PAGE_LENGTH);
+    
+     
+     // 第一步清除缓冲区
+    flash_buffer_clear();
+    // 第二步把数据存到缓冲区
+    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 4 * FLASH_PAGE_LENGTH; i++, j++)
+    {
+        flash_union_buffer[j].float_type = Yaw_remenber[i];
+    }
+
+    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16))
+    { // 判断是否有数据
+        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16);
+    } // 擦除这一页
+    // 第四步存到FLASH指定扇区
+    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16, FLASH_PAGE_LENGTH);
+    
+    
+    
+     
+     // 第一步清除缓冲区
+    flash_buffer_clear();
+    // 第二步把数据存到缓冲区
+    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 5 * FLASH_PAGE_LENGTH; i++, j++)
+    {
+        flash_union_buffer[j].float_type = Yaw_remenber[i];
+    }
+
+    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17))
+    { // 判断是否有数据
+        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17);
+    } // 擦除这一页
+    // 第四步存到FLASH指定扇区
+    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17, FLASH_PAGE_LENGTH);
+    
+    
+    
+     
+     // 第一步清除缓冲区
+    flash_buffer_clear();
+    // 第二步把数据存到缓冲区
+    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 6 * FLASH_PAGE_LENGTH; i++, j++)
+    {
+        flash_union_buffer[j].float_type = Yaw_remenber[i];
+    }
+
+    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18))
+    { // 判断是否有数据
+        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18);
+    } // 擦除这一页
+    // 第四步存到FLASH指定扇区
+    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18, FLASH_PAGE_LENGTH);
+
     // 存取过程结束 —— 成功存取
-    flash_flag = 3;
+    flash_yaw_flag = 3;
     
     
 }
@@ -63,7 +128,61 @@ void flash_road_memery_get(void)
             Yaw_load[i] = flash_union_buffer[i].float_type; // 取出历史偏航角
         }
     }
-    flash_flag = 4;
+    
+    
+    /*取路径数据*/
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14)) // 检查flash里面是否存了数据
+    {
+        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14, FLASH_PAGE_LENGTH);
+        for (size_t i = 0, j = FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
+        {
+            Yaw_load[j] = flash_union_buffer[i].float_type; //
+        }
+    }
+
+    /*取路径数据*/
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15)) // 检查flash里面是否存了数据
+    {
+        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15, FLASH_PAGE_LENGTH);
+        for (size_t i = 0, j = 2 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
+        {
+            Yaw_load[j] = flash_union_buffer[i].float_type; //
+        }
+    }
+
+    // 取路径数据
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16))
+    {
+        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16, FLASH_PAGE_LENGTH);
+        for (size_t i = 0, j = 3 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
+        {
+            Yaw_load[j] = flash_union_buffer[i].float_type;
+        }
+    }
+
+    // 取路径数据
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17))
+    {
+        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17, FLASH_PAGE_LENGTH);
+        for (size_t i = 0, j = 4 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
+        {
+            Yaw_load[j] = flash_union_buffer[i].float_type;
+        }
+    }
+
+    // 取路径数据
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18))
+    {
+        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18, FLASH_PAGE_LENGTH);
+        for (size_t i = 0, j = 5 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
+        {
+            Yaw_load[j] = flash_union_buffer[i].float_type;
+        }
+        // 从最后一页读取路径终点值
+        road_destination = flash_union_buffer[FLASH_PAGE_LENGTH - 1].uint16_type;
+    }
+    
+    flash_yaw_flag = 4;
 }
 
 void flash_road_memery_store_Plus(void)
@@ -87,6 +206,8 @@ void flash_road_memery_store_Plus(void)
     // 第四步存到FLASH指定扇区
     flash_write_page_from_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_1, FLASH_PAGE_LENGTH);
 
+    
+    
     // 第一步清除缓冲区
     flash_buffer_clear();
     // 第二步把数据存到缓冲区
@@ -244,7 +365,7 @@ void flash_road_memery_store_Plus(void)
     flash_write_page_from_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_12, FLASH_PAGE_LENGTH);
 
     // 存取过程结束 —— 成功存取
-    flash_flag_Plus = 3;
+    flash_xy_flag = 3;
 }
 
 void flash_road_memery_get_Plus(void)
@@ -308,8 +429,7 @@ void flash_road_memery_get_Plus(void)
         {
             X_load[j] = flash_union_buffer[i].float_type;
         }
-        // 从最后一页读取路径终点值
-        road_destination = flash_union_buffer[FLASH_PAGE_LENGTH - 1].uint16_type;
+        
     }
 
     /*取y轴数据,分三个扇区取*/
@@ -372,5 +492,5 @@ void flash_road_memery_get_Plus(void)
         }
     }
 
-    flash_flag_Plus = 4;
+    flash_xy_flag = 4;
 }

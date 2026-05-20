@@ -35,7 +35,7 @@ extern uint8 road_recurrent_flag;       // 路径复现标志位
 extern INS_t ins;
 extern volatile int num_index;
 extern volatile uint16 safe_index;
-
+extern uint8 road_destination;
 // 初始化
 void ins_init(void);
 void ins_enable(bool on_off);

@@ -1,6 +1,6 @@
 #include "zf_common_headfile.h"
 #define LED1                    (P19_0)     // SPI 涓插彛 SPI 涓わ拷?锟藉睆 杩欓噷瀹忓畾涔夊～锟?? IPS200_TYPE_SPI
-
+#define BUZZER_PIN              (P19_4)    
 char txt[128];
 
 int main(void)
@@ -14,57 +14,59 @@ int main(void)
   imu660rb_init();                                      // IMU初始化
   small_driver_uart_init();                             // 电机驱动初始化
   pit_ms_init(PIT_CH0,1);                               // PIT中断初始化
-
+  gpio_init(BUZZER_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);  // 蜂鸣器初始化
   screen_init();                                        // 屏幕初始化
+  flash_init();
 //  remote_control_init();                                // 遥控器初始化
   wireless_uart_init();
   road_memery_start_flag = 1;
   road_memery_finish_flag = 0;
   road_recurrent_flag = 0;
 int i = 0;
-  
+  flash_yaw_flag = 0;
   while(true)
   { 
                       
-    
+   
+     if (i == 1000 && flash_yaw_flag == 0)
+       flash_yaw_flag = 1;
      
-      
-      
-    
-//    remote_update();   // 遥控器状态更新
-//   
-//
-//     // 判断遥控器是否触发记录开始/结束
-//    rc_state=remote_left_01_switch_ctrl();    
-//    
-//        screen_data_item_t imu_table[] =
-//      {
-//          {"state",  SCREEN_DATA_INT,   {.int_value = 0},   0},
-//          {"x",  SCREEN_DATA_INT,   {.int_value = 0},   0},
-//          {"y",  SCREEN_DATA_INT,   {.float_value = 0},   0},
-//          {"yaw", SCREEN_DATA_INT,   {.float_value = 0},   0},
-//          {"rc_state", SCREEN_DATA_INT,   {.int_value = 0},   0},
-//          {"gyro_z", SCREEN_DATA_INT,   {.int_value = 0},   0},
-//          {"state",  SCREEN_DATA_STRING,{.str_value = "OK"},0},
-//      };
-//   
-//    imu_table[0].value.int_value = FLASH_PAGE_LENGTH;
-//    imu_table[1].value.int_value = i;
-//    imu_table[2].value.int_value = 0;
-//    imu_table[3].value.float_value = 0;
-//   
-//    screen_show_data_table(imu_table,2);
-    
-    if(i>=FLASH_PAGE_LENGTH * 6)
+     
+     
+     switch(flash_yaw_flag) {
+    case 1: // 写入
+        flash_road_memery_store();
+        flash_road_memery_store_Plus();
+        flash_yaw_flag = 2;
+        break;
+    case 2: // 读取
+        flash_road_memery_get();
+        flash_road_memery_get_Plus();
+        gpio_toggle_level(BUZZER_PIN);
+        flash_yaw_flag = 3; // 完成状态
+        break;
+    case 3:
+        // 已完成，不再操作
+        break;
+}
+      if(i>=FLASH_PAGE_LENGTH * 6)
     {
       i = FLASH_PAGE_LENGTH * 6 -1;
     }
-    sprintf(txt,
-            "(x|y):(%f,%f)\r\n",X_remenber[i],Y_remenber[i]);
     
+   
+      sprintf(txt,
+             "(x|y):(%f,%f)\r\n",X_load[i],Y_load[i]);
+      
+     if(flash_yaw_flag!=2)
+       i++;       
+     else 
+       i--;
+     if(i<=0)
+       i = 0;
 //    sprintf(txt,
 //            "vl|vr:%d,%d\r\n",small_driver_value.receive_left_speed_data,small_driver_value.receive_right_speed_data);
-    i++;
+   
     
 //    sprintf(txt,
 //            "true_speed:%f\r\n",(rpmtotrue(-small_driver_value.receive_left_speed_data) + 

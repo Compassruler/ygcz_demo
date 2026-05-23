@@ -132,12 +132,12 @@ void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 dis
  * @brief 在 IPS200 屏幕上绘制绿色横向阈值标记条。
  *
  * 该函数从屏幕最左侧 x=0 开始，在指定 y 坐标处绘制一条绿色横线；
- * 可通过 `width` 设置线条厚度，用于在摄像头图像显示区域上叠加检测行、
+ * 可通过 `width` 设置线条厚度，用于在摄像头图像显示区域上叠加横向检测行、
  * 阈值行或调试参考线。
  *
- * @param y      标记条起始 y 坐标。
- * @param length 标记条终点 x 坐标，实际绘制范围为 x=0 到 x=length。
- * @param width  标记条厚度，单位为像素；例如 1 表示单像素横线，3 表示三像素厚。
+ * @param y      横向标记条起始 y 坐标。
+ * @param length 横向标记条终点 x 坐标，实际绘制范围为 x=0 到 x=length。
+ * @param width  横向标记条厚度，单位为像素；例如 1 表示单像素横线，3 表示三像素厚。
  *
  * @return void
  *
@@ -145,7 +145,28 @@ void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 dis
  * @note 调用时需确保 length 小于 ips200_width_max，且 y + width - 1 小于 ips200_height_max。
  * @note 如果该线用于叠加在图像上，应在显示图像之后调用，否则可能被图像刷新覆盖。
  */
-void screen_show_image_threshold_bar(uint16 y, uint16 length, uint8 width);
+void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width);
+
+
+/**
+ * @brief 在 IPS200 屏幕上绘制绿色纵向阈值标记条。
+ *
+ * 该函数从指定坐标 `(x, y)` 开始，向下绘制一条绿色竖线；
+ * 可通过 `width` 设置线条厚度，用于在摄像头图像显示区域上叠加纵向检测列、
+ * 列范围边界或调试参考线。
+ *
+ * @param x      纵向标记条起始 x 坐标。
+ * @param y      纵向标记条起始 y 坐标。
+ * @param length 纵向标记条终点相对长度，实际绘制范围为 y 到 y + length。
+ * @param width  纵向标记条厚度，单位为像素；例如 1 表示单像素竖线，3 表示三像素厚。
+ *
+ * @return void
+ *
+ * @note 当前颜色固定为 RGB565_GREEN。
+ * @note 调用时需确保 x + width - 1 小于 ips200_width_max，且 y + length 小于 ips200_height_max。
+ * @note 如果该线用于叠加在图像上，应在显示图像之后调用，否则可能被图像刷新覆盖。
+ */
+void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8 width);
 
 
 // 字符串显示示例。
@@ -269,4 +290,3 @@ void screen_data_table_set_font(ips200_font_size_enum font);
 void screen_show_data_table(const screen_data_item_t *items, uint8 count);
 
 #endif
-

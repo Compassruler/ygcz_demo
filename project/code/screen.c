@@ -216,11 +216,19 @@ void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 dis
     ips200_show_gray_image(x, y, image, MT9V03X_W, MT9V03X_H, display_width, display_height, 0);
 }
 
-void screen_show_image_threshold_bar(uint16 y, uint16 length, uint8 width)
+void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width)
 {
     for (uint8 i = 0; i < width; i++)
     {
         ips200_draw_line(0, y + i, length, y + i, RGB565_GREEN);
+    }
+}
+
+void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8 width)
+{
+    for (uint8 i = 0; i < width; i++)
+    {
+        ips200_draw_line(x + i, y, x + i , y + length, RGB565_GREEN);
     }
 }
 

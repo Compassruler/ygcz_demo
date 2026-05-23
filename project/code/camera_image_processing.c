@@ -165,19 +165,20 @@ void camera_image_filter_isolated_white(uint8 image[MT9V03X_H][MT9V03X_W])
 }
 
 
-uint8 camera_image_check_jump(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 black_count)
+uint8 camera_image_check_jump_rows(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint16 black_count)
 {
     uint16 x = 0;
     int16 y = 0;
+    uint16 checked_columns = 0;
     uint16 current_black_count = 0;
     uint16 checked_rows = 0;
 
-    if(MT9V03X_H <= check_row)
+    if((MT9V03X_H <= check_row) || (MT9V03X_W <= check_column))
     {
         return 0;
     }
 
-    if(0 == check_row_count)
+    if((0 == check_row_count) || (0 == check_column_count))
     {
         return 0;
     }
@@ -185,13 +186,21 @@ uint8 camera_image_check_jump(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_ro
     for(y = (int16)check_row; (0 <= y) && (checked_rows < check_row_count); y--)
     {
         current_black_count = 0;
+        checked_columns = 0;
 
-        for(x = 0; x < MT9V03X_W; x++)
+        for(x = check_column; (x < MT9V03X_W) && (checked_columns < check_column_count); x++)
         {
             if(image[y][x] == 0)
             {
                 current_black_count++;
             }
+
+            checked_columns++;
+        }
+
+        if(checked_columns != check_column_count)
+        {
+            return 0;
         }
 
         if(current_black_count < black_count)
@@ -203,4 +212,126 @@ uint8 camera_image_check_jump(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_ro
     }
 
     return (checked_rows == check_row_count);
+}
+
+uint8 camera_image_check_jump_columns(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint16 black_count)
+{
+    uint16 x = 0;
+    int16 y = 0;
+    uint16 checked_columns = 0;
+    uint16 current_black_count = 0;
+    uint16 checked_rows = 0;
+
+    if((MT9V03X_H <= check_row) || (MT9V03X_W <= check_column))
+    {
+        return 0;
+    }
+
+    if((0 == check_row_count) || (0 == check_column_count))
+    {
+        return 0;
+    }
+
+    for(x = check_column; (x < MT9V03X_W) && (checked_columns < check_column_count); x++)
+    {
+        current_black_count = 0;
+        checked_rows = 0;
+
+        for(y = (int16)check_row; (0 <= y) && (checked_rows < check_row_count); y--)
+        {
+            if(image[y][x] == 0)
+            {
+                current_black_count++;
+            }
+
+            checked_rows++;
+        }
+
+        if(checked_rows != check_row_count)
+        {
+            return 0;
+        }
+
+        if(current_black_count < black_count)
+        {
+            return 0;
+        }
+
+        checked_columns++;
+    }
+
+    return (checked_columns == check_column_count);
+}
+
+uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint32 black_count)
+{
+    uint16 x = 0;
+    uint16 y = 0;
+    uint16 checked_rows = 0;
+    uint16 checked_columns = 0;
+    uint32 current_black_count = 0;
+    uint32 check_area_size = 0;
+
+    if((MT9V03X_H <= check_row) || (MT9V03X_W <= check_column))
+    {
+        return 0;
+    }
+
+    if((0 == check_row_count) || (0 == check_column_count))
+    {
+        return 0;
+    }
+
+    if((check_row + 1) < check_row_count)
+    {
+        return 0;
+    }
+
+    if((MT9V03X_W - check_column) < check_column_count)
+    {
+        return 0;
+    }
+
+    check_area_size = (uint32)check_row_count * (uint32)check_column_count;
+    if(check_area_size < black_count)
+    {
+        return 0;
+    }
+
+    if(0 == black_count)
+    {
+        return 1;
+    }
+
+    for(checked_rows = 0; checked_rows < check_row_count; checked_rows++)
+    {
+        y = check_row - checked_rows;
+
+        for(checked_columns = 0; checked_columns < check_column_count; checked_columns++)
+        {
+            x = check_column + checked_columns;
+
+            if(image[y][x] == 0)
+            {
+                current_black_count++;
+
+                if(current_black_count >= black_count)
+                {
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+uint8 camera_image_check_jump_strict(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 row_black_count, uint16 check_column, uint16 check_column_count, uint16 column_black_count)
+{
+    if(!camera_image_check_jump_rows(image, check_row, check_row_count, check_column, check_column_count, row_black_count))
+    {
+        return 0;
+    }
+
+    return camera_image_check_jump_columns(image, check_row, check_row_count, check_column, check_column_count, column_black_count);
 }

@@ -73,7 +73,26 @@ void camera_wireless_screen_init(void)
     }
 }
 
-uint8 camera_show_processed_frame_on_screen(uint16 x, uint16 y, uint16 display_width, uint16 display_height, uint16 check_row, uint16 check_row_count, uint16 black_count)
+void camera_debug_on_screen(uint16 x, uint16 y, uint16 display_width, uint16 display_height)
+{
+    if(!mt9v03x_finish_flag)
+    {
+        return;
+    }
+
+    mt9v03x_finish_flag = 0;
+    memcpy(image_copy[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE); // 复制图像
+
+    camera_image_binary_otsu(image_copy);  // 大津法处理二值化
+    camera_image_filter_isolated_black(image_copy);  // 滤去黑色噪点
+    camera_image_filter_isolated_white(image_copy);  // 滤去白色噪点
+
+    screen_show_camera_image(x, y, image_copy[0], display_width, display_height);  // 返回图像
+
+}
+
+
+uint8 camera_processing(uint16 row, uint16 row_total, uint16 row_black_pix_count, uint16 colum, uint16 colum_total, uint16 colum_black_pix_count)
 {
     if(!mt9v03x_finish_flag)
     {
@@ -83,12 +102,11 @@ uint8 camera_show_processed_frame_on_screen(uint16 x, uint16 y, uint16 display_w
     mt9v03x_finish_flag = 0;
     memcpy(image_copy[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE); // 复制图像
 
+
     camera_image_binary_otsu(image_copy);  // 大津法处理二值化
     camera_image_filter_isolated_black(image_copy);  // 滤去黑色噪点
     camera_image_filter_isolated_white(image_copy);  // 滤去白色噪点
+
+    return camera_image_check_jump_strict(image_copy, row, row_total, row_black_pix_count, colum, colum_total, colum_black_pix_count);  // 检查是否跳跃（目前可以水平和垂直检查）
     
-    screen_show_camera_image(x, y, image_copy[0], display_width, display_height);  // 返回图像
-
-    return camera_image_check_jump(image_copy, check_row, check_row_count, black_count);  // 检查是否跳跃, 目前与debug image 合并
 }
-

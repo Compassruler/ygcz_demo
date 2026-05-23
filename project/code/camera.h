@@ -71,30 +71,51 @@ uint32 camera_wireless_get_frame_count(void);
 void camera_wireless_screen_init(void);
 
 /**
- * @brief 处理一帧摄像头图像、显示到 IPS200，并返回跳跃检测结果。
+ * @brief 处理一帧摄像头图像并显示到 IPS200 屏幕，用于图像调试观察。
  *
  * 如果检测到摄像头有新帧，本函数会：
  * 1. 清除帧完成标志；
  * 2. 复制 `mt9v03x_image` 到内部图像副本；
  * 3. 使用大津法自动阈值完成二值化；
  * 4. 执行黑色/白色孤立噪点过滤；
- * 5. 将处理后的图像显示到 IPS200 指定位置；
- * 6. 调用 `camera_image_check_jump()` 判断是否出现跳跃特征。
+ * 5. 将处理后的图像显示到 IPS200 指定位置。
  *
  * @param x               图像显示区域左上角 x 坐标。
  * @param y               图像显示区域左上角 y 坐标。
  * @param display_width   图像显示宽度。
  * @param display_height  图像显示高度。
- * @param check_row       跳跃检测的起始行纵向坐标。
- * @param check_row_count 从起始检测行的上一行开始，继续向上检查的行数。
- * @param black_count     起始检测行需要超过的黑色像素数量阈值。
+ *
+ * @return void
+ *
+ * @note 本函数只负责屏幕显示调试，不进行跳跃检测，也不进行无线发送。
+ * @note 本函数会显示处理后的二值图像，原始 `mt9v03x_image` 不会被直接修改。
+ */
+void camera_debug_on_screen(uint16 x, uint16 y, uint16 display_width, uint16 display_height);
+
+
+/**
+ * @brief 处理一帧摄像头图像并返回跳跃检测结果。
+ *
+ * 如果检测到摄像头有新帧，本函数会：
+ * 1. 清除帧完成标志；
+ * 2. 复制 `mt9v03x_image` 到内部图像副本；
+ * 3. 使用大津法自动阈值完成二值化；
+ * 4. 执行黑色/白色孤立噪点过滤；
+ * 5. 调用 `camera_image_check_jump_strict()` 综合行检测和列检测判断是否出现跳跃特征。
+ *
+ * @param row                   跳跃检测的起始行纵向坐标。
+ * @param row_total             从起始行开始向上检查的行数。
+ * @param row_black_pix_count   每一行需要达到的黑色像素数量阈值。
+ * @param colum                 跳跃检测的起始列横向坐标。
+ * @param colum_total           从起始列开始向右检查的列数。
+ * @param colum_black_pix_count 每一列需要达到的黑色像素数量阈值。
  *
  * @return uint8
  *         - 1：本次检测到新帧，并且检测到跳跃特征；
  *         - 0：当前没有新帧，或本次处理后未检测到跳跃特征。
  *
- * @note 本函数不进行无线发送，不会调用 `seekfree_assistant_camera_send()`。
- * @note 本函数会显示处理后的二值图像，原始 `mt9v03x_image` 不会被直接修改。
+ * @note 本函数不显示图像，也不进行无线发送。
+ * @note 本函数会在内部图像副本上处理，原始 `mt9v03x_image` 不会被直接修改。
  */
-uint8 camera_show_processed_frame_on_screen(uint16 x, uint16 y, uint16 display_width, uint16 display_height, uint16 check_row, uint16 check_row_count, uint16 black_count);
+uint8 camera_processing(uint16 row, uint16 row_total, uint16 row_black_pix_count, uint16 colum, uint16 colum_total, uint16 colum_black_pix_count);
 #endif

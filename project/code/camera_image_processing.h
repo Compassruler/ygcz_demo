@@ -91,33 +91,101 @@ void camera_image_filter_isolated_white(uint8 image[MT9V03X_H][MT9V03X_W]);
 
 
 /**
- * @brief 根据指定行向上的黑色像素增长趋势判断是否出现跳跃特征。
+ * @brief 在指定矩形区域内执行跳跃特征的行检测。
  *
- * 该函数用于处理已经二值化后的 MT9V03X 图像，默认约定：
+ * 该函数从 `check_row` 开始向上检查 `check_row_count` 行，
+ * 每一行只统计从 `check_column` 开始向右的 `check_column_count` 个像素。
+ * 只有每一行的黑色像素数量都大于或等于 `black_count`，才返回检测通过。
  *
- * - 像素值 0：黑色目标；
- * - 像素值 255：非黑色背景。
+ * @param image              待检测的二值图像数组，尺寸必须为 `MT9V03X_H * MT9V03X_W`。
+ * @param check_row          起始检测行的纵向坐标，范围应小于 `MT9V03X_H`。
+ * @param check_row_count    从起始检测行开始，继续向上检查的行数。
+ * @param check_column       起始检测列的横向坐标，范围应小于 `MT9V03X_W`。
+ * @param check_column_count 从起始检测列开始，继续向右检查的列数。
+ * @param black_count        每一行需要达到的黑色像素数量阈值。
  *
- * 判断规则：
- * 1. 先统计 `check_row` 指定行的整行黑色像素数量；
- * 2. 如果该行黑色像素数量小于或等于 `black_count`，则直接返回不跳跃；
- * 3. 如果该行黑色像素数量超过 `black_count`，则从上一行开始继续向上检查；
- * 4. 向上检查 `check_row_count` 行，要求每一行黑色像素数量大于或等于上一行；
- * 5. 若向上检查的所有行都满足增长趋势，则返回跳跃标志，否则返回不跳跃标志。
+ * @return uint8
+ *         - 1：行检测通过；
+ *         - 0：行检测未通过。
  *
- * @param image           待检测的二值图像数组，尺寸必须为 `MT9V03X_H * MT9V03X_W`。
- * @param check_row       起始检测行的纵向坐标，范围应小于 `MT9V03X_H`。
- * @param check_row_count 从起始检测行的上一行开始，继续向上检查的行数。
- * @param black_count     起始检测行需要超过的黑色像素数量阈值。
+ * @note 调用本函数前，应先完成二值化处理。
+ */
+uint8 camera_image_check_jump_rows(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint16 black_count);
+
+
+/**
+ * @brief 在指定矩形区域内执行跳跃特征的列检测。
+ *
+ * 该函数从 `check_column` 开始向右检查 `check_column_count` 列，
+ * 每一列只统计从 `check_row` 开始向上的 `check_row_count` 个像素。
+ * 只有每一列的黑色像素数量都大于或等于 `black_count`，才返回检测通过。
+ *
+ * @param image              待检测的二值图像数组，尺寸必须为 `MT9V03X_H * MT9V03X_W`。
+ * @param check_row          起始检测行的纵向坐标，范围应小于 `MT9V03X_H`。
+ * @param check_row_count    从起始检测行开始，继续向上检查的行数。
+ * @param check_column       起始检测列的横向坐标，范围应小于 `MT9V03X_W`。
+ * @param check_column_count 从起始检测列开始，继续向右检查的列数。
+ * @param black_count        每一列需要达到的黑色像素数量阈值。
+ *
+ * @return uint8
+ *         - 1：列检测通过；
+ *         - 0：列检测未通过。
+ *
+ * @note 调用本函数前，应先完成二值化处理。
+ */
+uint8 camera_image_check_jump_columns(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint16 black_count);
+
+
+/**
+ * @brief 在指定矩形区域内执行黑色像素总量检测。
+ *
+ * 该函数从 `check_row` 开始向上取 `check_row_count` 行，
+ * 从 `check_column` 开始向右取 `check_column_count` 列，形成一个矩形检测区域。
+ * 只要该矩形区域内黑色像素总数大于或等于 `black_count`，函数立即返回检测通过。
+ *
+ * @param image              待检测的二值图像数组，尺寸必须为 `MT9V03X_H * MT9V03X_W`。
+ * @param check_row          起始检测行的纵向坐标，范围应小于 `MT9V03X_H`。
+ * @param check_row_count    从起始检测行开始，继续向上检查的行数。
+ * @param check_column       起始检测列的横向坐标，范围应小于 `MT9V03X_W`。
+ * @param check_column_count 从起始检测列开始，继续向右检查的列数。
+ * @param black_count        整个矩形区域内需要达到的黑色像素总数阈值。
+ *
+ * @return uint8
+ *         - 1：矩形区域内黑色像素总数达到阈值；
+ *         - 0：矩形区域内黑色像素总数未达到阈值，或检测区域越界。
+ *
+ * @note 调用本函数前，应先完成二值化处理。
+ * @note 当前检测区域为从 `check_row` 向上、从 `check_column` 向右形成的矩形区域。
+ * @note 若 `black_count` 大于矩形区域像素总数，函数会直接返回 0。
+ */
+uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint32 black_count);
+
+
+/**
+ * @brief 综合行检测和列检测判断是否出现跳跃特征。
+ *
+ * 该函数会在同一个矩形区域内分别调用：
+ *
+ * 1. `camera_image_check_jump_rows()`：要求区域内每一行黑点数量达标；
+ * 2. `camera_image_check_jump_columns()`：要求区域内每一列黑点数量达标。
+ *
+ * 只有行检测和列检测同时通过，函数才返回跳跃标志。
+ *
+ * @param image              待检测的二值图像数组，尺寸必须为 `MT9V03X_H * MT9V03X_W`。
+ * @param check_row          起始检测行的纵向坐标，范围应小于 `MT9V03X_H`。
+ * @param check_row_count    从起始检测行开始，继续向上检查的行数。
+ * @param row_black_count    每一行需要达到的黑色像素数量阈值。
+ * @param check_column       起始检测列的横向坐标，范围应小于 `MT9V03X_W`。
+ * @param check_column_count 从起始检测列开始，继续向右检查的列数。
+ * @param column_black_count 每一列需要达到的黑色像素数量阈值。
  *
  * @return uint8
  *         - 1：检测到跳跃特征；
  *         - 0：未检测到跳跃特征。
  *
  * @note 调用本函数前，应先完成二值化处理。
- * @note 当前检测范围是整行宽度 `MT9V03X_W`，不是只检测图像中间区域。
- * @note 传入的 `check_row_count` 不应大于 `check_row`，否则可检查行数不足时会返回 0。
+ * @note 当前检测区域为从 `check_row` 向上、从 `check_column` 向右形成的矩形区域。
  */
-uint8 camera_image_check_jump(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 black_count);
+uint8 camera_image_check_jump_strict(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 row_black_count, uint16 check_column, uint16 check_column_count, uint16 column_black_count);
 
 #endif

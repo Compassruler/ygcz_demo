@@ -154,7 +154,7 @@ void flash_read_page_to_buffer (uint32 sector_num, uint32 page_num, uint32 len)
 #endif    
     for(data_count = 0; data_count < len; data_count ++)
     {
-        flash_union_buffer[data_count].uint32_type = flash_addr[data_count];
+        flash_union_buffer[data_count].uint32_type = flash_addr[data_count]; 
     }
 }
 

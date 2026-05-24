@@ -28,10 +28,7 @@ extern float Y_load[FLASH_PAGE_LENGTH * 6];
 extern float Yaw_load[FLASH_PAGE_LENGTH * 6];
 
 
-extern uint8 road_memery_finish_flag;   // 路径记忆完成标志位
-extern uint8 road_memery_start_flag;    //路径记忆开始标志位
-extern uint8 road_recurrent_flag;       // 路径复现标志位
-
+extern uint8 road_memery_flag;   // 路径记忆完成标志位
 extern INS_t ins;
 extern volatile int num_index;
 extern volatile uint16 safe_index;

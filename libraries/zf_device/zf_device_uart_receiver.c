@@ -58,16 +58,16 @@ uint8   uart_receiver_data[REV_DATA_LEN]  = {0};    // 接收器原始数据
 //  使用示例     uint32 time = uart_receiver_interval_time();
 //  备注信息     内部调用
 //-------------------------------------------------------------------------------------------------------------------
-static uint32 uart_receiver_interval_time (void)
-{
-    uint32 interval_time;
-
-    interval_time = timer_get(UART_RECEVIER_COUNTER);
-
-    timer_clear(UART_RECEVIER_COUNTER);
-    
-    return interval_time;
-}
+//static uint32 uart_receiver_interval_time (void)
+//{
+//    uint32 interval_time;
+//
+//    interval_time = timer_get(UART_RECEVIER_COUNTER);
+//
+//    timer_clear(UART_RECEVIER_COUNTER);
+//    
+//    return interval_time;
+//}
 
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     SBUS数据解析
@@ -77,19 +77,24 @@ static uint32 uart_receiver_interval_time (void)
 // 使用示例
 // 备注信息     对sbus数据解析进行解析
 //-------------------------------------------------------------------------------------------------------------------
-static void uart_receiver_analysis (uart_receiver_struct *remote_data,uint8 * buffer)
+static void uart_receiver_analysis(uart_receiver_struct *remote_data, uint8 *buffer)
 {
-    uint8 num = 0;
-    remote_data->channel[num++] = (buffer[1] |buffer[ 2] << 8 ) & 0x07FF;
-    remote_data->channel[num++] = (buffer[2] >> 3 | buffer[3] << 5 ) & 0x07FF;
-    remote_data->channel[num++] = (buffer[3] >> 6 | buffer[4] << 2 | buffer[5] << 10 ) & 0x07FF;
-    remote_data->channel[num++] = (buffer[5] >> 1 | buffer[6] << 7 ) & 0x07FF;
-    remote_data->channel[num++] = (buffer[6] >> 4 | buffer[7] << 4 ) & 0x07FF;
-    remote_data->channel[num++] = (buffer[7] >> 7 | buffer[8] << 1 | buffer[9] << 9 ) & 0x07FF;
-    remote_data->state = (SBUS_ABNORMAL_STATE == (buffer[23] & SBUS_ABNORMAL_STATE)) ? 0 : 1;
-    uart_receiver.finsh_flag  = 1;
-}
+    remote_data->channel[0]  = ((buffer[1]      | buffer[2]  << 8) & 0x07FF);
+    remote_data->channel[1]  = ((buffer[2] >> 3 | buffer[3]  << 5) & 0x07FF);
+    remote_data->channel[2]  = ((buffer[3] >> 6 | buffer[4]  << 2 | buffer[5]  << 10) & 0x07FF);
+    remote_data->channel[3]  = ((buffer[5] >> 1 | buffer[6]  << 7) & 0x07FF);
+    remote_data->channel[4]  = ((buffer[6] >> 4 | buffer[7]  << 4) & 0x07FF);
+    remote_data->channel[5]  = ((buffer[7] >> 7 | buffer[8]  << 1 | buffer[9]  << 9) & 0x07FF);
 
+    remote_data->channel[6]  = ((buffer[9]  >> 2 | buffer[10] << 6) & 0x07FF);
+    remote_data->channel[7]  = ((buffer[10] >> 5 | buffer[11] << 3) & 0x07FF);
+    remote_data->channel[8]  = ((buffer[12]      | buffer[13] << 8) & 0x07FF);
+    remote_data->channel[9]  = ((buffer[13] >> 3 | buffer[14] << 5) & 0x07FF);
+
+    remote_data->state = (SBUS_ABNORMAL_STATE == (buffer[23] & SBUS_ABNORMAL_STATE)) ? 0 : 1;
+
+    uart_receiver.finsh_flag = 1;
+}
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     串口接收机模块 串口中断回调函数
 // 参数说明     void

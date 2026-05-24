@@ -53,7 +53,7 @@
 
 #define UART_RECEVIER_COUNTER               (TC_TIME2_CH2)      // 定义遥控器接受间隔计数器通道
 #define SBUS_UART_BAUDRATE                  (100000)            // 指定 SBUS 串口所使用的的串口波特率 (用户不可修改)
-#define UART_RECEVIER_CHANNEL_NUM           ( 6 )               // 定义遥控器通道数量 (用户不可修改)
+#define UART_RECEVIER_CHANNEL_NUM           ( 10 )               // 定义遥控器通道数量 (用户不可修改)
 
 #define REV_DATA_LEN                        ( 25   )            // SBUS帧长
 #define FRAME_STAR                          ( 0X0F )            // 帧头信息

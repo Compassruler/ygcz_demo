@@ -12,6 +12,7 @@ void pit0_ch0_isr()
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
     
+    // 跳跃测试demo    
 //    if(system_time == 5000)
 //    {
 //      jump_flag = 1;
@@ -23,7 +24,7 @@ void pit0_ch0_isr()
       small_driver_get_speed(&small_driver_value);
       // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
-      pid_pos_calc(&banlance.speed_pid, 0 , car_speed);
+      pid_pos_calc(&banlance.speed_pid, remote_front_rear_ctrl() , car_speed);
       if (road_memery_start_flag&& !road_memery_finish_flag&& !road_recurrent_flag )
       {
         true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + rpmtotrue(small_driver_value.receive_right_speed_data)) / 2;  
@@ -56,10 +57,11 @@ void pit0_ch0_isr()
 
     // 角速度环
     pid_pos_calc(&banlance.gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y);
+
     int balance_out = (int)banlance.gyro_pid.output;
     int yaw_out     = (int)banlance.yaw_angle_pid.output;
     
-    if(fabs(pitch_filter.filtering_angle) > 40.0f || fabs(true_speed) >=8.0f)
+    if(fabs(pitch_filter.filtering_angle) > 40.0f || fabs(true_speed) >=8.0f) // 保护
       {
         protect_flag = 1;
       }
@@ -186,8 +188,8 @@ void uart1_isr (void)
     if(uart_isr_mask(UART_1))            // 串口1接收中断
     {
         
-         wireless_module_uart_handler();  // 无线模块统一回调函数
-//        uart_receiver_handler() ; // 遥控器
+//         wireless_module_uart_handler();  // 无线模块统一回调函数
+        uart_receiver_handler() ; // 遥控器
       
     }
     else                                // 串口1发送中断

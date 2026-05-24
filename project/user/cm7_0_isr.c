@@ -25,7 +25,8 @@ void pit0_ch0_isr()
       // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
       pid_pos_calc(&banlance.speed_pid, remote_front_rear_ctrl() , car_speed);
-      if (road_memery_start_flag&& !road_memery_finish_flag&& !road_recurrent_flag )
+      
+      if (road_memery_flag == 1)
       {
         true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + rpmtotrue(small_driver_value.receive_right_speed_data)) / 2;  
         ins_update(dt,yaw_angle,true_speed);  // ins数据更新

@@ -62,12 +62,16 @@ void pit0_ch0_isr()
     int balance_out = (int)banlance.gyro_pid.output;
     int yaw_out     = (int)banlance.yaw_angle_pid.output;
     
-    if(fabs(pitch_filter.filtering_angle) > 40.0f || fabs(true_speed) >=8.0f) // 保护
+    if(fabs(pitch_filter.filtering_angle) > 40.0f || fabs(true_speed) >=8.0f) // 自动保护
       {
-        protect_flag = 1;
+        auto_protect_flag = 1;
       }
+    // if(fabs(pitch_filter.filtering_angle) < 10.0f && fabs(true_speed) < 1.0f) //自动取消保护 后面再用
+    //   {
+    //     auto_protect_flag = 0;
+    //   }
     
-    if(protect_flag == 1)
+    if(auto_protect_flag || manual_protect_flag == 1)
       {
         small_driver_set_duty(&small_driver_value,0, 0); 
       }

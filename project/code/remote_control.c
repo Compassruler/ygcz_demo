@@ -86,14 +86,19 @@ int16 remote_left_right_ctrl(void)
     return remote_control_calc_channel(REMOTE_CONTROL_LEFT_RIGHT_CH);
 }
 
-uint8 remote_left_01_switch_ctrl(void)
+void remote_left_01_switch_ctrl(void)
 {
-       if(remote_get_channel(REMOTE_CONTROL_LEFT_01_SWITCH_CH)<200)
-         return 1;
+        if(!remote_is_online())
+    {
+        return;
+    }
+    remote_left_01_last_flag = remote_left_01_now_flag;
+  if(remote_get_channel(REMOTE_CONTROL_LEFT_01_SWITCH_CH)<REMOTE_CONTROL_CENTER_RAW)
+        remote_left_01_now_flag = 1;
        else if (remote_get_channel(REMOTE_CONTROL_LEFT_01_SWITCH_CH)>=200 && remote_get_channel(REMOTE_CONTROL_LEFT_01_SWITCH_CH) < 1500)
-         return 0;
+         remote_left_01_now_flag = 0;
        else 
-         return 2;
+         remote_left_01_now_flag = 2;
 }
 
 void remote_left_02_switch_ctrl(void)

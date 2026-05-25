@@ -10,7 +10,7 @@ void flash_road_memery_store(void)
     // 第二步把数据存到缓冲区
     for (size_t i = 0; i < FLASH_PAGE_LENGTH - 1; i++)
     {
-        flash_union_buffer[i].float_type = Yaw_remenber[i]; // 存储偏航角
+        flash_union_buffer[i].float_type = Yaw_remember[i]; // 存储偏航角
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -28,7 +28,7 @@ void flash_road_memery_store(void)
     // 第二步把数据存到缓冲区
     for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 2 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Yaw_remenber[i];
+        flash_union_buffer[j].float_type = Yaw_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -45,7 +45,7 @@ void flash_road_memery_store(void)
     // 第二步把数据存到缓冲区
     for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 3 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Yaw_remenber[i];
+        flash_union_buffer[j].float_type = Yaw_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -62,7 +62,7 @@ void flash_road_memery_store(void)
     // 第二步把数据存到缓冲区
     for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 4 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Yaw_remenber[i];
+        flash_union_buffer[j].float_type = Yaw_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -81,7 +81,7 @@ void flash_road_memery_store(void)
     // 第二步把数据存到缓冲区
     for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 5 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Yaw_remenber[i];
+        flash_union_buffer[j].float_type = Yaw_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -100,7 +100,7 @@ void flash_road_memery_store(void)
     // 第二步把数据存到缓冲区
     for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 6 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Yaw_remenber[i];
+        flash_union_buffer[j].float_type = Yaw_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -195,7 +195,7 @@ void flash_road_memery_store_Plus(void)
     // 第二步把数据存到缓冲区
     for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
     {
-        flash_union_buffer[i].float_type = X_remenber[i];
+        flash_union_buffer[i].float_type = X_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -213,7 +213,7 @@ void flash_road_memery_store_Plus(void)
     // 第二步把数据存到缓冲区
     for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 2 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = X_remenber[i];
+        flash_union_buffer[j].float_type = X_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -229,7 +229,7 @@ void flash_road_memery_store_Plus(void)
     // 第二步把数据存到缓冲区
     for (size_t i = 2 * FLASH_PAGE_LENGTH, j = 0; i < 3 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = X_remenber[i];
+        flash_union_buffer[j].float_type = X_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -244,7 +244,7 @@ void flash_road_memery_store_Plus(void)
     flash_buffer_clear();
     for (size_t i = 3 * FLASH_PAGE_LENGTH, j = 0; i < 4 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = X_remenber[i];
+        flash_union_buffer[j].float_type = X_remember[i];
     }
     if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_7))
     {
@@ -256,7 +256,7 @@ void flash_road_memery_store_Plus(void)
     flash_buffer_clear();
     for (size_t i = 4 * FLASH_PAGE_LENGTH, j = 0; i < 5 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = X_remenber[i];
+        flash_union_buffer[j].float_type = X_remember[i];
     }
     if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_9))
     {
@@ -268,7 +268,7 @@ void flash_road_memery_store_Plus(void)
     flash_buffer_clear();
     for (size_t i = 5 * FLASH_PAGE_LENGTH, j = 0; i < 6 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = X_remenber[i];
+        flash_union_buffer[j].float_type = X_remember[i];
     }
     // 在最后一页的最后一个位置存储NUM_L_Plus，用于记录实际数据长度即路径终点
     flash_union_buffer[FLASH_PAGE_LENGTH - 1].uint16_type = num_index;
@@ -285,7 +285,7 @@ void flash_road_memery_store_Plus(void)
     // 第二步把数据存到缓冲区
     for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
     {
-        flash_union_buffer[i].float_type = Y_remenber[i];
+        flash_union_buffer[i].float_type = Y_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -301,7 +301,7 @@ void flash_road_memery_store_Plus(void)
     // 第二步把数据存到缓冲区
     for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 2 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Y_remenber[i];
+        flash_union_buffer[j].float_type = Y_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -317,7 +317,7 @@ void flash_road_memery_store_Plus(void)
     // 第二步把数据存到缓冲区
     for (size_t i = 2 * FLASH_PAGE_LENGTH, j = 0; i < 3 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Y_remenber[i];
+        flash_union_buffer[j].float_type = Y_remember[i];
     }
 
     // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
@@ -332,7 +332,7 @@ void flash_road_memery_store_Plus(void)
     flash_buffer_clear();
     for (size_t i = 3 * FLASH_PAGE_LENGTH, j = 0; i < 4 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Y_remenber[i];
+        flash_union_buffer[j].float_type = Y_remember[i];
     }
     if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_8))
     {
@@ -344,7 +344,7 @@ void flash_road_memery_store_Plus(void)
     flash_buffer_clear();
     for (size_t i = 4 * FLASH_PAGE_LENGTH, j = 0; i < 5 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Y_remenber[i];
+        flash_union_buffer[j].float_type = Y_remember[i];
     }
     if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_10))
     {
@@ -356,7 +356,7 @@ void flash_road_memery_store_Plus(void)
     flash_buffer_clear();
     for (size_t i = 5 * FLASH_PAGE_LENGTH, j = 0; i < 6 * FLASH_PAGE_LENGTH; i++, j++)
     {
-        flash_union_buffer[j].float_type = Y_remenber[i];
+        flash_union_buffer[j].float_type = Y_remember[i];
     }
     if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_12))
     {

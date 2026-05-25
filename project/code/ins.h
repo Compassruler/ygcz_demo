@@ -19,9 +19,9 @@ typedef struct {
 
 
 
-extern float X_remenber[FLASH_PAGE_LENGTH * 6];
-extern float Y_remenber[FLASH_PAGE_LENGTH * 6];
-extern float Yaw_remenber[FLASH_PAGE_LENGTH * 6];
+extern float X_remember[FLASH_PAGE_LENGTH * 6];
+extern float Y_remember[FLASH_PAGE_LENGTH * 6];
+extern float Yaw_remember[FLASH_PAGE_LENGTH * 6];
 
 extern float X_load[FLASH_PAGE_LENGTH * 6];
 extern float Y_load[FLASH_PAGE_LENGTH * 6];

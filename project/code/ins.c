@@ -1,9 +1,9 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
 
-float X_remenber[FLASH_PAGE_LENGTH * 6] = {0};
-float Y_remenber[FLASH_PAGE_LENGTH * 6] = {0};
-float Yaw_remenber[FLASH_PAGE_LENGTH * 6] = {0};
+float X_remember[FLASH_PAGE_LENGTH * 6] = {0};
+float Y_remember[FLASH_PAGE_LENGTH * 6] = {0};
+float Yaw_remember[FLASH_PAGE_LENGTH * 6] = {0};
 
 float X_load[FLASH_PAGE_LENGTH * 6] = {0};
 float Y_load[FLASH_PAGE_LENGTH * 6] = {0};
@@ -29,20 +29,20 @@ void ins_update(float dt, float yaw, float v_enc)
 //  yaw = round(yaw * 100.0f) / 100.0f;
   
     // 确保不会越界访问数组
-    if (num_index >= FLASH_PAGE_LENGTH * 6 - 2 || flash_yaw_flag ==2)
+    if (num_index >= FLASH_PAGE_LENGTH * 6 - 2 || flash_yaw_flag)
     {
         road_memery_flag = 2; // 路径记忆完成标志位
         return;                           // 直接返回，不再记录新的点
     }
-    Yaw_remenber[num_index] = yaw;  // 姿态已滤波
+    Yaw_remember[num_index] = yaw;  // 姿态已滤波
     // 编码器速度投影到世界坐标系
     yaw = yaw * 3.1415f /180;
     vx = v_enc * cosf(yaw);
     vy = v_enc * sinf(yaw);
     x += vx * dt;
     y += vy * dt;
-    X_remenber[num_index] =x;
-    Y_remenber[num_index] =y; 
+    X_remember[num_index] =x;
+    Y_remember[num_index] =y; 
     num_index ++;
 }
 

@@ -46,10 +46,10 @@
 
 #include "zf_common_typedef.h"
 
-// 遥控器 更改到 UART 1
-#define UART_RECEVIER_UART_INDEX            UART_1
-#define UART_RECEVIER_TX_PIN                UART1_TX_P04_1
-#define UART_RECEVIER_RX_PIN                UART1_RX_P04_0
+// 遥控器 更改到 UART 2               UART 1   UART1_TX_P04_1 UART1_RX_P04_0
+#define UART_RECEVIER_UART_INDEX            UART_2
+#define UART_RECEVIER_TX_PIN                UART2_TX_P10_1
+#define UART_RECEVIER_RX_PIN                UART2_RX_P10_0
 
 #define UART_RECEVIER_COUNTER               (TC_TIME2_CH2)      // 定义遥控器接受间隔计数器通道
 #define SBUS_UART_BAUDRATE                  (100000)            // 指定 SBUS 串口所使用的的串口波特率 (用户不可修改)

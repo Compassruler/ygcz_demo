@@ -82,9 +82,14 @@ int16 remote_left_right_ctrl(void)
     return remote_control_calc_channel(REMOTE_CONTROL_LEFT_RIGHT_CH);
 }
 
-void remote_left_01_switch_ctrl(void)
+uint8 remote_left_01_switch_ctrl(void)
 {
-    uint16 raw_data = remote_get_channel(REMOTE_CONTROL_LEFT_01_SWITCH_CH);
+       if(remote_get_channel(REMOTE_CONTROL_LEFT_01_SWITCH_CH)<200)
+         return 1;
+       else if (remote_get_channel(REMOTE_CONTROL_LEFT_01_SWITCH_CH)>=200 && remote_get_channel(REMOTE_CONTROL_LEFT_01_SWITCH_CH) < 1500)
+         return 0;
+       else 
+         return 2;
 }
 
 void remote_left_02_switch_ctrl(void)

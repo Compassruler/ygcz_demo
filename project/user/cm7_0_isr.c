@@ -189,7 +189,7 @@ void uart1_isr (void)
     if(uart_isr_mask(UART_1))            // 串口1接收中断
     {
         
-//         wireless_module_uart_handler();  // 无线模块统一回调函数
+
         uart_receiver_handler() ; // 遥控器
       
     }
@@ -205,8 +205,9 @@ void uart2_isr (void)
 {
     if(uart_isr_mask(UART_2))            // 串口2接收中断
     {
+               wireless_module_uart_handler();  // 无线模块统一回调函数
         
-        gnss_uart_callback();            // GPS模块回调函数      
+//        gnss_uart_callback();            // GPS模块回调函数      
         
     }
     else                                // 串口2发送中断

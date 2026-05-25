@@ -62,6 +62,10 @@ static int16 remote_control_apply_dead_zone(int16 data)
 
 static int16 remote_control_calc_channel(uint8 channel)
 {
+    if(!remote_is_online())
+    {
+        return 0;
+    }
     int16 raw_data_to_zero = (int16)(remote_get_channel(channel)) - REMOTE_CONTROL_CENTER_RAW;
     float coeff = (float)(REMOTE_CONTROL_OUTPUT_MAX - REMOTE_CONTROL_OUTPUT_MIN) / 1600.0f; //目前倍率为1
     float output_data;
@@ -94,10 +98,15 @@ uint8 remote_left_01_switch_ctrl(void)
 
 void remote_left_02_switch_ctrl(void)
 {
+    if(!remote_is_online())
+    {
+        manual_protect_flag = 0;
+        return;
+    }
     uint16 raw_data = remote_get_channel(REMOTE_CONTROL_LEFT_02_SWITCH_CH);
 
-    if(raw_data < REMOTE_CONTROL_CENTER_RAW) protect_flag = 0;
-    else  protect_flag = 1;
+    if(raw_data < REMOTE_CONTROL_CENTER_RAW) manual_protect_flag = 1;   // 往上拨触发保护
+    else  manual_protect_flag = 0;
 }
 
 void remote_right_01_switch_ctrl(void)
@@ -108,14 +117,19 @@ void remote_right_01_switch_ctrl(void)
 void remote_right_02_switch_ctrl(void)
 {
     static uint16 last_raw = 0;
-    static uint8 has_last_raw = 0;
+    static uint8 has_last_raw = 0; 
     uint16 raw_data = remote_get_channel(REMOTE_CONTROL_RIGHT_02_SWITCH_CH);
 
-    if(has_last_raw && raw_data != last_raw)
+    if(!remote_is_online())
     {
-        jump_flag = 1;
+        raw_data = 992;
+        return ;
     }
 
-    last_raw = raw_data;
+    if(has_last_raw && raw_data != last_raw)
+    { 
+        jump_flag = 1; 
+    } 
+    last_raw = raw_data; 
     has_last_raw = 1;
 }

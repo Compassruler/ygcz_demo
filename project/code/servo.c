@@ -184,7 +184,7 @@ void calculate_servo_angle(float alpha, float beta, float *front, float *rear)
 // 速度偏移和舵机角度坐标对应
 void leg_control(void)
 {
-  if(protect_flag == 1)
+  if(auto_protect_flag|| manual_protect_flag == 1)
     {
       leg_disable();
     }

@@ -2,4 +2,7 @@
 float car_speed;
 float true_speed;
 
-int protect_flag = 0;
+
+
+int auto_protect_flag = 0;
+int manual_protect_flag = 0;

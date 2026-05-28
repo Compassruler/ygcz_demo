@@ -39,6 +39,12 @@ int main(void)
 
 */
 
+//=========================== WiFi SPI 调参配置 ===========================
+#define ENABLE_ASSISTANT_PARAM  (1)                             // 1 开启 | 0 关闭
+
+//=========================== 显示模式选择 ===========================
+#define IMAGE_DEBUG_TYPE        (3)                             // 0 无显示 | 1 仅屏幕 | 2 仅 WiFi 图传 | 3 同时显示
+
 //=========================== WiFi SPI 配置 ===========================
 #define WIFI_SSID               "WiFi名称"                      // WiFi SSID
 #define WIFI_PWD                "12345678"                      // WiFi 密码
@@ -72,8 +78,9 @@ static void ipc_callback(uint32 data)
 }
 
 // 屏幕显示函数
-void debug_image_screen_display()
+void debug_image_screen_display(JumpDetectParams_t jump_params)
 {
+    #if IMAGE_DEBUG_TYPE == 1 || IMAGE_DEBUG_TYPE == 3
     //在显示屏上显示摄像头图像
     camera_debug_on_screen(
         IMAGE_X,
@@ -84,36 +91,52 @@ void debug_image_screen_display()
 
     // 四个绘制绿色标识线屏幕函数
     screen_show_threshold_horizontal_bar(
-        IMAGE_Y + JUMP_ROW - JUMP_ROW_TOTAL + 1,
+        IMAGE_Y + jump_params.check_row - jump_params.check_row_count + 1,
         IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
         2
     );
 
     screen_show_threshold_horizontal_bar(
-        IMAGE_Y + JUMP_ROW,
+        IMAGE_Y + jump_params.check_row,
         IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
         2
     );
 
     screen_show_threshold_vertical_bar(
-        IMAGE_X + JUMP_COLUMN,
+        IMAGE_X + jump_params.check_column,
         IMAGE_Y,
         IMAGE_DISPLAY_HEIGHT - 1,
         2
     );
 
     screen_show_threshold_vertical_bar(
-        IMAGE_X + JUMP_COLUMN + JUMP_COLUMN_TOTAL - 1,
+        IMAGE_X + jump_params.check_column + jump_params.check_column_count - 1,
         IMAGE_Y,
         IMAGE_DISPLAY_HEIGHT - 1,
         2
     );
+    #endif
 }
 
 // WiFi SPI 函数
 void debug_image_wifispi_display()
 {
+    #if IMAGE_DEBUG_TYPE == 2 || IMAGE_DEBUG_TYPE == 3
     camera_debug_on_wifi_spi(CAMERA_WIFI_IMAGE_SEND_DIV_DEFAULT);
+    #endif
+}
+
+// 调参设定与更新函数
+static void jump_param_update_from_assistant(JumpDetectParams_t *jump_params)
+{
+    camera_assistant_parameter_update();
+    camera_assistant_parameter_read_uint16(1, &jump_params->check_row,          0, MT9V03X_H - 1);
+    camera_assistant_parameter_read_uint16(2, &jump_params->check_row_count,    1, MT9V03X_H);
+    camera_assistant_parameter_read_uint16(3, &jump_params->check_column,       0, MT9V03X_W - 1);
+    camera_assistant_parameter_read_uint16(4, &jump_params->check_column_count, 1, MT9V03X_W);
+    camera_assistant_parameter_read_uint32(5, &jump_params->dot_count,          0, MT9V03X_IMAGE_SIZE);
+    camera_assistant_parameter_read_uint32(6, &jump_params->multi_frame,        1, 30);
+    camera_assistant_parameter_read_uint32(7, &jump_params->cooldown_time_ms,   0, 5000);
 }
 
 int main(void)
@@ -153,13 +176,27 @@ int main(void)
 
     camera_init();                                      // MT9V03X 摄像头初始化
     screen_init();                                      // 屏幕 初始化
+
+    #if ENABLE_ASSISTANT_PARAM
+    camera_assistant_wifi_spi_init(
+        WIFI_SSID, 
+        WIFI_PWD, 
+        TARGET_IP, 
+        TARGET_PORT, 
+        LOCAL_PORT
+
+    );                                                  // WiFi SPI + 调参 初始化
+
+    #else
     camera_wifi_spi_init(
         WIFI_SSID, 
         WIFI_PWD, 
         TARGET_IP, 
         TARGET_PORT, 
         LOCAL_PORT
-    );                                                  // WiFi SPI 初始化
+    );                                                  // 仅限 WiFi SPI 初始化
+    #endif
+
     pit_ms_init(PIT_CH1, 1);                            // PIT_CH1 1ms周期中断，用于 sys_ms 计时
     ipc_communicate_init(IPC_PORT_2, ipc_callback);     // IPC 初始化
     system_delay_ms(500);                               // 等待 核0 完成 IPC 初始化
@@ -167,6 +204,11 @@ int main(void)
     
     while(true)
     {
+        // 如果启用 WiFi SPI 调参，则更新跳跃参数
+        #if ENABLE_ASSISTANT_PARAM
+        jump_param_update_from_assistant(&jump_params);
+        #endif
+
         // 当检测到有帧时
         if(camera_has_frame())
         {
@@ -175,7 +217,7 @@ int main(void)
             ipc_result = ipc_send_data((uint32)is_jump);  // 发送 跳跃标志位值
 
             // 使用屏幕显示图像
-            debug_image_screen_display();   
+            debug_image_screen_display(jump_params);   
             
             // 使用 WiFi SPI 发送图像
             debug_image_wifispi_display();
@@ -194,3 +236,4 @@ int main(void)
         }
     }
 }
+

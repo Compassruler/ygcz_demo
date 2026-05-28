@@ -13,6 +13,33 @@ static uint8 camera_processed_image_valid = 0;
 static uint8 camera_wifi_spi_ready = 0;
 static uint16 camera_wifi_frame_count = 0;
 
+static uint8 camera_assistant_channel_to_index(uint8 channel, uint8 *index)
+{
+    if((0 == channel) || (SEEKFREE_ASSISTANT_SET_PARAMETR_COUNT < channel) || (NULL == index))
+    {
+        return 0;
+    }
+
+    *index = channel - 1;
+
+    return 1;
+}
+
+static float camera_limit_float(float value, float min_value, float max_value)
+{
+    if(value < min_value)
+    {
+        return min_value;
+    }
+
+    if(value > max_value)
+    {
+        return max_value;
+    }
+
+    return value;
+}
+
 static void camera_config_assistant_image(void)
 {
     seekfree_assistant_camera_information_config(
@@ -99,6 +126,97 @@ uint8 camera_wifi_spi_init(char *wifi_ssid, char *pass_word, char *target_ip, ch
     camera_wifi_spi_ready = 1;
 
     return 0;
+}
+
+uint8 camera_assistant_wifi_spi_init(char *wifi_ssid, char *pass_word, char *target_ip, char *target_port, char *local_port)
+{
+    return camera_wifi_spi_init(wifi_ssid, pass_word, target_ip, target_port, local_port);
+}
+
+void camera_assistant_parameter_update(void)
+{
+    seekfree_assistant_data_analysis();
+}
+
+uint8 camera_assistant_parameter_read_float(uint8 channel, float *value, float min_value, float max_value)
+{
+    uint8 index = 0;
+    float parameter_value = 0.0f;
+
+    if((NULL == value) || !camera_assistant_channel_to_index(channel, &index))
+    {
+        return 0;
+    }
+
+    if(!seekfree_assistant_parameter_update_flag[index])
+    {
+        return 0;
+    }
+
+    seekfree_assistant_parameter_update_flag[index] = 0;
+    parameter_value = seekfree_assistant_parameter[index];
+    *value = camera_limit_float(parameter_value, min_value, max_value);
+
+    return 1;
+}
+
+uint8 camera_assistant_parameter_read_int16(uint8 channel, int16 *value, int16 min_value, int16 max_value)
+{
+    float parameter_value = 0.0f;
+    int16 rounded_value = 0;
+
+    if(NULL == value)
+    {
+        return 0;
+    }
+
+    if(!camera_assistant_parameter_read_float(channel, &parameter_value, (float)min_value, (float)max_value))
+    {
+        return 0;
+    }
+
+    rounded_value = (0.0f <= parameter_value) ? (int16)(parameter_value + 0.5f) : (int16)(parameter_value - 0.5f);
+    *value = rounded_value;
+
+    return 1;
+}
+
+uint8 camera_assistant_parameter_read_uint16(uint8 channel, uint16 *value, uint16 min_value, uint16 max_value)
+{
+    float parameter_value = 0.0f;
+
+    if(NULL == value)
+    {
+        return 0;
+    }
+
+    if(!camera_assistant_parameter_read_float(channel, &parameter_value, (float)min_value, (float)max_value))
+    {
+        return 0;
+    }
+
+    *value = (uint16)(parameter_value + 0.5f);
+
+    return 1;
+}
+
+uint8 camera_assistant_parameter_read_uint32(uint8 channel, uint32 *value, uint32 min_value, uint32 max_value)
+{
+    float parameter_value = 0.0f;
+
+    if(NULL == value)
+    {
+        return 0;
+    }
+
+    if(!camera_assistant_parameter_read_float(channel, &parameter_value, (float)min_value, (float)max_value))
+    {
+        return 0;
+    }
+
+    *value = (uint32)(parameter_value + 0.5f);
+
+    return 1;
 }
 
 void camera_init(void)

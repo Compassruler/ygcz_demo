@@ -84,6 +84,101 @@ uint8 camera_wifi_spi_init(char *wifi_ssid, char *pass_word, char *target_ip, ch
 
 
 /**
+ * @brief 初始化 WiFi SPI 逐飞助手通道，用于上位机图传或参数调试。
+ *
+ * 本函数是 `camera_wifi_spi_init()` 的语义化封装，适合在主函数中表达
+ * “本次使用 WiFi SPI 作为逐飞助手调参通道”。
+ *
+ * @param wifi_ssid   需要连接的 WiFi 名称。
+ * @param pass_word   WiFi 密码；如果目标 WiFi 无密码，可传入 NULL。
+ * @param target_ip   上位机 IP 地址字符串。
+ * @param target_port 上位机端口号字符串。
+ * @param local_port  本机端口号字符串，通常可使用 "6666"。
+ *
+ * @return uint8
+ *         - 0：初始化成功；
+ *         - 非 0：WiFi 连接或 Socket 连接失败。
+ *
+ * @note 逐飞助手同一时间只有一组发送/接收接口。调用本函数后，
+ *       参数调试、图传和示波器都会走 WiFi SPI。
+ */
+uint8 camera_assistant_wifi_spi_init(char *wifi_ssid, char *pass_word, char *target_ip, char *target_port, char *local_port);
+
+
+/**
+ * @brief 解析逐飞助手接收到的参数数据包。
+ *
+ * 调参时应在主循环中周期性调用本函数。调用后，若上位机修改了某个通道，
+ * 对应的 `camera_assistant_parameter_read_xxx()` 函数即可读到新值。
+ *
+ * @return void
+ *
+ * @note 本函数只解析数据包，不决定参数含义；每个通道对应什么变量由主文件自行设置。
+ */
+void camera_assistant_parameter_update(void);
+
+
+/**
+ * @brief 从逐飞助手指定通道读取 float 参数，并自动限幅。
+ *
+ * @param channel   上位机参数通道号，范围为 1~8。
+ * @param value     读取成功后写入的新参数值。
+ * @param min_value 允许的最小值。
+ * @param max_value 允许的最大值。
+ *
+ * @return uint8
+ *         - 1：该通道收到新参数，且已写入 `value`；
+ *         - 0：该通道没有新参数，或参数指针/通道号非法。
+ */
+uint8 camera_assistant_parameter_read_float(uint8 channel, float *value, float min_value, float max_value);
+
+
+/**
+ * @brief 从逐飞助手指定通道读取 int16 参数，并自动四舍五入和限幅。
+ *
+ * @param channel   上位机参数通道号，范围为 1~8。
+ * @param value     读取成功后写入的新参数值。
+ * @param min_value 允许的最小值。
+ * @param max_value 允许的最大值。
+ *
+ * @return uint8
+ *         - 1：该通道收到新参数，且已写入 `value`；
+ *         - 0：该通道没有新参数，或参数指针/通道号非法。
+ */
+uint8 camera_assistant_parameter_read_int16(uint8 channel, int16 *value, int16 min_value, int16 max_value);
+
+
+/**
+ * @brief 从逐飞助手指定通道读取 uint16 参数，并自动四舍五入和限幅。
+ *
+ * @param channel   上位机参数通道号，范围为 1~8。
+ * @param value     读取成功后写入的新参数值。
+ * @param min_value 允许的最小值。
+ * @param max_value 允许的最大值。
+ *
+ * @return uint8
+ *         - 1：该通道收到新参数，且已写入 `value`；
+ *         - 0：该通道没有新参数，或参数指针/通道号非法。
+ */
+uint8 camera_assistant_parameter_read_uint16(uint8 channel, uint16 *value, uint16 min_value, uint16 max_value);
+
+
+/**
+ * @brief 从逐飞助手指定通道读取 uint32 参数，并自动四舍五入和限幅。
+ *
+ * @param channel   上位机参数通道号，范围为 1~8。
+ * @param value     读取成功后写入的新参数值。
+ * @param min_value 允许的最小值。
+ * @param max_value 允许的最大值。
+ *
+ * @return uint8
+ *         - 1：该通道收到新参数，且已写入 `value`；
+ *         - 0：该通道没有新参数，或参数指针/通道号非法。
+ */
+uint8 camera_assistant_parameter_read_uint32(uint8 channel, uint32 *value, uint32 min_value, uint32 max_value);
+
+
+/**
  * @brief 初始化 MT9V03X 摄像头模块。
  *
  * 该函数会初始化错误提示 LED，并持续尝试初始化 MT9V03X 摄像头。

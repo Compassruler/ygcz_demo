@@ -22,15 +22,15 @@ void banlance_init(void)
     banlance.pitch_angle_pid.K = 1.0f;            // 缩放系数
 
     // 横滚角度环 PID 初始化
-    banlance.roll_angle_pid.kp = 0.8f;            // 比例系数
+    banlance.roll_angle_pid.kp = 0.2f;            // 比例系数
     banlance.roll_angle_pid.ki = 0.0f;            // 积分系数
-    banlance.roll_angle_pid.kd = 0.0f;            // 微分系数
-    banlance.roll_angle_pid.maxIntegral = 0;      // 积分限幅
+    banlance.roll_angle_pid.kd = 0.1f;            // 微分系数
+    banlance.roll_angle_pid.maxIntegral = 10;      // 积分限幅
     banlance.roll_angle_pid.maxOutput = 10000;    // 输出限幅
     banlance.roll_angle_pid.K = 1.0f;             // 缩放系数
 
     // 偏航角度环 PID 初始化
-    banlance.yaw_angle_pid.kp = 3.0f;             // 比例系数
+    banlance.yaw_angle_pid.kp = 8.0f;             // 比例系数
     banlance.yaw_angle_pid.ki = 0.0f;             // 积分系数
     banlance.yaw_angle_pid.kd = 0.0f;             // 微分系数
     banlance.yaw_angle_pid.maxIntegral = 0;       // 积分限幅

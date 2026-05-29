@@ -11,3 +11,5 @@ uint8 remote_left_01_last_flag = 0;
 uint8 remote_right_01_last_flag = 0;
 uint8 remote_left_01_now_flag = 0;
 uint8 remote_right_01_now_flag = 0;
+
+float target_yaw = 0;

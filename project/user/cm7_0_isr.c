@@ -8,7 +8,13 @@ void pit0_ch0_isr()
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
     float dt = 0.020;  // ins调用周期（s）
+    float target_yaw_rate = 0.0f;
+    float yaw_rate_scale = 0.1f;
+    
     system_time ++;
+    remote_update();
+    //remote_left_02_switch_ctrl();   // 如果你要用保护开关
+    //remote_right_02_switch_ctrl();  // 如果你要用遥控触发跳跃
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
     
@@ -38,7 +44,6 @@ void pit0_ch0_isr()
       
       first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);          // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle
       first_order_complementary_filtering(&roll_filter, imu_data.gyro_x, roll_acc2angle);            // 输出roll_filter.filtering_angle
-      
       pid_pos_calc(&banlance.pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&banlance.roll_angle_pid, 0, roll_filter.filtering_angle);
 
@@ -49,7 +54,7 @@ void pit0_ch0_isr()
       
     }
     
-    jump_control();
+    //jump_control();
 
     // 角速度环
     pid_pos_calc(&banlance.gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y);

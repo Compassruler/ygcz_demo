@@ -1116,22 +1116,76 @@
     <group>
         <name>code</name>
         <file>
+            <name>$PROJ_DIR$\..\..\code\camera.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\camera.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\camera_image_processing.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\camera_image_processing.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\filter.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\filter.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\flag_value.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\flag_value.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\flash.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\flash.h</name>
+        </file>
+        <file>
             <name>$PROJ_DIR$\..\..\code\imu.c</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\code\imu.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\..\code\motor.c</name>
+            <name>$PROJ_DIR$\..\..\code\ins.c</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\..\code\motor.h</name>
+            <name>$PROJ_DIR$\..\..\code\ins.h</name>
         </file>
         <file>
-            <name>$PROJ_DIR$\..\..\code\serco.h</name>
+            <name>$PROJ_DIR$\..\..\code\pid.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\pid.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\remote_control.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\remote_control.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\screen.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\screen.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\code\servo.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\servo.h</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\small_driver_uart_control.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\..\code\small_driver_uart_control.h</name>
         </file>
         <file>
             <name>$PROJ_DIR$\..\..\code\本文件夹作用.txt</name>

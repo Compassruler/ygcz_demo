@@ -5,13 +5,13 @@ BANLANCE banlance;
 
 void banlance_init(void)
 {
-    // 角速度环 PID 初始化
-    banlance.gyro_pid.kp = 2.5f;           // 比例系数
-    banlance.gyro_pid.ki = 0.0f;           // 积分系数
-    banlance.gyro_pid.kd = 0.0f;           // 微分系数
-    banlance.gyro_pid.maxIntegral = 0.0f;  // 积分限幅
-    banlance.gyro_pid.maxOutput = 10000;   // 输出限幅
-    banlance.gyro_pid.K = 1.0f;            // 缩放系数
+    // 俯仰角速度环 PID 初始化
+    banlance.pitch_gyro_pid.kp = 2.5f;           // 比例系数
+    banlance.pitch_gyro_pid.ki = 0.0f;           // 积分系数
+    banlance.pitch_gyro_pid.kd = 0.0f;           // 微分系数
+    banlance.pitch_gyro_pid.maxIntegral = 0.0f;  // 积分限幅
+    banlance.pitch_gyro_pid.maxOutput = 10000;   // 输出限幅
+    banlance.pitch_gyro_pid.K = 1.0f;            // 缩放系数
 
     // 俯仰角度环 PID 初始化
     banlance.pitch_angle_pid.kp = 61.0f;           // 比例系数
@@ -30,13 +30,21 @@ void banlance_init(void)
     banlance.roll_angle_pid.K = 1.0f;             // 缩放系数
 
     // 偏航角度环 PID 初始化
-    banlance.yaw_angle_pid.kp = 8.0f;             // 比例系数
+    banlance.yaw_angle_pid.kp = 10.0f;             // 比例系数
     banlance.yaw_angle_pid.ki = 0.0f;             // 积分系数
     banlance.yaw_angle_pid.kd = 0.0f;             // 微分系数
     banlance.yaw_angle_pid.maxIntegral = 0;       // 积分限幅
     banlance.yaw_angle_pid.maxOutput = 10000;     // 输出限幅
     banlance.yaw_angle_pid.K = 1.0f;              // 缩放系数
-
+    
+    // 偏航角速度环 PID 初始化
+    banlance.yaw_gyro_pid.kp = 1.0f;             // 比例系数
+    banlance.yaw_gyro_pid.ki = 0.0f;             // 积分系数
+    banlance.yaw_gyro_pid.kd = 0.0f;             // 微分系数
+    banlance.yaw_gyro_pid.maxIntegral = 0;       // 积分限幅
+    banlance.yaw_gyro_pid.maxOutput = 10000;     // 输出限幅
+    banlance.yaw_gyro_pid.K = 1.0f;              // 缩放系数
+    
     // 速度环 PID 初始化
     banlance.speed_pid.kp = 0.5f;            // 比例系数
     banlance.speed_pid.ki = 0.0f;            // 积分系数

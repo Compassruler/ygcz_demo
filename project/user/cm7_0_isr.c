@@ -8,8 +8,6 @@ void pit0_ch0_isr()
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
     float dt = 0.020;  // ins调用周期（s）
-    float target_yaw_rate = 0.0f;
-    float yaw_rate_scale = 0.1f;
     
     system_time ++;
     remote_update();
@@ -47,23 +45,25 @@ void pit0_ch0_isr()
       pid_pos_calc(&banlance.pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&banlance.roll_angle_pid, 0, roll_filter.filtering_angle);
 
-      target_yaw += remote_left_right_ctrl() * 0.0005f;
-      pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle); // 航向角PID
+      target_yaw += remote_left_right_ctrl() * 0.0005f; 
+      pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle); // 航向角PID 没使用
       
       leg_control(); // 5ms调用一次
       
     }
     
-    //jump_control();
+    jump_control();
 
     // 角速度环
-    pid_pos_calc(&banlance.gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y);
+    pid_pos_calc(&banlance.pitch_gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y); // 俯仰角
+    pid_pos_calc(&banlance.yaw_gyro_pid, remote_left_right_ctrl() * 1.0f, imu_data.gyro_z);
 
-    int balance_out = (int)banlance.gyro_pid.output;
-    int yaw_out     = (int)banlance.yaw_angle_pid.output; 
+    int balance_out = (int)banlance.pitch_gyro_pid.output;
+    int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
+//    int yaw_out     = (int)banlance.yaw_angle_pid.output; 
 //    int yaw_out     = remote_left_right_ctrl() / 2; 
     
-    if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
+    if(fabs(pitch_filter.filtering_angle) > 100.0f || fabs(true_speed) >=12.0f) // 自动保护
       {
         auto_protect_flag = 1;
       }
@@ -78,7 +78,7 @@ void pit0_ch0_isr()
       }
     else
     {
-      small_driver_set_duty(&small_driver_value,-(balance_out + yaw_out), (balance_out - yaw_out)); 
+      small_driver_set_duty(&small_driver_value,-(balance_out + yaw_gyro_out), (balance_out - yaw_gyro_out)); 
 //    small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
     }
 }

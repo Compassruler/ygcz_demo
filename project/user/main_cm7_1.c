@@ -157,11 +157,11 @@ int main(void)
     screen_data_item_t data_table[] =
     {
         {"Jump",     SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
-        {"FPS",      SCREEN_DATA_UINT,     {.uint_value = 0},  0},
+        {"FPS",      SCREEN_DATA_UINT,     {.uint_value = 0 }, 0},
         {"IPCstate", SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
         {"Row",      SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
         {"Column",   SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
-        {"DotCount", SCREEN_DATA_UINT,     {.uint_value = 0},  0},
+        {"DotCount", SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
     };  // 屏幕数据列表
 
     uint8 is_jump = 0;                // 跳跃触发标志位，触发后受冷却时间限制
@@ -170,6 +170,7 @@ int main(void)
     uint32 fps = 0;                   // FPS
     char str_row_range[32];           // 行识别信息显示用字符串
     char str_column_range[32];        // 列识别信息显示用字符串
+    char str_dot_info[32];            // 检测点信息显示用字符串
 
     clock_init(SYSTEM_CLOCK_250M);
     debug_info_init();
@@ -213,7 +214,7 @@ int main(void)
         if(camera_has_frame())
         {
             frame_count++;
-            is_jump = camera_processing(sys_ms, jump_params);  // 检测跳跃
+            is_jump = camera_processing(sys_ms, &jump_params);  // 检测跳跃
             ipc_result = ipc_send_data((uint32)is_jump);  // 发送 跳跃标志位值
 
             // 使用屏幕显示图像
@@ -223,14 +224,15 @@ int main(void)
             debug_image_wifispi_display();
 
             // 屏幕显示参数
-            sprintf(str_row_range, "%d | %d", JUMP_ROW, JUMP_ROW_TOTAL);
-            sprintf(str_column_range, "%d | %d", JUMP_COLUMN, JUMP_COLUMN_TOTAL);
-            data_table[0].value.str_value   = (is_jump) ? "JUMP" : "Waiting";
+            sprintf(str_row_range,    "%d | %d", jump_params.check_row,    jump_params.check_row_count);
+            sprintf(str_column_range, "%d | %d", jump_params.check_column, jump_params.check_column_count);
+            sprintf(str_dot_info,     "%d | %s", jump_params.dot_count,    (jump_params.dot_type) ? "White" : "Black");
+            data_table[0].value.str_value   = (is_jump) ? "JUMP" : "Waiting...";
             data_table[1].value.uint_value  = calc_fps(sys_ms, &frame_count, &fps);
             data_table[2].value.str_value   = (ipc_result == 0) ? "OK" : "Failed";
             data_table[3].value.str_value   = str_row_range;
             data_table[4].value.str_value   = str_column_range;
-            data_table[5].value.uint_value  = JUMP_DOT_COUNT;
+            data_table[5].value.str_value   = str_dot_info;
             screen_show_data_table(data_table, 6);
 
         }

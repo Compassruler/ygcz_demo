@@ -286,40 +286,58 @@ uint32 calc_fps(uint32 time_ms, uint32 *frame_count, uint32 *fps)
     return *fps;
 }
 
-uint8 camera_processing(uint32 time_ms, JumpDetectParams_t jump_params_t)
+uint8 camera_processing(uint32 time_ms, JumpDetectParams_t *jump_params)
 {
     uint8 jump_detected = 0;
+    uint32 required_frame_count = 0;
     static uint32 multi_frame_count = 0;
+
+    if(NULL == jump_params)
+    {
+        return 0;
+    }
 
     if(!camera_copy_and_process_frame())
     {
         return 0;
     }
 
-    // 严格检测：要求检测区域内每一行、每一列的黑色像素数量都达到阈值
-    if(jump_params_t.algo_type == CAMERA_JUMP_ALGO_STRICT)
+    required_frame_count = jump_params->multi_frame;
+    if(0 == required_frame_count)
     {
+        required_frame_count = 1;
+    }
+
+    // 严格检测：要求检测区域内每一行、每一列的黑色像素数量都达到阈值
+    if(jump_params->algo_type == CAMERA_JUMP_ALGO_STRICT)
+    {
+        if(jump_params->dot_count > 0xFFFFu)
+        {
+            multi_frame_count = 0;
+            return 0;
+        }
+
         jump_detected = camera_image_check_jump_strict(
             image_copy,
-            jump_params_t.check_row,
-            jump_params_t.check_row_count,
-            (uint16)jump_params_t.dot_count,
-            jump_params_t.check_column,
-            jump_params_t.check_column_count,
-            (uint16)jump_params_t.dot_count
+            jump_params->check_row,
+            jump_params->check_row_count,
+            (uint16)jump_params->dot_count,
+            jump_params->check_column,
+            jump_params->check_column_count,
+            (uint16)jump_params->dot_count
         );
     }
-    else if(jump_params_t.algo_type == CAMERA_JUMP_ALGO_AREA)
+    else if(jump_params->algo_type == CAMERA_JUMP_ALGO_AREA)
     {   
         // 矩形检测：统计指定矩形区域内的黑色或白色像素总数
         jump_detected = camera_image_check_jump_area(
             image_copy, 
-            jump_params_t.check_row, 
-            jump_params_t.check_row_count, 
-            jump_params_t.check_column, 
-            jump_params_t.check_column_count, 
-            jump_params_t.dot_count,
-            jump_params_t.dot_type
+            jump_params->check_row, 
+            jump_params->check_row_count, 
+            jump_params->check_column, 
+            jump_params->check_column_count, 
+            jump_params->dot_count,
+            jump_params->dot_type
         );
     }
     else
@@ -335,7 +353,7 @@ uint8 camera_processing(uint32 time_ms, JumpDetectParams_t jump_params_t)
     }
 
     multi_frame_count++;
-    if(multi_frame_count < jump_params_t.multi_frame)
+    if(multi_frame_count < required_frame_count)
     {
         return 0;
     }
@@ -343,5 +361,13 @@ uint8 camera_processing(uint32 time_ms, JumpDetectParams_t jump_params_t)
     multi_frame_count = 0;
 
     // 通过多帧确认后，再进入触发冷却过滤，避免连续重复触发
-    return camera_image_jump_trigger_filter(time_ms, jump_params_t.cooldown_time_ms, 1);
+    jump_detected = camera_image_jump_trigger_filter(time_ms, jump_params->cooldown_time_ms, 1);
+
+    if(jump_detected)
+    {
+        jump_params->dot_type = camera_dot_type_switch();
+        return 1;
+    }
+    
+    return 0;
 }

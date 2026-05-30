@@ -293,7 +293,6 @@ uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 che
         return 0;
     }
 
-    // 根据 dot_type 选择本次要统计的二值像素
     if(CAMERA_IMAGE_DOT_BLACK == dot_type)
     {
         target_dot_value = 0;
@@ -318,7 +317,6 @@ uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 che
         return 1;
     }
 
-    // 检测区域为：从 check_row 向上、从 check_column 向右形成的矩形。
     for(checked_rows = 0; checked_rows < check_row_count; checked_rows++)
     {
         y = check_row - checked_rows;
@@ -353,7 +351,7 @@ uint8 camera_image_check_jump_strict(uint8 image[MT9V03X_H][MT9V03X_W], uint16 c
 }
 
 
-// 跳跃触发冷却时间检查
+// 跳跃触发冷却时间检测
 uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, uint8 jump_detected)
 {
     static uint32 last_jump_time = 0;
@@ -373,4 +371,11 @@ uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, 
     last_jump_time = time_ms;
 
     return 1;
+}
+
+uint8 camera_dot_type_switch()
+{
+    static uint32 jump_trigger_count = 0;
+    jump_trigger_count++;
+    return (uint8)dot_type_list[jump_trigger_count % CAMERA_DOT_TYPE_LIST_COUNT];
 }

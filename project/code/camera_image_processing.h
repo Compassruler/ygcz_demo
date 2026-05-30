@@ -23,6 +23,15 @@ typedef struct
 
 } JumpDetectParams_t;               // 跳跃检测参数结构体
 
+// 跳跃触发成功后，下一次检测像素类型会按该列表循环切换
+static const uint32 dot_type_list[] =
+{
+    CAMERA_IMAGE_DOT_BLACK,
+    CAMERA_IMAGE_DOT_BLACK,
+    CAMERA_IMAGE_DOT_WHITE,
+};
+
+#define CAMERA_DOT_TYPE_LIST_COUNT     (sizeof(dot_type_list) / sizeof(dot_type_list[0]))
 
 /**
  * @brief 对 MT9V03X 灰度图像进行固定阈值二值化处理。
@@ -229,4 +238,24 @@ uint8 camera_image_check_jump_strict(uint8 image[MT9V03X_H][MT9V03X_W], uint16 c
  */
 uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, uint8 jump_detected);
 
+
+/**
+ * @brief 按跳跃触发次数循环切换检测像素类型。
+ *
+ * 本函数用于在跳跃触发成功后，记录一次触发次数，并用触发次数对
+ * `dot_type_list` 的长度取模，得到下一次需要检测的像素类型。
+ * 例如列表为 `{BLACK, BLACK, WHITE}`，且初始检测类型为列表第 0 项时，
+ * 后续检测顺序为：黑色 -> 黑色 -> 白色 -> 黑色 -> ...
+ * 
+ * 
+ * @return uint8
+ *         - 返回 `dot_type_list[jump_trigger_count % CAMERA_DOT_TYPE_LIST_COUNT]`；
+ *         - 每调用一次，内部触发次数自动加 1。
+ *
+ * @note 该函数只返回检测类型，不会直接修改任何 `JumpDetectParams_t` 参数；
+ *       使用时需要将返回值赋给 `jump_params->dot_type` 或 `jump_params.dot_type`。
+ * @note 本函数应只在一次跳跃被确认触发后调用；如果在未触发时频繁调用，
+ *       会导致检测类型提前切换。
+ */
+uint8 camera_dot_type_switch();
 #endif

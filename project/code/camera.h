@@ -245,23 +245,24 @@ uint32 calc_fps(uint32 time_ms, uint32 *frame_count, uint32 *fps);
  * 2. 复制 `mt9v03x_image` 到内部图像副本；
  * 3. 使用大津法自动阈值完成二值化；
  * 4. 执行黑色/白色孤立噪点过滤；
- * 5. 根据 `jump_params_t.algo_type` 选择严格检测或矩形区域总量检测；
- * 6. 根据 `jump_params_t.multi_frame` 做连续多帧确认；
- * 7. 根据 `jump_params_t.cooldown_time_ms` 做单次触发冷却过滤。
+ * 5. 根据 `jump_params->algo_type` 选择严格检测或矩形区域总量检测；
+ * 6. 根据 `jump_params->multi_frame` 做连续多帧确认；
+ * 7. 根据 `jump_params->cooldown_time_ms` 做单次触发冷却过滤；
+ * 8. 当跳跃触发成功时，自动切换 `jump_params->dot_type`，用于下一次检测相反颜色。
  *
- * @param time_ms       当前系统毫秒时间，用于跳跃冷却判断。
- * @param jump_params_t 跳跃检测参数结构体，包含检测区域、算法类型、像素类型、像素阈值、
- *                      连续检测帧数和冷却时间。
+ * @param time_ms     当前系统毫秒时间，用于跳跃冷却判断。
+ * @param jump_params 跳跃检测参数结构体指针，包含检测区域、算法类型、像素类型、像素阈值、
+ *                    连续检测帧数和冷却时间。函数可能会在触发成功后修改其中的 `dot_type`。
  *
  * @return uint8
  *         - 1：本次检测到新帧，并且检测到跳跃特征；
- *         - 0：当前没有新帧，或本次处理后未检测到跳跃特征。
+ *         - 0：当前没有新帧、参数指针为空，或本次处理后未检测到跳跃特征。
  *
  * @note 本函数不显示图像，也不进行无线发送。
  * @note 本函数只有在检测到新帧时才会执行处理；如果没有新帧，直接返回 0。
  * @note 本函数会在内部图像副本上处理，原始 `mt9v03x_image` 不会被直接修改。
- * @note 矩形区域检测可以通过 `jump_params_t.dot_type` 选择统计黑色或白色像素。
- * @note 严格检测当前仍以黑色像素为判断目标，并将 `jump_params_t.dot_count` 同时作为行阈值和列阈值。
+ * @note 矩形区域检测可以通过 `jump_params->dot_type` 选择统计黑色或白色像素。
+ * @note 严格检测当前仍以黑色像素为判断目标，并将 `jump_params->dot_count` 同时作为行阈值和列阈值。
  */
-uint8 camera_processing(uint32 time_ms, JumpDetectParams_t jump_params_t);
+uint8 camera_processing(uint32 time_ms, JumpDetectParams_t *jump_params);
 #endif

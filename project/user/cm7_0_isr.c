@@ -8,29 +8,26 @@ void pit0_ch0_isr()
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
     float dt = 0.020;  // ins调用周期（s）
-    
+
     system_time ++;
     remote_update();
-    //remote_left_02_switch_ctrl();   // 如果你要用保护开关
-    //remote_right_02_switch_ctrl();  // 如果你要用遥控触发跳跃
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
-    
+
      // 速度环 
     if(system_time % 20 == 0)
     {
       small_driver_get_speed(&small_driver_value);
-      // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
       pid_pos_calc(&banlance.speed_pid, remote_front_rear_ctrl(), car_speed);
-      
+
       if (road_memery_flag == 1)
       {
         true_speed = (rpmtotrue(-small_driver_value.receive_left_speed_data) + rpmtotrue(small_driver_value.receive_right_speed_data)) / 2;  
         ins_update(dt,yaw_angle,true_speed);  // ins数据更新
         
       }
-      
+
     }
 
     // 角度环
@@ -39,38 +36,34 @@ void pit0_ch0_isr()
       pitch_acc2angle =  imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);            // 角速度转角度 俯仰角
       roll_acc2angle  =  imu_acc2angle(imu_data.acc_y, imu_data.acc_x, imu_data.acc_z);            // 角速度转角度 横滚角
       yaw_angle += imu_data.gyro_z * 0.005f;                                                          // 直接对角速度做积分，yaw角的加速度不能得到yaw角
-      
+
       first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);          // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle
       first_order_complementary_filtering(&roll_filter, imu_data.gyro_x, roll_acc2angle);            // 输出roll_filter.filtering_angle
       pid_pos_calc(&banlance.pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&banlance.roll_angle_pid, 0, roll_filter.filtering_angle);
 
-      target_yaw += remote_left_right_ctrl() * 0.0005f; 
+      target_yaw += remote_left_right_ctrl() * 0.002f; 
       pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle); // 航向角PID 没使用
-      
+
       leg_control(); // 5ms调用一次
       
     }
-    
+
     jump_control();
 
     // 角速度环
     pid_pos_calc(&banlance.pitch_gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y); // 俯仰角
-    pid_pos_calc(&banlance.yaw_gyro_pid, remote_left_right_ctrl() * 1.0f, imu_data.gyro_z);
+//    pid_pos_calc(&banlance.yaw_gyro_pid, remote_left_right_ctrl() * 1.0f, imu_data.gyro_z);
+    pid_pos_calc(&banlance.yaw_gyro_pid,  banlance.yaw_angle_pid.output, imu_data.gyro_z);
 
     int balance_out = (int)banlance.pitch_gyro_pid.output;
     int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
 //    int yaw_out     = (int)banlance.yaw_angle_pid.output; 
-//    int yaw_out     = remote_left_right_ctrl() / 2; 
-    
+
     if(fabs(pitch_filter.filtering_angle) > 100.0f || fabs(true_speed) >=12.0f) // 自动保护
       {
         auto_protect_flag = 1;
       }
-    // if(fabs(pitch_filter.filtering_angle) < 10.0f && fabs(true_speed) < 1.0f) //自动取消保护 后面再用
-    //   {
-    //     auto_protect_flag = 0;
-    //   }
     
     if(auto_protect_flag || manual_protect_flag == 1)
       {
@@ -79,7 +72,6 @@ void pit0_ch0_isr()
     else
     {
       small_driver_set_duty(&small_driver_value,-(balance_out + yaw_gyro_out), (balance_out - yaw_gyro_out)); 
-//    small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
     }
 }
 

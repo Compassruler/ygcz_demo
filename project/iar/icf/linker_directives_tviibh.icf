@@ -114,6 +114,12 @@ define symbol _size_SRAM_CM7_0                  = cm7_0_sram_reserve;
 define symbol _base_SRAM_CM7_1                  = sram_base_address + cm0plus_sram_reserve + cm7_0_sram_reserve;
 define symbol _size_SRAM_CM7_1                  = sram_total_size_user - cm0plus_sram_reserve - cm7_0_sram_reserve;
 
+// The SeekFree MT9V03X capture buffer is fixed at 0x28026024 by the driver.
+// Keep CM7_0 application data away from that SRAM window.
+define symbol cm7_0_seekfree_camera_sram_reserve = 64K;
+define symbol _base_SRAM_CM7_0_APP              = _base_SRAM_CM7_0 + cm7_0_seekfree_camera_sram_reserve;
+define symbol _size_SRAM_CM7_0_APP              = _size_SRAM_CM7_0 - cm7_0_seekfree_camera_sram_reserve;
+
 // Code flash reservations
 define symbol _base_CODE_FLASH_CM0P             = code_flash_base_address;
 define symbol _size_CODE_FLASH_CM0P             = cm0plus_code_flash_reserve;
@@ -147,8 +153,8 @@ if(isdefinedsymbol(_CORE_cm0plus_))
 } 
 else if(isdefinedsymbol(_CORE_cm7_0_)) 
 {
-    define symbol _base_SRAM                    = _base_SRAM_CM7_0;
-    define symbol _size_SRAM                    = _size_SRAM_CM7_0;
+    define symbol _base_SRAM                    = _base_SRAM_CM7_0_APP;
+    define symbol _size_SRAM                    = _size_SRAM_CM7_0_APP;
     define symbol _base_CODE_FLASH              = _base_CODE_FLASH_CM7_0;
     define symbol _size_CODE_FLASH              = _size_CODE_FLASH_CM7_0;   
     define symbol _base_ITCM                    = cm7_0_itcm_base_address;
@@ -222,7 +228,7 @@ define region SFLASH_TOC2                       = mem:[from _base_SFLASH_TOC2   
 // CM7 regions are required in CM0+ linker script for assigning the CM7 binary further below. (IAR multi core debugging)
 if(isdefinedsymbol(_CORE_cm0plus_)) {
 
-    define region SRAM_CM7_0            = mem:[from _base_SRAM_CM7_0         size _size_SRAM_CM7_0       ];
+    define region SRAM_CM7_0            = mem:[from _base_SRAM_CM7_0_APP     size _size_SRAM_CM7_0_APP   ];
     define region CODE_FLASH_CM7_0      = mem:[from _base_CODE_FLASH_CM7_0   size _size_CODE_FLASH_CM7_0 ];
     define region SRAM_CM7_1            = mem:[from _base_SRAM_CM7_1         size _size_SRAM_CM7_1       ];
     define region CODE_FLASH_CM7_1      = mem:[from _base_CODE_FLASH_CM7_1   size _size_CODE_FLASH_CM7_1 ];

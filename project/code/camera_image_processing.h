@@ -20,6 +20,7 @@ typedef struct
     uint32 dot_count;               // 矩形检测时的像素总数阈值；严格检测时作为行/列阈值使用
     uint32 cooldown_time_ms;        // 跳跃触发后的冷却时间，单位 ms
     uint32 multi_frame;             // 连续检测到目标的帧数阈值，0 或 1 表示单帧触发
+    uint32 steps;                   // 已执行的识别步骤
 
 } JumpDetectParams_t;               // 跳跃检测参数结构体
 
@@ -257,5 +258,23 @@ uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, 
  * @note 本函数应只在一次跳跃被确认触发后调用；如果在未触发时频繁调用，
  *       会导致检测类型提前切换。
  */
-uint8 camera_dot_type_switch();
+uint8 camera_dot_type_switch(void);
+
+/**
+ * @brief 获取当前已经触发成功的跳跃次数。
+ *
+ * @return uint32 当前跳跃触发计数。
+ */
+uint32 camera_dot_type_get_steps(void);
+
+/**
+ * @brief 复位跳跃检测序列，并返回初始检测像素类型。
+ *
+ * @return uint8 `dot_type_list` 的第一个检测像素类型。
+ *
+ * @note 调用后应将返回值同步赋给 `jump_params.dot_type`，
+ *       这样内部计数和外部当前检测类型才能保持一致。
+ */
+uint8 camera_dot_type_reset(void);
+
 #endif

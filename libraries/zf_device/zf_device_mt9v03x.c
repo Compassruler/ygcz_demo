@@ -61,7 +61,7 @@ uint8 mt9v03x_image[MT9V03X_H][MT9V03X_W];
 static uint8 perfect_proportion = 0;
 
 #pragma location = 0x28026024                                                   // 将下面这个数组定义到指定的RAM地址
-__no_init uint8  mt9v03x_image_temp[MT9V03X_H][MT9V03X_W];                      
+__no_init uint8  mt9v03x_image_temp[MT9V03X_H][MT9V03X_W];
 #pragma location = 0x28006bf0
 __no_init uint16 mt9v03x_h_num;
 #pragma location = 0x28006bf2

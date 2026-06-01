@@ -1,5 +1,6 @@
 #include "zf_common_headfile.h"
 #include "camera.h"
+#include "button.h"
 
 /*
 核0 使用示例，将收到的 is_jump_from_core1 标志位输出到无线串口
@@ -55,18 +56,18 @@ int main(void)
 //=========================== 跳跃判断条件 ===========================
 #define JUMP_ALGO_TYPE          (1)                             // 跳跃检测算法选择
 
-#define JUMP_ROW                (82)                            // 行起始位置
-#define JUMP_ROW_TOTAL          (10)                            // 行向上检查行数
+#define JUMP_ROW                (98)                            // 行起始位置
+#define JUMP_ROW_TOTAL          (25)                            // 行向上检查行数
 
-#define JUMP_COLUMN             (40)                            // 列起始位置
-#define JUMP_COLUMN_TOTAL       (80)                            // 列向右检查行数
+#define JUMP_COLUMN             (55)                            // 列起始位置
+#define JUMP_COLUMN_TOTAL       (73)                            // 列向右检查行数
 
 #define JUMP_DOT_TYPE           (CAMERA_IMAGE_DOT_BLACK)        // 检测点类型
-#define JUMP_DOT_COUNT          (400)                           // 矩形内点阈值
+#define JUMP_DOT_COUNT          (837)                           // 矩形内点阈值
 
 #define JUMP_COOLDOWN_MS        (500)                           // 跳跃触发一次后的禁止重复触发时间
 
-#define JUMP_MULTI_FRAME        (3)                             // 有效帧阈值
+#define JUMP_MULTI_FRAME        (1)                             // 有效帧阈值
 //====================================================================
 
 volatile uint32 sys_ms = 0;      // 毫秒计时器
@@ -151,7 +152,8 @@ int main(void)
     .dot_type            = JUMP_DOT_TYPE,
     .dot_count           = JUMP_DOT_COUNT,
     .cooldown_time_ms    = JUMP_COOLDOWN_MS,
-    .multi_frame         = JUMP_MULTI_FRAME
+    .multi_frame         = JUMP_MULTI_FRAME,
+    .steps               = 0
     };  // 跳跃检测参数结构体
 
     screen_data_item_t data_table[] =
@@ -175,8 +177,11 @@ int main(void)
     clock_init(SYSTEM_CLOCK_250M);
     debug_info_init();
 
-    camera_init();                                      // MT9V03X 摄像头初始化
     screen_init();                                      // 屏幕 初始化
+    ipc_communicate_init(IPC_PORT_2, ipc_callback);     // IPC 初始化
+    button_init();                                      // 主板按钮 初始化
+    camera_init();                                      // MT9V03X 摄像头初始化
+    
 
     #if ENABLE_ASSISTANT_PARAM
     camera_assistant_wifi_spi_init(
@@ -199,12 +204,12 @@ int main(void)
     #endif
 
     pit_ms_init(PIT_CH1, 1);                            // PIT_CH1 1ms周期中断，用于 sys_ms 计时
-    ipc_communicate_init(IPC_PORT_2, ipc_callback);     // IPC 初始化
-    system_delay_ms(500);                               // 等待 核0 完成 IPC 初始化
     SCB_DisableDCache();                                // 关闭 CM7 DCache 放在所有初始化的最后
     
     while(true)
     {
+        button_update();  // 按钮状态更新
+
         // 如果启用 WiFi SPI 调参，则更新跳跃参数
         #if ENABLE_ASSISTANT_PARAM
         jump_param_update_from_assistant(&jump_params);
@@ -224,9 +229,9 @@ int main(void)
             debug_image_wifispi_display();
 
             // 屏幕显示参数
-            sprintf(str_row_range,    "%d | %d", jump_params.check_row,    jump_params.check_row_count);
-            sprintf(str_column_range, "%d | %d", jump_params.check_column, jump_params.check_column_count);
-            sprintf(str_dot_info,     "%d | %s", jump_params.dot_count,    (jump_params.dot_type) ? "White" : "Black");
+            sprintf(str_row_range,    "%d | %d",     jump_params.check_row,     jump_params.check_row_count);
+            sprintf(str_column_range, "%d | %d",     jump_params.check_column,  jump_params.check_column_count);
+            sprintf(str_dot_info,     "%d | (%d)%s", jump_params.dot_count, jump_params.steps, (jump_params.dot_type) ? "White" : "Black");
             data_table[0].value.str_value   = (is_jump) ? "JUMP" : "Waiting...";
             data_table[1].value.uint_value  = calc_fps(sys_ms, &frame_count, &fps);
             data_table[2].value.str_value   = (ipc_result == 0) ? "OK" : "Failed";
@@ -235,6 +240,13 @@ int main(void)
             data_table[5].value.str_value   = str_dot_info;
             screen_show_data_table(data_table, 6);
 
+        }
+
+        // 当检测到 按钮1 被按下后，重置检测序列
+        if (button_flag[BTN_1])
+        {
+            jump_params.dot_type = camera_dot_type_reset();
+            jump_params.steps = camera_dot_type_get_steps();
         }
     }
 }

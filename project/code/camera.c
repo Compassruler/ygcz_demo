@@ -366,6 +366,7 @@ uint8 camera_processing(uint32 time_ms, JumpDetectParams_t *jump_params)
     if(jump_detected)
     {
         jump_params->dot_type = camera_dot_type_switch();
+        jump_params->steps = camera_dot_type_get_steps();
         return 1;
     }
     

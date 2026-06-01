@@ -1,6 +1,8 @@
 #include "camera_image_processing.h"
 #include <string.h>
 
+static uint32 jump_trigger_count = 0;
+
 void vision_binary_fixed(uint8 image[MT9V03X_H][MT9V03X_W], uint8 threshold)
 {
     uint16 x = 0;
@@ -373,9 +375,19 @@ uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, 
     return 1;
 }
 
-uint8 camera_dot_type_switch()
+uint8 camera_dot_type_switch(void)
 {
-    static uint32 jump_trigger_count = 0;
     jump_trigger_count++;
     return (uint8)dot_type_list[jump_trigger_count % CAMERA_DOT_TYPE_LIST_COUNT];
+}
+
+uint32 camera_dot_type_get_steps(void)
+{
+    return jump_trigger_count;
+}
+
+uint8 camera_dot_type_reset(void)
+{
+    jump_trigger_count = 0;
+    return (uint8)dot_type_list[0];
 }

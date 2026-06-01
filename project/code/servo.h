@@ -126,6 +126,6 @@ void jump_step_a(int step_num);
 void jump_control(void);
 
 extern int jump_flag;
-//extern uint16 jump_time;
+extern int jump_time;
 
 #endif

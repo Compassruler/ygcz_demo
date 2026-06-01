@@ -11,18 +11,18 @@ float X_L = 0.0f, Y_L = 0.0f;    // 左腿当前坐标
 float X_R = 0.0f, Y_R = 0.0f;    // 右腿当前坐标
 
 // 当前舵机角度
-float servoLeftFront_now  = 60.0f;
-float servoLeftRear_now   = 60.0f;
-float servoRightFront_now = 60.0f;
-float servoRightRear_now  = 60.0f;
+float servoLeftFront_now  = 90.0f;
+float servoLeftRear_now   = 90.0f;
+float servoRightFront_now = 90.0f;
+float servoRightRear_now  = 90.0f;
 
 float speed_to_x_offset, balance_to_y_offset;
 
-// 目标舵机坐标
+// 目标舵机坐标 20（90度）
 float X_left = 0.0f;
-float Y_left = 30.0f;
+float Y_left = 20.0f;
 float X_right = 0.0f;
-float Y_right = 30.0f;
+float Y_right = 20.0f;
 
 // 当前实际坐标（0为初始值）
 float XLeft = 0.0f, YLeft = 0.0f;
@@ -44,8 +44,8 @@ float servoRightFront, servoRightRear;  // 前后舵机角度
 // jump部分
 const jump_control_struct jump_control_config[] =
 {
-    {  0, 108, jump_step_a, "起跳"     },
-    {108, 250, jump_step_a, "收脚"     },
+    {  0, 70, jump_step_a, "起跳"     },
+    {70, 250, jump_step_a, "收脚"     },
     {250, 330, jump_step_a, "准备缓冲" },
     {330, 430, jump_step_a, "执行缓冲" },
 };
@@ -53,7 +53,7 @@ const jump_control_struct jump_control_config[] =
 const uint8 jump_step = sizeof(jump_control_config) / sizeof(jump_control_struct);
 
 int jump_flag = 0;
-uint16 jump_time = 0;
+int jump_time = 0;
 
 float servoLeftFront_jump = 0, servoLeftRear_jump = 0, servoRightFront_jump = 0, servoRightRear_jump = 0;
 float servoLeftFront_jump_now = 0, servoLeftRear_jump_now = 0, servoRightFront_jump_now = 0, servoRightRear_jump_now= 0;
@@ -258,32 +258,32 @@ void jump_step_a(int step_num)
   {
     case 0: // 起跳蓄力
     {
-      Set_angle(170, 170, 170, 170);
+      Set_angle(140, 140, 140, 140);
     }break;
 
     case 1: // 收腿
     {
-      Set_angle(30, 30, 30, 30);
+      Set_angle(90, 90, 90, 90);
     }break;
 
     case 2:  // 准备缓冲
     {
-      Set_angle(90, 90, 90, 90);
+//      Set_angle(90, 90, 90, 90);
       // 初始化当前值
-      servoLeftFront_jump  = 90;
-      servoLeftRear_jump   = 90;
-      servoRightFront_jump = 90;
-      servoRightRear_jump  = 90;
+//      servoLeftFront_jump  = 90;
+//      servoLeftRear_jump   = 90;
+//      servoRightFront_jump = 90;
+//      servoRightRear_jump  = 90;
     }break;
 
     case 3: // 执行缓冲（平滑）
     {
-      servoLeftFront_jump_now  = servo_step(servoLeftFront_jump, 60, 2);
-      servoLeftRear_jump_now   = servo_step(servoLeftRear_jump, 60, 2);
-      servoRightFront_jump_now = servo_step(servoRightFront_jump, 60, 2);
-      servoRightRear_jump_now  = servo_step(servoRightRear_jump, 60, 2);
-
-      Set_angle(servoLeftFront_jump_now, servoLeftRear_jump_now, servoRightFront_jump_now, servoRightRear_jump_now);
+//      servoLeftFront_jump  = servo_step(servoLeftFront_jump, 90, 2);
+//      servoLeftRear_jump   = servo_step(servoLeftRear_jump, 90, 2);
+//      servoRightFront_jump = servo_step(servoRightFront_jump, 90, 2);
+//      servoRightRear_jump  = servo_step(servoRightRear_jump, 90, 2);
+//
+//      Set_angle(servoLeftFront_jump, servoLeftRear_jump, servoRightFront_jump, servoRightRear_jump);
     }break;
 
     default: break;

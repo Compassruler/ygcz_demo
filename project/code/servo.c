@@ -11,18 +11,18 @@ float X_L = 0.0f, Y_L = 0.0f;    // 左腿当前坐标
 float X_R = 0.0f, Y_R = 0.0f;    // 右腿当前坐标
 
 // 当前舵机角度
-float servoLeftFront_now  = 60.0f;
-float servoLeftRear_now   = 60.0f;
-float servoRightFront_now = 60.0f;
-float servoRightRear_now  = 60.0f;
+float servoLeftFront_now  = 110.0f;
+float servoLeftRear_now   = 110.0f;
+float servoRightFront_now = 110.0f;
+float servoRightRear_now  = 110.0f;
 
 float speed_to_x_offset, balance_to_y_offset;
 
-// 目标舵机坐标
+// 目标舵机坐标 20（90度）
 float X_left = 0.0f;
-float Y_left = 20.0f;
+float Y_left = 50.0f;
 float X_right = 0.0f;
-float Y_right = 20.0f;
+float Y_right = 50.0f;
 
 // 当前实际坐标（0为初始值）
 float XLeft = 0.0f, YLeft = 0.0f;
@@ -44,8 +44,8 @@ float servoRightFront, servoRightRear;  // 前后舵机角度
 // jump部分
 const jump_control_struct jump_control_config[] =
 {
-    {  0, 108, jump_step_a, "起跳"     },
-    {108, 250, jump_step_a, "收脚"     },
+    {  0, 70, jump_step_a, "起跳"     },
+    {70, 250, jump_step_a, "收脚"     },
     {250, 330, jump_step_a, "准备缓冲" },
     {330, 430, jump_step_a, "执行缓冲" },
 };
@@ -53,7 +53,7 @@ const jump_control_struct jump_control_config[] =
 const uint8 jump_step = sizeof(jump_control_config) / sizeof(jump_control_struct);
 
 int jump_flag = 0;
-uint16 jump_time = 0;
+int jump_time = 0;
 
 float servoLeftFront_jump = 0, servoLeftRear_jump = 0, servoRightFront_jump = 0, servoRightRear_jump = 0;
 float servoLeftFront_jump_now = 0, servoLeftRear_jump_now = 0, servoRightFront_jump_now = 0, servoRightRear_jump_now= 0;
@@ -193,16 +193,20 @@ void leg_control(void)
     static float speed_offset_filter = 0;
     static float roll_offset_filter  = 0;
 
+    // 跳跃时减弱 PID 影响
+    float pid_scale = (jump_flag == 1) ? 0.2f : 1.0f;
+    
     // X 方向：俯仰偏移计算
-    float target_offset = banlance.speed_pid.output * 0.1f;
+    float target_offset = banlance.speed_pid.output * 0.1f * pid_scale;
     speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;
     speed_to_x_offset = func_limit_ab(speed_offset_filter, -45.0f, 45.0f);
-
+    
     // Y 方向：横滚偏移计算
-    float roll_target_offset = banlance.roll_angle_pid.output * 0.8f;
+//    float roll_target_offset = 0;
+    float roll_target_offset = banlance.roll_angle_pid.output * 5.0f * pid_scale;
     if(fabs(roll_filter.filtering_angle) < 1.0f) roll_target_offset = 0;
     roll_offset_filter = (roll_offset_filter * 19.0f + roll_target_offset) / 20.0f;
-    balance_to_y_offset = func_limit_ab(roll_offset_filter, -60.0f, 60.0f);
+    balance_to_y_offset = func_limit_ab(roll_offset_filter, -100.0f, 100.0f);
   
     // 输入限幅
     if(Y_left < 10) Y_left = 10;
@@ -216,9 +220,13 @@ void leg_control(void)
     float target_X_right = X_right + X_OFFSET - speed_to_x_offset;
   
     // Y 方向：只做伸长
-    float target_Y_left  = Y_left  + Y_OFFSET - (balance_to_y_offset > 0.0f ? 0.0f : balance_to_y_offset);
-    float target_Y_right = Y_right + Y_OFFSET + (balance_to_y_offset > 0.0f ? balance_to_y_offset : 0.0f);
-  
+//    float target_Y_left  = Y_left  + Y_OFFSET + (balance_to_y_offset > 0.0f ? balance_to_y_offset : 0.0f);
+//    float target_Y_right = Y_right + Y_OFFSET - (balance_to_y_offset > 0.0f ? 0.0f : balance_to_y_offset);
+    
+    // Y 方向：一边伸长 一边收缩（效果好）
+    float target_Y_left  = Y_left  + Y_OFFSET + balance_to_y_offset;
+    float target_Y_right = Y_right + Y_OFFSET - balance_to_y_offset;
+                                                 
     // 更新实际坐标
     XLeft  = target_X_left;
     YLeft  = target_Y_left;
@@ -254,32 +262,32 @@ void jump_step_a(int step_num)
   {
     case 0: // 起跳蓄力
     {
-      Set_angle(170, 170, 170, 170);
+      Set_angle(140, 140, 140, 140);
     }break;
 
     case 1: // 收腿
     {
-      Set_angle(30, 30, 30, 30);
+      Set_angle(90, 90, 90, 90);
     }break;
 
     case 2:  // 准备缓冲
     {
-      Set_angle(90, 90, 90, 90);
+//      Set_angle(90, 90, 90, 90);
       // 初始化当前值
-      servoLeftFront_jump  = 90;
-      servoLeftRear_jump   = 90;
-      servoRightFront_jump = 90;
-      servoRightRear_jump  = 90;
+//      servoLeftFront_jump  = 90;
+//      servoLeftRear_jump   = 90;
+//      servoRightFront_jump = 90;
+//      servoRightRear_jump  = 90;
     }break;
 
     case 3: // 执行缓冲（平滑）
     {
-      servoLeftFront_jump_now  = servo_step(servoLeftFront_jump, 60, 2);
-      servoLeftRear_jump_now   = servo_step(servoLeftRear_jump, 60, 2);
-      servoRightFront_jump_now = servo_step(servoRightFront_jump, 60, 2);
-      servoRightRear_jump_now  = servo_step(servoRightRear_jump, 60, 2);
-
-      Set_angle(servoLeftFront_jump_now, servoLeftRear_jump_now, servoRightFront_jump_now, servoRightRear_jump_now);
+//      servoLeftFront_jump  = servo_step(servoLeftFront_jump, 90, 2);
+//      servoLeftRear_jump   = servo_step(servoLeftRear_jump, 90, 2);
+//      servoRightFront_jump = servo_step(servoRightFront_jump, 90, 2);
+//      servoRightRear_jump  = servo_step(servoRightRear_jump, 90, 2);
+//
+//      Set_angle(servoLeftFront_jump, servoLeftRear_jump, servoRightFront_jump, servoRightRear_jump);
     }break;
 
     default: break;

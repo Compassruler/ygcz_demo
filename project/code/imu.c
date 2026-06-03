@@ -17,7 +17,7 @@ void imu_data_get(void)
     imu660rb_get_gyro(); // 获取陀螺仪数据
 
     imu_raw.acc_x = imu660rb_acc_x - 160; // 加速度零偏修正
-    imu_raw.acc_y = imu660rb_acc_y - 440;
+    imu_raw.acc_y = -(imu660rb_acc_y - 440);
     imu_raw.acc_z = imu660rb_acc_z;
     imu_raw.gyro_x = imu660rb_gyro_x - 5;  // 陀螺仪零偏修正
     imu_raw.gyro_y = imu660rb_gyro_y + 6;

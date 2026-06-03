@@ -17,11 +17,11 @@ int main(void)
   gpio_init(BUZZER_PIN, GPO, GPIO_LOW, GPO_PUSH_PULL);  // 蜂鸣器初始化
   screen_init();                                        // 屏幕初始化
   flash_init();
-//  remote_control_init();                                // 遥控器初始化
+  remote_control_init();                                // 遥控器初始化
   wireless_uart_init();
-  road_memery_start_flag = 1;
-  road_memery_finish_flag = 0;
-  road_recurrent_flag = 0;
+ // road_memery_start_flag = 1;
+ // road_memery_finish_flag = 0;
+ // road_recurrent_flag = 0;
 int i = 0;
   flash_yaw_flag = 0;
   while(true)

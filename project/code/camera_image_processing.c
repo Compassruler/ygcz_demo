@@ -1,6 +1,8 @@
 #include "camera_image_processing.h"
 #include <string.h>
 
+static uint32 jump_trigger_count = 0;
+
 void vision_binary_fixed(uint8 image[MT9V03X_H][MT9V03X_W], uint8 threshold)
 {
     uint16 x = 0;
@@ -263,13 +265,14 @@ uint8 camera_image_check_jump_columns(uint8 image[MT9V03X_H][MT9V03X_W], uint16 
     return (checked_columns == check_column_count);
 }
 
-uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint32 black_count)
+uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint32 dot_count, uint32 dot_type)
 {
     uint16 x = 0;
     uint16 y = 0;
     uint16 checked_rows = 0;
     uint16 checked_columns = 0;
-    uint32 current_black_count = 0;
+    uint8 target_dot_value = 0;
+    uint32 current_dot_count = 0;
     uint32 check_area_size = 0;
 
     if((MT9V03X_H <= check_row) || (MT9V03X_W <= check_column))
@@ -292,13 +295,26 @@ uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 che
         return 0;
     }
 
-    check_area_size = (uint32)check_row_count * (uint32)check_column_count;
-    if(check_area_size < black_count)
+    if(CAMERA_IMAGE_DOT_BLACK == dot_type)
+    {
+        target_dot_value = 0;
+    }
+    else if(CAMERA_IMAGE_DOT_WHITE == dot_type)
+    {
+        target_dot_value = 255;
+    }
+    else
     {
         return 0;
     }
 
-    if(0 == black_count)
+    check_area_size = (uint32)check_row_count * (uint32)check_column_count;
+    if(check_area_size < dot_count)
+    {
+        return 0;
+    }
+
+    if(0 == dot_count)
     {
         return 1;
     }
@@ -311,11 +327,11 @@ uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 che
         {
             x = check_column + checked_columns;
 
-            if(image[y][x] == 0)
+            if(image[y][x] == target_dot_value)
             {
-                current_black_count++;
+                current_dot_count++;
 
-                if(current_black_count >= black_count)
+                if(current_dot_count >= dot_count)
                 {
                     return 1;
                 }
@@ -334,4 +350,44 @@ uint8 camera_image_check_jump_strict(uint8 image[MT9V03X_H][MT9V03X_W], uint16 c
     }
 
     return camera_image_check_jump_columns(image, check_row, check_row_count, check_column, check_column_count, column_black_count);
+}
+
+
+// 跳跃触发冷却时间检测
+uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, uint8 jump_detected)
+{
+    static uint32 last_jump_time = 0;
+    static uint8 has_triggered = 0;
+
+    if(!jump_detected)
+    {
+        return 0;
+    }
+
+    if(has_triggered && ((time_ms - last_jump_time) < cooldown_time_ms))
+    {
+        return 0;
+    }
+
+    has_triggered = 1;
+    last_jump_time = time_ms;
+
+    return 1;
+}
+
+uint8 camera_dot_type_switch(void)
+{
+    jump_trigger_count++;
+    return (uint8)dot_type_list[jump_trigger_count % CAMERA_DOT_TYPE_LIST_COUNT];
+}
+
+uint32 camera_dot_type_get_steps(void)
+{
+    return jump_trigger_count;
+}
+
+uint8 camera_dot_type_reset(void)
+{
+    jump_trigger_count = 0;
+    return (uint8)dot_type_list[0];
 }

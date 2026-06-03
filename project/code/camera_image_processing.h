@@ -3,6 +3,37 @@
 
 #include "zf_common_headfile.h"
 
+#define CAMERA_JUMP_ALGO_STRICT       (0)    // 严格检测：行检测和列检测必须同时通过
+#define CAMERA_JUMP_ALGO_AREA         (1)    // 矩形检测：矩形区域内指定颜色像素总数达到阈值
+
+#define CAMERA_IMAGE_DOT_BLACK        (0)    // 检测二值图中的黑色像素，像素值为 0
+#define CAMERA_IMAGE_DOT_WHITE        (1)    // 检测二值图中的白色像素，像素值为 255
+
+typedef struct 
+{
+    uint16 algo_type;               // 算法类型选择：CAMERA_JUMP_ALGO_STRICT 或 CAMERA_JUMP_ALGO_AREA
+    uint16 check_row;               // 检测矩形的起始行，后续从该行向上检查
+    uint16 check_row_count;         // 从起始行向上检查的行数量
+    uint16 check_column;            // 检测矩形的起始列，后续从该列向右检查
+    uint16 check_column_count;      // 从起始列向右检查的列数量
+    uint32 dot_type;                // 检测像素类型：CAMERA_IMAGE_DOT_BLACK 或 CAMERA_IMAGE_DOT_WHITE
+    uint32 dot_count;               // 矩形检测时的像素总数阈值；严格检测时作为行/列阈值使用
+    uint32 cooldown_time_ms;        // 跳跃触发后的冷却时间，单位 ms
+    uint32 multi_frame;             // 连续检测到目标的帧数阈值，0 或 1 表示单帧触发
+    uint32 steps;                   // 已执行的识别步骤
+
+} JumpDetectParams_t;               // 跳跃检测参数结构体
+
+// 跳跃触发成功后，下一次检测像素类型会按该列表循环切换
+static const uint32 dot_type_list[] =
+{
+    CAMERA_IMAGE_DOT_BLACK,
+    CAMERA_IMAGE_DOT_BLACK,
+    CAMERA_IMAGE_DOT_WHITE,
+};
+
+#define CAMERA_DOT_TYPE_LIST_COUNT     (sizeof(dot_type_list) / sizeof(dot_type_list[0]))
+
 /**
  * @brief 对 MT9V03X 灰度图像进行固定阈值二值化处理。
  *
@@ -137,28 +168,31 @@ uint8 camera_image_check_jump_columns(uint8 image[MT9V03X_H][MT9V03X_W], uint16 
 
 
 /**
- * @brief 在指定矩形区域内执行黑色像素总量检测。
+ * @brief 在指定矩形区域内执行指定颜色像素总量检测。
  *
  * 该函数从 `check_row` 开始向上取 `check_row_count` 行，
  * 从 `check_column` 开始向右取 `check_column_count` 列，形成一个矩形检测区域。
- * 只要该矩形区域内黑色像素总数大于或等于 `black_count`，函数立即返回检测通过。
+ * 只要该矩形区域内指定颜色像素总数大于或等于 `dot_count`，函数立即返回检测通过。
  *
  * @param image              待检测的二值图像数组，尺寸必须为 `MT9V03X_H * MT9V03X_W`。
  * @param check_row          起始检测行的纵向坐标，范围应小于 `MT9V03X_H`。
  * @param check_row_count    从起始检测行开始，继续向上检查的行数。
  * @param check_column       起始检测列的横向坐标，范围应小于 `MT9V03X_W`。
  * @param check_column_count 从起始检测列开始，继续向右检查的列数。
- * @param black_count        整个矩形区域内需要达到的黑色像素总数阈值。
+ * @param dot_count          整个矩形区域内需要达到的指定颜色像素总数阈值。
+ * @param dot_type           需要统计的像素类型：
+ *                           - CAMERA_IMAGE_DOT_BLACK：统计黑色像素，像素值为 0；
+ *                           - CAMERA_IMAGE_DOT_WHITE：统计白色像素，像素值为 255。
  *
  * @return uint8
- *         - 1：矩形区域内黑色像素总数达到阈值；
- *         - 0：矩形区域内黑色像素总数未达到阈值，或检测区域越界。
+ *         - 1：矩形区域内指定颜色像素总数达到阈值；
+ *         - 0：指定颜色像素总数未达到阈值、检测区域越界，或 `dot_type` 非法。
  *
  * @note 调用本函数前，应先完成二值化处理。
  * @note 当前检测区域为从 `check_row` 向上、从 `check_column` 向右形成的矩形区域。
- * @note 若 `black_count` 大于矩形区域像素总数，函数会直接返回 0。
+ * @note 若 `dot_count` 大于矩形区域像素总数，函数会直接返回 0。
  */
-uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint32 black_count);
+uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint32 dot_count, uint32 dot_type);
 
 
 /**
@@ -187,5 +221,60 @@ uint8 camera_image_check_jump_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 che
  * @note 当前检测区域为从 `check_row` 向上、从 `check_column` 向右形成的矩形区域。
  */
 uint8 camera_image_check_jump_strict(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 row_black_count, uint16 check_column, uint16 check_column_count, uint16 column_black_count);
+
+
+/**
+ * @brief 对跳跃检测结果进行单次触发冷却过滤。
+ *
+ * 当检测到跳跃后，本函数会记录触发时间。在冷却时间未结束前，
+ * 即使底层视觉算法继续检测到跳跃，也会返回 0，避免连续重复触发。
+ *
+ * @param time_ms          当前系统毫秒时间。
+ * @param cooldown_time_ms 冷却时间，单位 ms。
+ * @param jump_detected    原始跳跃检测结果，1 表示检测到跳跃。
+ *
+ * @return uint8
+ *         - 1：本次允许触发跳跃；
+ *         - 0：未检测到跳跃，或处于冷却时间内。
+ */
+uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, uint8 jump_detected);
+
+
+/**
+ * @brief 按跳跃触发次数循环切换检测像素类型。
+ *
+ * 本函数用于在跳跃触发成功后，记录一次触发次数，并用触发次数对
+ * `dot_type_list` 的长度取模，得到下一次需要检测的像素类型。
+ * 例如列表为 `{BLACK, BLACK, WHITE}`，且初始检测类型为列表第 0 项时，
+ * 后续检测顺序为：黑色 -> 黑色 -> 白色 -> 黑色 -> ...
+ * 
+ * 
+ * @return uint8
+ *         - 返回 `dot_type_list[jump_trigger_count % CAMERA_DOT_TYPE_LIST_COUNT]`；
+ *         - 每调用一次，内部触发次数自动加 1。
+ *
+ * @note 该函数只返回检测类型，不会直接修改任何 `JumpDetectParams_t` 参数；
+ *       使用时需要将返回值赋给 `jump_params->dot_type` 或 `jump_params.dot_type`。
+ * @note 本函数应只在一次跳跃被确认触发后调用；如果在未触发时频繁调用，
+ *       会导致检测类型提前切换。
+ */
+uint8 camera_dot_type_switch(void);
+
+/**
+ * @brief 获取当前已经触发成功的跳跃次数。
+ *
+ * @return uint32 当前跳跃触发计数。
+ */
+uint32 camera_dot_type_get_steps(void);
+
+/**
+ * @brief 复位跳跃检测序列，并返回初始检测像素类型。
+ *
+ * @return uint8 `dot_type_list` 的第一个检测像素类型。
+ *
+ * @note 调用后应将返回值同步赋给 `jump_params.dot_type`，
+ *       这样内部计数和外部当前检测类型才能保持一致。
+ */
+uint8 camera_dot_type_reset(void);
 
 #endif

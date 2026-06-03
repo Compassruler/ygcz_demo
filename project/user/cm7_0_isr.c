@@ -8,20 +8,14 @@ void pit0_ch0_isr()
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
     system_time ++;
+    remote_update();
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
-    
-    // 跳跃测试demo    
-//    if(system_time == 5000)
-//    {
-//      jump_flag = 1;
-//    }
-    
+
      // 速度环 
     if(system_time % 20 == 0)
     {
       small_driver_get_speed(&small_driver_value);
-      // (-small_driver_value.receive_left_speed_data) (small_driver_value.receive_right_speed_data) 向前数值为正 向后数值为负
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
       if (remote_right_01_now_flag == 1)
       {
@@ -48,33 +42,36 @@ void pit0_ch0_isr()
       while(yaw_angle < -180.0f) target_yaw += 360.0f;
       first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);          // 一阶互补滤波处理，这里输出pitch_filter.filtering_angle
       first_order_complementary_filtering(&roll_filter, imu_data.gyro_x, roll_acc2angle);            // 输出roll_filter.filtering_angle
-      
       pid_pos_calc(&banlance.pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&banlance.roll_angle_pid, 0, roll_filter.filtering_angle);
       if (remote_right_01_now_flag == 1)
         pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle);
       
-      else pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
-//      pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
-      leg_control(); // 5ms调用一次       
+      else 
+      {
+        target_yaw_remote += remote_left_right_ctrl() * 0.002f;
+        pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);// 航向角PID 没使用
+         
     }
-    
+        //      pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
+      leg_control(); // 5ms调用一次      
+    }
+
     jump_control();
 
     // 角速度环
-    pid_pos_calc(&banlance.gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y);
+    pid_pos_calc(&banlance.pitch_gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y); // 俯仰角
+//    pid_pos_calc(&banlance.yaw_gyro_pid, remote_left_right_ctrl() * 1.0f, imu_data.gyro_z);
+    pid_pos_calc(&banlance.yaw_gyro_pid,  banlance.yaw_angle_pid.output, imu_data.gyro_z);
 
-    int balance_out = (int)banlance.gyro_pid.output;
-    int yaw_out     = (int)banlance.yaw_angle_pid.output;
-    
-    if(fabs(pitch_filter.filtering_angle) > 40.0f || fabs(true_speed) >=8.0f) // 自动保护
+    int balance_out = (int)banlance.pitch_gyro_pid.output;
+    int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
+//    int yaw_out     = (int)banlance.yaw_angle_pid.output; 
+
+    if(fabs(pitch_filter.filtering_angle) > 80.0f || fabs(true_speed) >=8.0f) // 自动保护
       {
         auto_protect_flag = 1;
       }
-    // if(fabs(pitch_filter.filtering_angle) < 10.0f && fabs(true_speed) < 1.0f) //自动取消保护 后面再用
-    //   {
-    //     auto_protect_flag = 0;
-    //   }
     
     if(auto_protect_flag || manual_protect_flag == 1)
       {
@@ -82,8 +79,7 @@ void pit0_ch0_isr()
       }
     else
     {
-      small_driver_set_duty(&small_driver_value,-(balance_out + yaw_out), (balance_out - yaw_out)); 
-//    small_driver_set_duty(&small_driver_value, -(int)gyro_pid.output, (int)gyro_pid.output );
+      small_driver_set_duty(&small_driver_value,-(balance_out + yaw_gyro_out), (balance_out - yaw_gyro_out)); 
     }
 }
 

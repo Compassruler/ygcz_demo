@@ -37,10 +37,11 @@ typedef struct
 
 typedef struct
 {
-    PID gyro_pid;          // 角速度环pid结构体
+    PID pitch_gyro_pid;    // 角速度环pid结构体
     PID pitch_angle_pid;  // 俯仰角度环pid结构体
     PID roll_angle_pid;   // 横滚角度环pid结构体
-    PID yaw_angle_pid;    // 速度环
+    PID yaw_angle_pid;    // 偏航角度环pid结构体
+    PID yaw_gyro_pid;    // 偏航角速度环pid结构体
     PID speed_pid;       // 速度环pid结构体
 } BANLANCE;
 

@@ -67,4 +67,6 @@ void pid_inc_calc(PID *pid, float reference, float feedback);
 
 // rpm转为真实线速度单位 m/s
 float rpmtotrue(short int rpm);
+// 真实线速度(m/s) 转为prm 转/min
+int truetorpm(float v);
 #endif

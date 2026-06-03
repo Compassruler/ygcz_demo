@@ -68,3 +68,14 @@ void imu_update(void)
   pitch_acc2angle = imu_acc2angle(imu_data.acc_x, imu_data.acc_y, imu_data.acc_z);
   first_order_complementary_filtering(&pitch_filter, imu_data.gyro_y, pitch_acc2angle);        // 一阶互补滤波，结果写入 pitch_filter.filtering_angle
 }
+
+float angle_limit(float angle)
+{
+    while(angle > PI)
+        angle -= 2.0f * PI;
+
+    while(angle < -PI)
+        angle += 2.0f * PI;
+
+    return angle;
+}

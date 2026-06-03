@@ -116,7 +116,26 @@ void remote_left_02_switch_ctrl(void)
 
 void remote_right_01_switch_ctrl(void)
 {
-    uint16 raw_data = remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH);
+     if(!remote_is_online())
+    {
+        return;
+    }        
+    remote_right_01_last_flag = remote_right_01_now_flag;
+  if(remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH)<REMOTE_CONTROL_CENTER_RAW)
+  {
+    remote_right_01_now_flag = 1;
+//  road_memery_flag = 1;
+  }
+       else if (remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH)>=200 && remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH) < 1500)
+         remote_right_01_now_flag = 0;
+       else 
+         remote_right_01_now_flag = 2;
+         
+   if(remote_right_01_last_flag == 0 && remote_right_01_now_flag == 1)
+    {
+      x = 0.0f;
+      y = 0.0f;
+    }
 }
 
 void remote_right_02_switch_ctrl(void)

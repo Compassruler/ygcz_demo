@@ -50,4 +50,6 @@ float imu_acc2angle(float acc_main, float acc_oth1, float acc_oth2);
 // 函数声明：更新 IMU 处理流程，执行互补滤波
 void imu_update(void);
 
+// 函数声明：角度转弧度
+float angle_limit(float angle); 
 #endif

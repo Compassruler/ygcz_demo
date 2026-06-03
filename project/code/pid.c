@@ -112,3 +112,12 @@ float rpmtotrue(short int rpm)
     float v = omega * wheel_radius;
     return v;
 }
+
+int truetorpm(float v)
+{
+    float rpm;
+    rpm = v / (2.0f * 3.14159265f * wheel_radius) * 60.0f;
+    rpm = (int)rpm;
+    return rpm;
+
+}

@@ -72,7 +72,7 @@ typedef struct
     {
         const char *str_value;
         int32       int_value;
-        uint32      uint_value;
+        uint16      uint_value;
         float       float_value;
     } value;
 

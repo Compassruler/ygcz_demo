@@ -14,7 +14,6 @@ extern uint8 remote_right_01_last_flag;
 extern uint8 remote_left_01_now_flag;
 extern uint8 remote_right_01_now_flag;
 
-<<<<<<< HEAD
 extern float target_yaw_turn;
 extern int flash_task_flag;
 
@@ -22,9 +21,7 @@ extern float KP_DIS;
 extern float DIST_TH;
 extern int MAX_SPEED;
 extern int MIN_SPEED;
-=======
-extern float target_yaw; // 目标航向角 （遥控用）
+extern float target_yaw_remote; // 目标航向角 （遥控用）
 
 
->>>>>>> 97c83c0068a711009e6c3a2711feb7fa078a9049
 #endif

@@ -88,6 +88,102 @@ uint8 camera_image_binary_otsu(uint8 image[MT9V03X_H][MT9V03X_W])
     return threshold;
 }
 
+uint8 camera_image_binary_otsu_roi(uint8 image[MT9V03X_H][MT9V03X_W], uint16 roi_row, uint16 roi_row_count, uint16 roi_column, uint16 roi_column_count)
+{
+    uint16 x = 0;
+    uint16 y = 0;
+    uint16 checked_rows = 0;
+    uint16 checked_columns = 0;
+    uint16 threshold_temp = 0;
+    uint8  threshold = 0;
+    uint32 total = 0;
+    uint32 sum = 0;
+    uint32 sum_background = 0;
+    uint32 weight_background = 0;
+    uint32 weight_foreground = 0;
+    uint32 histogram[256] = {0};
+    double mean_background = 0;
+    double mean_foreground = 0;
+    double between_class_variance = 0;
+    double max_between_class_variance = 0;
+
+    if((MT9V03X_H <= roi_row) || (MT9V03X_W <= roi_column))
+    {
+        return camera_image_binary_otsu(image);
+    }
+
+    if((0 == roi_row_count) || (0 == roi_column_count))
+    {
+        return camera_image_binary_otsu(image);
+    }
+
+    if((roi_row + 1) < roi_row_count)
+    {
+        return camera_image_binary_otsu(image);
+    }
+
+    if((MT9V03X_W - roi_column) < roi_column_count)
+    {
+        return camera_image_binary_otsu(image);
+    }
+
+    total = (uint32)roi_row_count * (uint32)roi_column_count;
+
+    for(checked_rows = 0; checked_rows < roi_row_count; checked_rows++)
+    {
+        y = roi_row - checked_rows;
+
+        for(checked_columns = 0; checked_columns < roi_column_count; checked_columns++)
+        {
+            x = roi_column + checked_columns;
+            histogram[image[y][x]]++;
+        }
+    }
+
+    for(threshold_temp = 0; threshold_temp < 256; threshold_temp++)
+    {
+        sum += threshold_temp * histogram[threshold_temp];
+    }
+
+    for(threshold_temp = 0; threshold_temp < 256; threshold_temp++)
+    {
+        weight_background += histogram[threshold_temp];
+        if(weight_background == 0)
+        {
+            continue;
+        }
+
+        weight_foreground = total - weight_background;
+        if(weight_foreground == 0)
+        {
+            break;
+        }
+
+        sum_background += threshold_temp * histogram[threshold_temp];
+        mean_background = (double)sum_background / weight_background;
+        mean_foreground = (double)(sum - sum_background) / weight_foreground;
+        between_class_variance = (double)weight_background *
+                                 (double)weight_foreground *
+                                 (mean_background - mean_foreground) *
+                                 (mean_background - mean_foreground);
+
+        if(between_class_variance > max_between_class_variance)
+        {
+            max_between_class_variance = between_class_variance;
+            threshold = (uint8)threshold_temp;
+        }
+    }
+
+    if(0 == max_between_class_variance)
+    {
+        return camera_image_binary_otsu(image);
+    }
+
+    vision_binary_fixed(image, threshold);
+
+    return threshold;
+}
+
 void camera_image_filter_isolated_black(uint8 image[MT9V03X_H][MT9V03X_W])
 {
     uint16 x = 0;
@@ -353,7 +449,7 @@ uint8 camera_image_check_jump_strict(uint8 image[MT9V03X_H][MT9V03X_W], uint16 c
 }
 
 
-// 跳跃触发冷却时间检测
+// 跳跃触发冷却时间检�?
 uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, uint8 jump_detected)
 {
     static uint32 last_jump_time = 0;

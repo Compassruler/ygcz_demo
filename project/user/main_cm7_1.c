@@ -4,12 +4,10 @@
 #include "appipc.h"
 
 /*
-核0 使用示例，将收到的 is_jump_from_core1 标志位输出到无线串口
+核0 最简使用示例
 
 #include "zf_common_headfile.h"
 #include "appipc.h"
-
-char txt[32];
 
 volatile uint8 is_jump_from_core1 = 0;  // 来自 核1 的跳跃标志位值
 volatile uint8 is_jump_updated = 0;     // 数据更新标志位
@@ -29,7 +27,7 @@ int main(void)
     {   
         if(is_jump_updated)
         {
-            is_jump_updated = 0;
+            is_jump_updated = 0;  // 需要手动复位
 
             // 在这里使用 is_jump_from_core1 标志位, 1 为跳跃 0 为不跳跃，自动更新，无需手动复位
         }
@@ -38,11 +36,14 @@ int main(void)
 
 */
 
+//=========================== 启动选择 ===========================
+#define HOLD_MS                 (1500)                          // 启动时暂停跳跃时间
+
 //=========================== WiFi SPI 调参配置 ===========================
-#define ENABLE_ASSISTANT_PARAM  (2)                             // 2 启动 WiFi SPI 但不使用调参 | 1 开启 WiFi SPI 并启动调参 | 0 彻底关闭 WiFi SPI
+#define ENABLE_ASSISTANT_PARAM  (0)                             // 2 启动 WiFi SPI 但不使用调参 | 1 开启 WiFi SPI 并启动调参 | 0 彻底关闭 WiFi SPI
 
 //=========================== 显示模式选择 ===========================
-#define IMAGE_DEBUG_TYPE        (0)                             // 0 无显示 | 1 仅屏幕 | 2 仅 WiFi 图传 | 3 同时显示
+#define IMAGE_DEBUG_TYPE        (1)                             // 0 无显示 | 1 仅屏幕 | 2 仅 WiFi 图传 | 3 同时显示
                                                                 // 注意 当使用 WiFi 图传时 上面的 ENABLE_ASSISTANT_PARAM 是否设置为 1 或 2
 
 //=========================== WiFi SPI 配置 ===========================
@@ -74,46 +75,15 @@ int main(void)
 #define JUMP_MULTI_FRAME        (1)                             // 有效帧阈值
 //====================================================================
 
-volatile uint32 sys_ms = 0;      // 毫秒计时器
+volatile uint32 sys_ms = 0;  // 毫秒计时器
 
 // 屏幕显示函数
 void debug_image_screen_display(JumpDetectParams_t jump_params)
 {
     #if IMAGE_DEBUG_TYPE == 1 || IMAGE_DEBUG_TYPE == 3
-    //在显示屏上显示摄像头图像
-    camera_debug_on_screen(
-        IMAGE_X,
-        IMAGE_Y,
-        IMAGE_DISPLAY_WIDTH,
-        IMAGE_DISPLAY_HEIGHT
-    );
-
-    // 四个绘制绿色标识线屏幕函数
-    screen_show_threshold_horizontal_bar(
-        IMAGE_Y + jump_params.check_row - jump_params.check_row_count + 1,
-        IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
-        2
-    );
-
-    screen_show_threshold_horizontal_bar(
-        IMAGE_Y + jump_params.check_row,
-        IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
-        2
-    );
-
-    screen_show_threshold_vertical_bar(
-        IMAGE_X + jump_params.check_column,
-        IMAGE_Y,
-        IMAGE_DISPLAY_HEIGHT - 1,
-        2
-    );
-
-    screen_show_threshold_vertical_bar(
-        IMAGE_X + jump_params.check_column + jump_params.check_column_count - 1,
-        IMAGE_Y,
-        IMAGE_DISPLAY_HEIGHT - 1,
-        2
-    );
+    camera_debug_on_screen();                            // 在显示屏上显示摄像头图像
+    screen_show_detect_threshold_bar(jump_params);       // 识别矩形框 绘制四个绿色标识线
+    screen_show_roi_threshold_bar(jump_params);          // ROI矩形框 绘制四个粉色标识线
     #endif
 }
 
@@ -140,6 +110,33 @@ static void jump_param_update_from_assistant(JumpDetectParams_t *jump_params)
     #endif
 }
 
+// 统一更新函数
+void updates(uint32 sys_ms, JumpDetectParams_t *jump_params, uint32 fps, uint32 is_jump, uint8 ipc_result, uint32 *frame_count)
+{
+    button_update();                                   // 按钮状态更新
+    screen_show_table_t2(*jump_params, fps, is_jump);  // 屏幕显示参数更新
+
+    // 图像信息更新时
+    if (camera_has_frame())
+    {
+        (*frame_count)++;                              // 更新帧计数
+        debug_image_screen_display(*jump_params);      // 使用屏幕显示图像
+        debug_image_wifispi_display();                 // 使用 WiFi SPI 发送图像
+    }
+    
+    // 更新按钮状态，当检测到 按钮1 被按下后，重置检测序列
+    if (button_flag[BTN_1])
+    {
+        jump_params->dot_type = camera_dot_type_reset();
+        jump_params->steps    = camera_dot_type_get_steps();
+    }
+
+    // 如果启用 WiFi SPI 调参，则更新跳跃参数
+    #if ENABLE_ASSISTANT_PARAM
+    jump_param_update_from_assistant(jump_params);
+    #endif
+}
+
 int main(void)
 {
     JumpDetectParams_t jump_params = 
@@ -158,118 +155,56 @@ int main(void)
     .cooldown_time_ms         = JUMP_COOLDOWN_MS,
     .multi_frame              = JUMP_MULTI_FRAME,
     .steps                    = 0
-    };  // 跳跃检测参数结构体
+    };                                        // 跳跃检测参数结构体
+    uint8  is_jump      = 0;                  // 跳跃触发标志位
+    uint8  ipc_result   = APPIPC_BUSY;        // IPC发送结果：APPIPC_OK 成功，APPIPC_BUSY 失败或超时
+    uint32 frame_count  = 0;                  // 帧计数
+    uint32 fps          = 0;                  // FPS
 
-    screen_data_item_t data_table[] =
-    {
-        {"Jump",     SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
-        {"FPS",      SCREEN_DATA_UINT,     {.uint_value = 0 }, 0},
-        {"ROI",      SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
-        {"Area",     SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
-        {"Limits",   SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
-        {"DotCount", SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
-    };  // 屏幕数据列表
-
-    uint8 is_jump = 0;                // 跳跃触发标志位，触发后受冷却时间限制
-    uint8 ipc_result = APPIPC_BUSY;   // IPC发送结果：APPIPC_OK 成功，APPIPC_BUSY 失败或超时
-    uint32 frame_count = 0;           // 帧计数
-    uint32 fps = 0;                   // FPS
-    char str_roi_info[32];            // ROI范围显示用字符串
-    char str_area_info[32];           // 识别矩形框信息显示用字符串
-    char str_limit_info[32];          // 视觉限制信息显示用字符串
-    char str_dot_info[32];            // 检测点信息显示用字符串
-
-    clock_init(SYSTEM_CLOCK_250M);
-    debug_info_init();
-
-    screen_init();                                      // 屏幕 初始化
-    button_init();                                      // 主板按钮 初始化
-    camera_init();                                      // MT9V03X 摄像头初始化
+    clock_init(SYSTEM_CLOCK_250M);            // 系统 初始化
+    screen_init();                            // 屏幕 初始化
+    button_init();                            // 主板按钮 初始化
+    camera_init();                            // MT9V03X 摄像头初始化
+    pit_ms_init(PIT_CH1, 1);                  // PIT_CH1 1ms周期中断，用于 sys_ms 计时
     
-
     #if ENABLE_ASSISTANT_PARAM == 1
-    camera_assistant_wifi_spi_init(
-        WIFI_SSID, 
-        WIFI_PWD, 
-        TARGET_IP, 
-        TARGET_PORT, 
-        LOCAL_PORT
-
-    );                                                  // WiFi SPI + 调参 初始化
+    camera_assistant_wifi_spi_init(WIFI_SSID, WIFI_PWD, TARGET_IP, TARGET_PORT, LOCAL_PORT);  // WiFi SPI + 调参 初始化
 
     #elif ENABLE_ASSISTANT_PARAM == 2
-    camera_wifi_spi_init(
-        WIFI_SSID, 
-        WIFI_PWD, 
-        TARGET_IP, 
-        TARGET_PORT, 
-        LOCAL_PORT
-    );                                                  // 仅限 WiFi SPI 初始化
-    #else
-                                                        // 不初始化 WiFi SPI
+    camera_wifi_spi_init(WIFI_SSID, WIFI_PWD, TARGET_IP, TARGET_PORT, LOCAL_PORT);            // 仅限 WiFi SPI 初始化
     #endif
 
-    pit_ms_init(PIT_CH1, 1);                            // PIT_CH1 1ms周期中断，用于 sys_ms 计时
-    
     while(true)
     {
-        button_update();  // 按钮状态更新
+        updates(sys_ms, &jump_params, calc_fps(sys_ms, &frame_count, &fps), is_jump, ipc_result, &frame_count);  // 统一更新函数
 
-        // 如果启用 WiFi SPI 调参，则更新跳跃参数
-        #if ENABLE_ASSISTANT_PARAM
-        jump_param_update_from_assistant(&jump_params);
-        #endif
-
-        // 当检测到有帧时
-        if(camera_has_frame())
+        // 当检测到有帧时 且 当计时器时间大于启动时暂停跳跃时间执行
+        if (camera_has_frame() && sys_ms > HOLD_MS)
         {
-            frame_count++;
-            is_jump = camera_processing_roi(sys_ms, &jump_params);  // 检测跳跃（使用ROI）
-            ipc_result = appipc_send_u32((uint32)is_jump);  // 发送 跳跃标志位值
-
-            // 使用屏幕显示图像
-            debug_image_screen_display(jump_params);   
-            
-            // 使用 WiFi SPI 发送图像
-            debug_image_wifispi_display();
-
-            // 屏幕显示参数
-            sprintf(str_roi_info,     "R:%d | C:%d | r:%d | c:%d", jump_params.otsu_roi_row, jump_params.otsu_roi_column, jump_params.otsu_roi_row_count, jump_params.otsu_roi_column_count);
-            sprintf(str_area_info,    "R:%d | C:%d | r:%d | c:%d", jump_params.check_row,    jump_params.check_column,    jump_params.check_row_count,    jump_params.check_column_count);
-            sprintf(str_limit_info,   "Frame:%d | CD:%d",          jump_params.multi_frame,  jump_params.cooldown_time_ms);
-            sprintf(str_dot_info,     "%d | (%d)%s", jump_params.dot_count, jump_params.steps, (jump_params.dot_type) ? "White" : "Black");
-            data_table[0].value.str_value   = (is_jump) ? "JUMP" : "Waiting...";
-            data_table[1].value.uint_value  = calc_fps(sys_ms, &frame_count, &fps);
-            data_table[2].value.str_value   = str_roi_info;  // data_table[2].value.str_value   = (ipc_result == APPIPC_OK) ? "OK" : "Failed";  // 显示 IPC 状态
-            data_table[3].value.str_value   = str_area_info;
-            data_table[4].value.str_value   = str_limit_info;
-            data_table[5].value.str_value   = str_dot_info;
-            screen_show_data_table(data_table, 6);
-
-        }
-
-        // 当检测到 按钮1 被按下后，重置检测序列
-        if (button_flag[BTN_1] || jump_params.steps == CAMERA_DOT_TYPE_LIST_COUNT)
-        {
-            jump_params.dot_type = camera_dot_type_reset();
-            jump_params.steps = camera_dot_type_get_steps();
+            is_jump    = camera_processing_roi(sys_ms, &jump_params);  // 检测跳跃（使用ROI）
+            ipc_result = appipc_send_u32((uint32)is_jump);             // 发送 跳跃标志位值
         }
         
         // 不同跳跃下的识别参数细调
-        if (jump_params.steps == 0 || jump_params.steps == 1)
+        switch (jump_params.steps)
         {
-          jump_params.check_row = 105;
-          jump_params.check_row_count= 25;
-        
+            // 控制第一次跳跃时的检测参数
+            case 0:
+                jump_params.check_row = 100;
+                jump_params.check_row_count= 25;
+                break;
+
+            // 控制第二次跳跃时的检测参数
+            case 1:
+                jump_params.check_row = 110;
+                jump_params.check_row_count= 25;
+                break;
+
+            // 控制第三次跳跃时的检测参数
+            case 2:
+                jump_params.check_row = 110;
+                jump_params.check_row_count= 25;
+                break;
         }
-        
-        if (jump_params.steps == 2)
-        {
-          jump_params.check_row = 100;
-          jump_params.check_row_count= 25;
-        
-        }
-        
     }
 }
-

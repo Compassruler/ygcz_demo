@@ -260,8 +260,13 @@ void camera_init(void)
     }
 }
 
-void camera_debug_on_screen(uint16 x, uint16 y, uint16 display_width, uint16 display_height)
+void camera_debug_on_screen()  //(uint16 x, uint16 y, uint16 display_width, uint16 display_height)
 {
+    uint16 x              = IMAGE_X;
+    uint16 y              = IMAGE_Y;
+    uint16 display_width  = IMAGE_DISPLAY_WIDTH;
+    uint16 display_height = IMAGE_DISPLAY_HEIGHT;
+
     camera_copy_and_process_frame();
 
     if(!camera_processed_image_valid)
@@ -397,6 +402,13 @@ uint8 camera_processing(uint32 time_ms, JumpDetectParams_t *jump_params)
     {
         jump_params->dot_type = camera_dot_type_switch();
         jump_params->steps = camera_dot_type_get_steps();
+
+        if (jump_params->steps == CAMERA_DOT_TYPE_LIST_COUNT)
+        {
+            jump_params->dot_type = camera_dot_type_reset();
+            jump_params->steps = camera_dot_type_get_steps();
+        }
+        
         return 1;
     }
     
@@ -480,6 +492,13 @@ uint8 camera_processing_roi(uint32 time_ms, JumpDetectParams_t *jump_params)
     {
         jump_params->dot_type = camera_dot_type_switch();
         jump_params->steps = camera_dot_type_get_steps();
+
+        if (jump_params->steps == CAMERA_DOT_TYPE_LIST_COUNT)
+        {
+            jump_params->dot_type = camera_dot_type_reset();
+            jump_params->steps = camera_dot_type_get_steps();
+        }
+
         return 1;
     }
 

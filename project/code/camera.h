@@ -198,6 +198,7 @@ void camera_init(void);
  *
  * 如果当前没有新帧，但内部已经有处理过的图像副本，本函数会继续显示最近一次处理结果。
  *
+ * // 一般无需调整，已固定在函数中
  * @param x               图像显示区域左上角 x 坐标。
  * @param y               图像显示区域左上角 y 坐标。
  * @param display_width   图像显示宽度。
@@ -209,7 +210,7 @@ void camera_init(void);
  * @note 若需要同时检测与显示，建议先调用 `camera_processing()`，再调用本函数显示同一帧处理结果。
  * @note 本函数会显示处理后的二值图像，原始 `mt9v03x_image` 不会被直接修改。
  */
-void camera_debug_on_screen(uint16 x, uint16 y, uint16 display_width, uint16 display_height);
+void camera_debug_on_screen();  // (uint16 x, uint16 y, uint16 display_width, uint16 display_height);
 
 
 /**

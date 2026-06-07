@@ -1,7 +1,8 @@
 ﻿#ifndef CAMERA_IMAGE_PROCESSING_H
 #define CAMERA_IMAGE_PROCESSING_H
 
-#include "zf_common_headfile.h"
+#include "zf_common_typedef.h"
+#include "zf_device_mt9v03x.h"
 
 #define CAMERA_JUMP_ALGO_STRICT       (0)    // 严格检测：行检测和列检测必须同时通过
 #define CAMERA_JUMP_ALGO_AREA         (1)    // 矩形检测：矩形区域内指定颜色像素总数达到阈值
@@ -31,7 +32,7 @@ typedef struct
 // 跳跃触发成功后，下一次检测像素类型会按该列表循环切换
 static const uint32 dot_type_list[] =
 {
-    CAMERA_IMAGE_DOT_BLACK,
+    CAMERA_IMAGE_DOT_WHITE,
     CAMERA_IMAGE_DOT_BLACK,
     CAMERA_IMAGE_DOT_WHITE,
 };

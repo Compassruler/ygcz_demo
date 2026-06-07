@@ -1,5 +1,7 @@
 ﻿#include "screen.h"
 #include "zf_device_mt9v03x.h"
+#include "camera.h"
+#include "camera_image_processing.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -18,6 +20,34 @@ typedef struct
 static uint8 screen_initialized = 0;
 static uint8 screen_data_table_first_draw = 1;
 static ips200_font_size_enum screen_data_table_font = IPS200_8X16_FONT;
+
+// ========================= 固定显示内容列表 1 =========================
+static screen_data_item_t screen_table_1[] =
+{
+    {"Pitch",     SCREEN_DATA_FLOAT,   {.float_value  = 0.0f}, 2},  // 1
+    {"Roll",      SCREEN_DATA_FLOAT,   {.float_value  = 0.0f}, 2},  // 2
+    {"Yaw",       SCREEN_DATA_FLOAT,   {.float_value  = 0.0f}, 2},  // 3
+    {"TrueSpeed", SCREEN_DATA_FLOAT,   {.float_value  = 0.0f}, 2},  // 4
+    {"-",         SCREEN_DATA_STRING,  {.str_value    = "/"},  0},  // 5
+    {"-",         SCREEN_DATA_STRING,  {.str_value    = "/"},  0},  // 6
+    {"-",         SCREEN_DATA_STRING,  {.str_value    = "/"},  0},  // 7
+    {"-",         SCREEN_DATA_STRING,  {.str_value    = "/"},  0},  // 8
+    {"-",         SCREEN_DATA_STRING,  {.str_value    = "/"},  0},  // 9
+    {"-",         SCREEN_DATA_STRING,  {.str_value    = "/"},  0},  // 10
+    {"-",         SCREEN_DATA_STRING,  {.str_value    = "/"},  0},  // 11
+    {"-",         SCREEN_DATA_STRING,  {.str_value    = "/"},  0},  // 12
+};
+
+// ========================= 固定显示内容列表 2 =========================
+screen_data_item_t screen_table_2[] =
+{
+    {"Jump",     SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
+    {"FPS",      SCREEN_DATA_UINT,     {.uint_value = 0 }, 0},
+    {"ROI",      SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
+    {"Area",     SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
+    {"Limits",   SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
+    {"DotCount", SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
+}; 
 
 // ========================= 内部辅助函数 =========================
 
@@ -216,19 +246,19 @@ void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 dis
     ips200_show_gray_image(x, y, image, MT9V03X_W, MT9V03X_H, display_width, display_height, 0);
 }
 
-void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width)
+void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width, rgb565_color_enum color)
 {
     for (uint8 i = 0; i < width; i++)
     {
-        ips200_draw_line(0, y + i, length, y + i, RGB565_GREEN);
+        ips200_draw_line(0, y + i, length, y + i, color);
     }
 }
 
-void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8 width)
+void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8 width, rgb565_color_enum color)
 {
     for (uint8 i = 0; i < width; i++)
     {
-        ips200_draw_line(x + i, y, x + i , y + length, RGB565_GREEN);
+        ips200_draw_line(x + i, y, x + i , y + length, color);
     }
 }
 
@@ -314,4 +344,112 @@ void screen_show_data_table(const screen_data_item_t *items, uint8 count)
         screen_format_value(value_buf, &items[index], layout.value_width);
         ips200_show_string(value_x, y, value_buf);
     }
+}
+
+void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params)
+{
+    // 四个绘制绿色标识线屏幕函数
+    screen_show_threshold_horizontal_bar(
+        IMAGE_Y + jump_params.check_row - jump_params.check_row_count + 1,
+        IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
+        2,
+        RGB565_GREEN
+    );
+
+    screen_show_threshold_horizontal_bar(
+        IMAGE_Y + jump_params.check_row,
+        IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
+        2,
+        RGB565_GREEN
+    );
+
+    screen_show_threshold_vertical_bar(
+        IMAGE_X + jump_params.check_column,
+        IMAGE_Y,
+        IMAGE_DISPLAY_HEIGHT - 1,
+        2,
+        RGB565_GREEN
+    );
+
+    screen_show_threshold_vertical_bar(
+        IMAGE_X + jump_params.check_column + jump_params.check_column_count - 1,
+        IMAGE_Y,
+        IMAGE_DISPLAY_HEIGHT - 1,
+        2,
+        RGB565_GREEN
+    );
+}
+
+
+void screen_show_roi_threshold_bar(JumpDetectParams_t jump_params)
+{
+    // 四个绘制绿色标识线屏幕函数
+    screen_show_threshold_horizontal_bar(
+        IMAGE_Y + jump_params.otsu_roi_row - jump_params.otsu_roi_row_count + 1,
+        IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
+        2,
+        RGB565_PINK
+    );
+
+    screen_show_threshold_horizontal_bar(
+        IMAGE_Y + jump_params.otsu_roi_row,
+        IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
+        2,
+        RGB565_PINK
+    );
+
+    screen_show_threshold_vertical_bar(
+        IMAGE_X + jump_params.otsu_roi_column,
+        IMAGE_Y,
+        IMAGE_DISPLAY_HEIGHT - 1,
+        2,
+        RGB565_PINK
+    );
+
+    screen_show_threshold_vertical_bar(
+        IMAGE_X + jump_params.otsu_roi_column + jump_params.otsu_roi_column_count - 1,
+        IMAGE_Y,
+        IMAGE_DISPLAY_HEIGHT - 1,
+        2,
+        RGB565_PINK
+    );
+}
+
+void screen_show_table_t1(void)
+{
+    screen_table_1[0].value.float_value = pitch_acc2angle;
+    screen_table_1[1].value.float_value = roll_acc2angle;
+    screen_table_1[2].value.float_value = yaw_angle;
+    screen_table_1[3].value.float_value = true_speed;
+    screen_table_1[4].value.str_value   = "/";
+    screen_table_1[5].value.str_value   = "/";
+    screen_table_1[6].value.str_value   = "/";
+    screen_table_1[7].value.str_value   = "/";
+    screen_table_1[8].value.str_value   = "/";
+    screen_table_1[9].value.str_value   = "/";
+    screen_table_1[10].value.str_value  = "/";
+    screen_table_1[11].value.str_value  = "/";
+
+    screen_show_data_table(screen_table_1, (uint8)(sizeof(screen_table_1) / sizeof(screen_table_1[0])));
+}
+
+void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_jump)
+{
+    char str_roi_info[32];            // ROI范围显示用字符串
+    char str_area_info[32];           // 识别矩形框信息显示用字符串
+    char str_limit_info[32];          // 视觉限制信息显示用字符串
+    char str_dot_info[32];            // 检测点信息显示用字符串
+    
+    sprintf(str_roi_info,     "%d | %d | %d | %d", jump_params.otsu_roi_row, jump_params.otsu_roi_column, jump_params.otsu_roi_row_count, jump_params.otsu_roi_column_count);
+    sprintf(str_area_info,    "%d | %d | %d | %d", jump_params.check_row,    jump_params.check_column,    jump_params.check_row_count,    jump_params.check_column_count);
+    sprintf(str_limit_info,   "Frame %d | CD %d",          jump_params.multi_frame,  jump_params.cooldown_time_ms);
+    sprintf(str_dot_info,     "%d | (%d)%s",               jump_params.dot_count,    jump_params.steps,           (jump_params.dot_type) ? "White" : "Black");
+    screen_table_2[0].value.str_value   = (is_jump) ? "JUMP" : "Waiting...";
+    screen_table_2[1].value.uint_value  = fps;
+    screen_table_2[2].value.str_value   = str_roi_info;  // data_table[2].value.str_value   = (ipc_result == APPIPC_OK) ? "OK" : "Failed";  // 显示 IPC 状态
+    screen_table_2[3].value.str_value   = str_area_info;
+    screen_table_2[4].value.str_value   = str_limit_info;
+    screen_table_2[5].value.str_value   = str_dot_info;
+
+    screen_show_data_table(screen_table_2, (uint8)(sizeof(screen_table_2) / sizeof(screen_table_2[0])));
 }

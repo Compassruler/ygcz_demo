@@ -4,6 +4,15 @@
 #include "zf_common_typedef.h"
 #include "zf_common_font.h"
 #include "zf_device_ips200.h"
+#include "camera_image_processing.h"
+
+/**
+ * 固定显示列表使用方法：
+ *      在 main 的 while 中调用下面的函数即可：
+ *      screen_show_table_t1();  
+ * 
+ * 由于 screen.c / .h 依赖视觉相关代码，使用前需要在工程中加入 camera.c / .h camera_image_processing.c / .h
+ */
 
 // 屏幕基础信息
 // IPS200 横屏分辨率为 320x240
@@ -79,9 +88,6 @@ typedef struct
     uint8 float_decimal;
 } screen_data_item_t;
 
-
-
-
 // ========================= 屏幕基础封装函数 =========================
 
 // 屏幕初始化。
@@ -145,7 +151,7 @@ void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 dis
  * @note 调用时需确保 length 小于 ips200_width_max，且 y + width - 1 小于 ips200_height_max。
  * @note 如果该线用于叠加在图像上，应在显示图像之后调用，否则可能被图像刷新覆盖。
  */
-void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width);
+void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width, rgb565_color_enum color);
 
 
 /**
@@ -166,7 +172,7 @@ void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width);
  * @note 调用时需确保 x + width - 1 小于 ips200_width_max，且 y + length 小于 ips200_height_max。
  * @note 如果该线用于叠加在图像上，应在显示图像之后调用，否则可能被图像刷新覆盖。
  */
-void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8 width);
+void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8 width, rgb565_color_enum color);
 
 
 // 字符串显示示例。
@@ -174,7 +180,11 @@ void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8
 void show_string_demo(void);
 
 
+// 矩形识别边框显示函数
+void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params);
 
+// 矩形ROI边框显示函数
+void screen_show_roi_threshold_bar(JumpDetectParams_t jump_params);
 
 
 // ========================= 通用数据表显示函数 =========================
@@ -288,5 +298,19 @@ void screen_data_table_set_font(ips200_font_size_enum font);
  * @endcode
  */
 void screen_show_data_table(const screen_data_item_t *items, uint8 count);
+
+
+
+/** 显示固定列表 1
+ * 显示内容：
+ *  "Pitch"     // 1
+ *  "Roll"      // 2
+ *  "Yaw"       // 3
+ *  "TrueSpeed" // 4
+ */
+void screen_show_table_t1(void);
+
+// 显示固定列表 2
+void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_jump);
 
 #endif

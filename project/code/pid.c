@@ -1,5 +1,5 @@
 #include "zf_common_headfile.h"
-#define wheel_radius 0.03206    // 轮子半径，单位 m
+#define wheel_radius 0.04550    // 轮子半径，单位 m orin 0 .03206
 
 BANLANCE banlance;
 
@@ -34,7 +34,7 @@ void banlance_init(void)
     banlance.yaw_angle_pid.ki = 0.0f;             // 积分系数
     banlance.yaw_angle_pid.kd = 0.0f;             // 微分系数
     banlance.yaw_angle_pid.maxIntegral = 0;       // 积分限幅
-    banlance.yaw_angle_pid.maxOutput = 10000;     // 输出限幅
+    banlance.yaw_angle_pid.maxOutput = 100;     // 输出限幅
     banlance.yaw_angle_pid.K = 1.0f;              // 缩放系数
     
     // 偏航角速度环 PID 初始化
@@ -42,7 +42,7 @@ void banlance_init(void)
     banlance.yaw_gyro_pid.ki = 0.0f;             // 积分系数
     banlance.yaw_gyro_pid.kd = 0.0f;             // 微分系数
     banlance.yaw_gyro_pid.maxIntegral = 0;       // 积分限幅
-    banlance.yaw_gyro_pid.maxOutput = 10000;     // 输出限幅
+    banlance.yaw_gyro_pid.maxOutput = 100;     // 输出限幅
     banlance.yaw_gyro_pid.K = 1.0f;              // 缩放系数
     
     // 速度环 PID 初始化
@@ -114,18 +114,19 @@ void pid_inc_calc(PID *pid, float reference, float feedback)
 }
 
 // rpm 到线速度的转换，单位 m/s
-float rpmtotrue(short int rpm)
+float rpmtotrue(float rpm)
 {
-    float omega = rpm * 2.0f * 3.14159265f / 60.0f;       // 角速度 rad/s
+    float omega = rpm * 2.0f * PI / 60.0f;       // 角速度 rad/s
     float v = omega * wheel_radius;
     return v;
 }
 
 int truetorpm(float v)
 {
-    float rpm;
-    rpm = v / (2.0f * 3.14159265f * wheel_radius) * 60.0f;
-    rpm = (int)rpm;
+    float rpm_middle;
+    int rpm;
+    rpm_middle = v / (2.0f * PI * wheel_radius) * 60.0f;
+    rpm = (int)rpm_middle;
     return rpm;
 
 }

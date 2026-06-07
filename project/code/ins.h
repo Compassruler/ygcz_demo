@@ -38,6 +38,11 @@ extern float target_yaw;
 extern int path_index;
 extern float x;
 extern float y;
+extern float yaw;
+
+extern float vx;
+extern float vy;
+
 extern float distance;
 extern float x_now;
 extern float y_now;
@@ -51,7 +56,7 @@ void ins_enable(bool on_off);
 void ins_clear(void);
 
 // dt 秒，yaw 已滤波，v_enc 编码器线速度 m/s
-void ins_update(float yaw, float v_enc);
+void ins_update(void);
 
 // 轨迹复现更新
 void Track_update(void);

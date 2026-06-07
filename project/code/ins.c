@@ -14,7 +14,7 @@ uint16_t road_destination = 0;        // 记录路径的终点
 uint16 num_index = 0;
 // ------------------ 初始化 ------------------
 int path_index= 0;
-float x=0.0f,y=0.0f;
+float x=0.0f,y=0.0f,yaw = 0.0f;
 float x_now = 0.0f, y_now = 0.0f, yaw_now = 0.0f;
 float target_x, target_y, target_yaw;
 float dx,dy,dyaw;
@@ -24,7 +24,7 @@ float yaw_error;
 int target_speed;
 float k_yaw = 3.0f;
 float dt = 0.020;  // ins调用周期（s）
-uint16_t dot_num = 0;
+
 void ins_init(void)
 {
   road_memery_flag = 1;
@@ -32,10 +32,10 @@ void ins_init(void)
 
 
 // ----------------- 更新数据 -----------------
-void ins_update(float yaw, float v_enc)
+void ins_update(void)
 {
 //  yaw = round(yaw * 100.0f) / 100.0f;
-  
+     
     // 确保不会越界访问数组
     if (remote_left_01_now_flag !=2 && (num_index >= FLASH_PAGE_LENGTH * 2 - 2 || flash_yaw_flag == 1))
     {
@@ -45,15 +45,17 @@ void ins_update(float yaw, float v_enc)
     }
     
     // 编码器速度投影到世界坐标系
-    yaw = yaw * PI / 180;
+    yaw = yaw_angle * (PI / 180);
     Yaw_remember[num_index] = yaw;  // 姿态已滤波（弧度制）
-    vx = v_enc * cosf(yaw);
-    vy = v_enc * sinf(yaw);
+    
+    vx = true_speed * cosf(yaw);
+    vy = true_speed * sinf(yaw);
     x += vx * dt;
     y += vy * dt;
     X_remember[num_index] =x;
     Y_remember[num_index] =y; 
     num_index ++;
+    
 }
 
 
@@ -94,13 +96,13 @@ void Track_update(void)
     //--------------------------------------------------
     // 目标角度
     //--------------------------------------------------
-    target_yaw = atan2f(dy, dx) * 180.0f / PI;
+    target_yaw =  atan2f(dy, dx) * (180.0f / PI);
 
-    while(target_yaw > 180.0f)
-        target_yaw -= 360.0f;
-
-    while(target_yaw < -180.0f)
-        target_yaw += 360.0f;
+//    while(target_yaw > 180.0f)
+//        target_yaw -= 360.0f;
+//
+//    while(target_yaw < -180.0f)
+//        target_yaw += 360.0f;
 
     //--------------------------------------------------
     // 计算航向误差
@@ -124,21 +126,9 @@ void Track_update(void)
     if(fabsf(yaw_error) > 90.0f)
     {
         // 改为倒车
+        yaw_error = yaw_error * (PI /180);
+        target_v = target_v * cosf(yaw_error);
 
-        target_v = -target_v;
-
-        // 给角度环一个最小转角
-        if(yaw_error > 0)
-            target_yaw -= 180.0f;
-        else
-            target_yaw += 180.0f;
-
-        // 重新归一化
-        while(target_yaw > 180.0f)
-            target_yaw -= 360.0f;
-
-        while(target_yaw < -180.0f)
-            target_yaw += 360.0f;
     }
 
     //--------------------------------------------------
@@ -149,7 +139,7 @@ void Track_update(void)
     //--------------------------------------------------
     // 限幅
     //--------------------------------------------------
-    if(target_speed > MAX_SPEED)
+    if(target_speed > MAX_SPEED)        
         target_speed = MAX_SPEED;
 
     if(target_speed < -MAX_SPEED)

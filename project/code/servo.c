@@ -11,18 +11,18 @@ float X_L = 0.0f, Y_L = 0.0f;    // 左腿当前坐标
 float X_R = 0.0f, Y_R = 0.0f;    // 右腿当前坐标
 
 // 当前舵机角度
-float servoLeftFront_now  = 110.0f;
-float servoLeftRear_now   = 110.0f;
-float servoRightFront_now = 110.0f;
-float servoRightRear_now  = 110.0f;
+float servoLeftFront_now  = 90.0f;
+float servoLeftRear_now   = 90.0f;
+float servoRightFront_now = 90.0f;
+float servoRightRear_now  = 90.0f;
 
 float speed_to_x_offset, balance_to_y_offset;
 
 // 目标舵机坐标 20（90度）
 float X_left = 0.0f;
-float Y_left = 50.0f;
+float Y_left = 20.0f;
 float X_right = 0.0f;
-float Y_right = 50.0f;
+float Y_right = 20.0f;
 
 // 当前实际坐标（0为初始值）
 float XLeft = 0.0f, YLeft = 0.0f;
@@ -42,7 +42,7 @@ float servoRightFront, servoRightRear;  // 前后舵机角度
 
 
 // jump部分
-const jump_control_struct jump_control_config[] =
+const jump_control_struct jump_control_config[] = 
 {
     {  0, 70, jump_step_a, "起跳"     },
     {70, 250, jump_step_a, "收脚"     },

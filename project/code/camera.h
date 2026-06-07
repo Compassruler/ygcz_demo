@@ -265,4 +265,20 @@ uint32 calc_fps(uint32 time_ms, uint32 *frame_count, uint32 *fps);
  * @note 严格检测当前仍以黑色像素为判断目标，并将 `jump_params->dot_count` 同时作为行阈值和列阈值。
  */
 uint8 camera_processing(uint32 time_ms, JumpDetectParams_t *jump_params);
+
+/**
+ * @brief 使用 ROI 大津法处理一帧摄像头图像，并返回跳跃检测结果。
+ *
+ * 本函数是 `camera_processing()` 的 ROI 大津法版本。函数会使用
+ * `jump_params->otsu_roi_*` 计算大津法阈值，再完成图像二值化，
+ * 最后执行与 `camera_processing()` 相同的跳跃检测逻辑。
+ *
+ * @param time_ms     当前系统毫秒时间。
+ * @param jump_params 跳跃检测参数结构体指针，包含大津法 ROI 参数。
+ *
+ * @return uint8
+ *         - 1：检测到跳跃，并且允许本次触发；
+ *         - 0：当前没有新帧、参数非法，或本次未检测到跳跃。
+ */
+uint8 camera_processing_roi(uint32 time_ms, JumpDetectParams_t *jump_params);
 #endif

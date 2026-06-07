@@ -16,6 +16,10 @@ typedef struct
     uint16 check_row_count;         // 从起始行向上检查的行数量
     uint16 check_column;            // 检测矩形的起始列，后续从该列向右检查
     uint16 check_column_count;      // 从起始列向右检查的列数量
+    uint16 otsu_roi_row;            // 大津法 ROI 底部行，从该行开始向上取区域
+    uint16 otsu_roi_row_count;      // 大津法 ROI 行数
+    uint16 otsu_roi_column;         // 大津法 ROI 左侧起始列
+    uint16 otsu_roi_column_count;   // 大津法 ROI 列数
     uint32 dot_type;                // 检测像素类型：CAMERA_IMAGE_DOT_BLACK 或 CAMERA_IMAGE_DOT_WHITE
     uint32 dot_count;               // 矩形检测时的像素总数阈值；严格检测时作为行/列阈值使用
     uint32 cooldown_time_ms;        // 跳跃触发后的冷却时间，单位 ms
@@ -73,6 +77,25 @@ void vision_binary_fixed(uint8 image[MT9V03X_H][MT9V03X_W], uint8 threshold);
  * @note 如果需要保留原图，应先复制图像，再调用本函数处理副本。
  */
 uint8 camera_image_binary_otsu(uint8 image[MT9V03X_H][MT9V03X_W]);
+
+
+/**
+ * @brief 从固定 ROI 区域计算大津法阈值，并用该阈值二值化整幅图像。
+ *
+ * ROI 从 `roi_row` 行开始向上取 `roi_row_count` 行，
+ * 从 `roi_column` 列开始向右取 `roi_column_count` 列。
+ * 如果 ROI 参数非法，或者 ROI 内灰度区分度不足，函数会回退到
+ * `camera_image_binary_otsu()` 对整幅图像计算阈值。
+ *
+ * @param image            待处理的图像数组，函数会直接修改该数组内容。
+ * @param roi_row          ROI 底部行坐标。
+ * @param roi_row_count    ROI 行数，从 `roi_row` 开始向上统计。
+ * @param roi_column       ROI 左侧起始列坐标。
+ * @param roi_column_count ROI 列数，从 `roi_column` 开始向右统计。
+ *
+ * @return uint8 实际用于二值化的大津法阈值。
+ */
+uint8 camera_image_binary_otsu_roi(uint8 image[MT9V03X_H][MT9V03X_W], uint16 roi_row, uint16 roi_row_count, uint16 roi_column, uint16 roi_column_count);
 
 
 /**

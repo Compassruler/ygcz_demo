@@ -69,6 +69,36 @@ static uint8 camera_copy_and_process_frame(void)
     return 1;
 }
 
+static uint8 camera_copy_and_process_frame_roi(JumpDetectParams_t *jump_params)
+{
+    if(NULL == jump_params)
+    {
+        return 0;
+    }
+
+    if(!mt9v03x_finish_flag)
+    {
+        return 0;
+    }
+
+    mt9v03x_finish_flag = 0;
+    memcpy(image_copy[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
+
+    camera_image_binary_otsu_roi(
+        image_copy,
+        jump_params->otsu_roi_row,
+        jump_params->otsu_roi_row_count,
+        jump_params->otsu_roi_column,
+        jump_params->otsu_roi_column_count
+    );
+    camera_image_filter_isolated_black(image_copy);
+    camera_image_filter_isolated_white(image_copy);
+
+    camera_processed_image_valid = 1;
+
+    return 1;
+}
+
 uint8 camera_has_frame(void)
 {
     return mt9v03x_finish_flag;
@@ -370,5 +400,88 @@ uint8 camera_processing(uint32 time_ms, JumpDetectParams_t *jump_params)
         return 1;
     }
     
+    return 0;
+}
+
+uint8 camera_processing_roi(uint32 time_ms, JumpDetectParams_t *jump_params)
+{
+    uint8 jump_detected = 0;
+    uint32 required_frame_count = 0;
+    static uint32 multi_frame_count = 0;
+
+    if(NULL == jump_params)
+    {
+        return 0;
+    }
+
+    if(!camera_copy_and_process_frame_roi(jump_params))
+    {
+        return 0;
+    }
+
+    required_frame_count = jump_params->multi_frame;
+    if(0 == required_frame_count)
+    {
+        required_frame_count = 1;
+    }
+
+    if(jump_params->algo_type == CAMERA_JUMP_ALGO_STRICT)
+    {
+        if(jump_params->dot_count > 0xFFFFu)
+        {
+            multi_frame_count = 0;
+            return 0;
+        }
+
+        jump_detected = camera_image_check_jump_strict(
+            image_copy,
+            jump_params->check_row,
+            jump_params->check_row_count,
+            (uint16)jump_params->dot_count,
+            jump_params->check_column,
+            jump_params->check_column_count,
+            (uint16)jump_params->dot_count
+        );
+    }
+    else if(jump_params->algo_type == CAMERA_JUMP_ALGO_AREA)
+    {
+        jump_detected = camera_image_check_jump_area(
+            image_copy,
+            jump_params->check_row,
+            jump_params->check_row_count,
+            jump_params->check_column,
+            jump_params->check_column_count,
+            jump_params->dot_count,
+            jump_params->dot_type
+        );
+    }
+    else
+    {
+        return 0;
+    }
+
+    if(!jump_detected)
+    {
+        multi_frame_count = 0;
+        return 0;
+    }
+
+    multi_frame_count++;
+    if(multi_frame_count < required_frame_count)
+    {
+        return 0;
+    }
+
+    multi_frame_count = 0;
+
+    jump_detected = camera_image_jump_trigger_filter(time_ms, jump_params->cooldown_time_ms, 1);
+
+    if(jump_detected)
+    {
+        jump_params->dot_type = camera_dot_type_switch();
+        jump_params->steps = camera_dot_type_get_steps();
+        return 1;
+    }
+
     return 0;
 }

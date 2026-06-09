@@ -206,16 +206,9 @@ void leg_control(void)
     float roll_target_offset = banlance.roll_angle_pid.output * 5.0f * pid_scale;
     if(fabs(roll_filter.filtering_angle) < 1.0f) roll_target_offset = 0;
     roll_offset_filter = (roll_offset_filter * 19.0f + roll_target_offset) / 20.0f;
-    balance_to_y_offset = func_limit_ab(roll_offset_filter, -100.0f, 100.0f);
-  
-    // 输入限幅
-    if(Y_left < 10) Y_left = 10;
-    if(Y_right < 10) Y_right = 10;
-
-    if(Y_left > 130) Y_left = 130;
-    if(Y_right > 130) Y_right = 130;
+    balance_to_y_offset = func_limit_ab(roll_offset_filter, -80.0f, 80.0f);
      
-    // 目标坐标计算
+    // X方向：目标坐标计算
     float target_X_left = X_left + X_OFFSET - speed_to_x_offset;
     float target_X_right = X_right + X_OFFSET - speed_to_x_offset;
   
@@ -226,7 +219,11 @@ void leg_control(void)
     // Y 方向：一边伸长 一边收缩（效果好）
     float target_Y_left  = Y_left  + Y_OFFSET + balance_to_y_offset;
     float target_Y_right = Y_right + Y_OFFSET - balance_to_y_offset;
-                                                 
+    
+    // 输出限幅
+    target_Y_left  = func_limit_ab(target_Y_left,  30.0f, 80.0f); // 25为y轴最低值（零点）留5mm余裕
+    target_Y_right = func_limit_ab(target_Y_right, 30.0f, 80.0f);
+    
     // 更新实际坐标
     XLeft  = target_X_left;
     YLeft  = target_Y_left;
@@ -260,9 +257,9 @@ void jump_step_a(int step_num)
 {
   switch(step_num)
   {
-    case 0: // 起跳蓄力
+    case 0: // 起跳
     {
-      Set_angle(140, 140, 140, 140);
+      Set_angle(150, 150, 150, 150);
     }break;
 
     case 1: // 收腿

@@ -61,6 +61,7 @@ void pit0_ch0_isr()
 
     // 角速度环
     pid_pos_calc(&banlance.pitch_gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y); // 俯仰角
+    
 //    pid_pos_calc(&banlance.yaw_gyro_pid, remote_left_right_ctrl() * 1.0f, imu_data.gyro_z);
     pid_pos_calc(&banlance.yaw_gyro_pid,  banlance.yaw_angle_pid.output, imu_data.gyro_z);
 
@@ -68,7 +69,7 @@ void pit0_ch0_isr()
     int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
 //    int yaw_out     = (int)banlance.yaw_angle_pid.output; 
 
-    if(fabs(pitch_filter.filtering_angle) > 80.0f || fabs(true_speed) >=8.0f) // 自动保护
+    if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
       {
         auto_protect_flag = 1;
       }

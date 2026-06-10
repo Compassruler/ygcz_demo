@@ -1,6 +1,7 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
-
+#define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
+#define NEAREST_SELECT_NUM 100       // 搜索最近点范围
 float X_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
 float Y_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
 float Yaw_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
@@ -58,7 +59,54 @@ void ins_update(void)
     
 }
 
+// ----------------- 找到最近点 -----------------
+int find_nearest_point(int start_index)
+{
+    float min_dist = 9999.0f;
+    int nearest_index = start_index;
+    for(int i = start_index; i < road_destination; i++)
+    {
+        dx = X_load[i] - x_now;
+        dy = Y_load[i] - y_now;
+        float dist = sqrtf(dx*dx + dy*dy);
+        if(dist < min_dist)
+        {
+            min_dist = dist;
+            nearest_index = i;
+        }
 
+        // 限制搜索范围，防止耗时
+        if(i - start_index > NEAREST_SELECT_NUM)  
+            break;
+    }
+    return nearest_index;
+}
+
+//----------------- 找到前视点 -----------------
+void find_lookahead_point(int nearest_index)
+{
+    for(int i = nearest_index; i < road_destination; i++)
+    {
+        dx = X_load[i] - x_now;
+        dy = Y_load[i] - y_now;
+
+        distance = sqrtf(dx*dx + dy*dy);
+
+        if(distance >= LOOK_AHEAD_DISTANCE)
+        {
+            target_x = X_load[i];
+            target_y = Y_load[i];
+            path_index = i;
+            return;
+        }
+    }
+    //没有前视点用最后一个点
+    target_x = X_load[road_destination - 1];
+    target_y = Y_load[road_destination - 1];
+    path_index = road_destination - 1;
+}
+
+//----------------- 路径回放 ----------------- 
 void Track_update(void)
 {
     // 当前位置
@@ -78,32 +126,22 @@ void Track_update(void)
 
         return;
     }
-
-    //--------------------------------------------------
-    // 当前目标点
-    //--------------------------------------------------
-    target_x = X_load[path_index];
-    target_y = Y_load[path_index];
+      
+    
+    find_lookahead_point(find_nearest_point(path_index));
 
     //--------------------------------------------------
     // 计算距离
     //--------------------------------------------------
-    float dx = target_x - x_now;
-    float dy = target_y - y_now;
+    dx = target_x - x_now;
+    dy = target_y - y_now;
 
-    distance = sqrtf(dx * dx + dy * dy);
+    distance = sqrtf(dx*dx + dy*dy);
 
     //--------------------------------------------------
     // 目标角度
     //--------------------------------------------------
     target_yaw =  atan2f(dy, dx) * (180.0f / PI);
-
-//    while(target_yaw > 180.0f)
-//        target_yaw -= 360.0f;
-//
-//    while(target_yaw < -180.0f)
-//        target_yaw += 360.0f;
-
     //--------------------------------------------------
     // 计算航向误差
     //--------------------------------------------------
@@ -126,8 +164,8 @@ void Track_update(void)
     if(fabsf(yaw_error) > 90.0f)
     {
         // 改为倒车
-        yaw_error = yaw_error * (PI /180);
-        target_v = target_v * cosf(yaw_error);
+        float yaw_error_rad = yaw_error * PI / 180.0f;
+        target_v = target_v * cosf(yaw_error_rad);
 
     }
 
@@ -145,15 +183,16 @@ void Track_update(void)
     if(target_speed < -MAX_SPEED)
         target_speed = -MAX_SPEED;
 
-    //--------------------------------------------------
-    // 到点判断
-    //--------------------------------------------------
-    if(distance < DIST_TH)
+     // 到终点判断
+    if(path_index >= road_destination - 2)
     {
-        if(path_index < road_destination - 1)
+        float dx_end = X_load[road_destination - 1] - x_now;
+        float dy_end = Y_load[road_destination - 1] - y_now;
+        if(sqrtf(dx_end*dx_end + dy_end*dy_end) < 0.05f)
         {
-            path_index++;
+            target_speed = 0;
+            remote_right_01_now_flag = 2;
         }
-    }
+    }     
 }
  

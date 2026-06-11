@@ -8,7 +8,7 @@ void flash_road_memery_store(void)
     // 第一步清除缓冲区
     flash_buffer_clear();
     // 第二步把数据存到缓冲区
-    for (size_t i = 0; i < FLASH_PAGE_LENGTH - 1; i++)
+    for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
     {
         flash_union_buffer[i].float_type = Yaw_remember[i]; // 存储偏航角
     }
@@ -124,7 +124,7 @@ void flash_road_memery_get(void)
     if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11)) // 检查flash里面是否存了数据
     {
         flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11, FLASH_PAGE_LENGTH - 1);
-        for (size_t i = 0; i < FLASH_PAGE_LENGTH - 1; i++)
+        for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
         {
             Yaw_load[i] = flash_union_buffer[i].float_type; // 取出历史偏航角
         }

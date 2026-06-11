@@ -1,7 +1,12 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
 #define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
-#define NEAREST_SELECT_NUM 100       // 搜索最近点范围
+#define NEAREST_SELECT_NUM 10       // 搜索最近点范围
+#define DISTANCE_STEP 0.02f  // 打点间距，单位 m（2cm）
+
+float x_last = 0.0f;
+float y_last = 0.0f;
+
 float X_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
 float Y_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
 float Yaw_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
@@ -15,9 +20,13 @@ uint16_t road_destination = 0;        // 记录路径的终点
 uint16 num_index = 0;
 // ------------------ 初始化 ------------------
 int path_index= 0;
-float x=0.0f,y=0.0f,yaw = 0.0f;
+float x=0.0f,y=0.0f,yaw_ins = 0.0f;
+float x_ins = 0.0f,y_ins = 0.0f;
+float dx_ins, dy_ins;
+float distance_ins;
 float x_now = 0.0f, y_now = 0.0f, yaw_now = 0.0f;
 float target_x, target_y, target_yaw;
+static float target_yaw_last = 0;
 float dx,dy,dyaw;
 float vx= 0.0f,vy=0.0f;
 float distance, target_v;
@@ -46,16 +55,29 @@ void ins_update(void)
     }
     
     // 编码器速度投影到世界坐标系
-    yaw = yaw_angle * (PI / 180);
-    Yaw_remember[num_index] = yaw;  // 姿态已滤波（弧度制）
+    yaw_ins = yaw_angle * (PI / 180);
     
-    vx = true_speed * cosf(yaw);
-    vy = true_speed * sinf(yaw);
+    vx = true_speed * cosf(yaw_ins);
+    vy = true_speed * sinf(yaw_ins);
     x += vx * dt;
     y += vy * dt;
-    X_remember[num_index] =x;
-    Y_remember[num_index] =y; 
-    num_index ++;
+    // 计算和上一个记录点的距离
+     dx_ins = x - x_last;
+     dy_ins = y - y_last;
+     distance_ins = sqrtf(dx_ins*dx_ins + dy_ins*dy_ins);
+    if (distance_ins >= DISTANCE_STEP)
+    {
+        // 超过打点间距，记录点
+        X_remember[num_index] = x;
+        Y_remember[num_index] = y;
+//        Yaw_remember[num_index] = yaw_ins;
+
+        // 更新上一个记录点
+        x_last = x;
+        y_last = y;
+
+        num_index++;
+    }
     
 }
 
@@ -141,7 +163,20 @@ void Track_update(void)
     //--------------------------------------------------
     // 目标角度
     //--------------------------------------------------
-    target_yaw =  atan2f(dy, dx) * (180.0f / PI);
+//    target_yaw =  atan2f(dy, dx) * (180.0f / PI);
+    
+    float target_yaw_raw = atan2f(dy, dx) * (180.0f / PI);
+    float delta_yaw = target_yaw_raw - target_yaw_last;
+
+    if(delta_yaw > 180.0f)
+       target_yaw_raw -= 360.0f;
+    else if(delta_yaw < -180.0f)
+       target_yaw_raw += 360.0f;
+
+    target_yaw = target_yaw_raw;
+    target_yaw_last = target_yaw;
+    
+    
     //--------------------------------------------------
     // 计算航向误差
     //--------------------------------------------------
@@ -195,4 +230,5 @@ void Track_update(void)
         }
     }     
 }
+ 
  

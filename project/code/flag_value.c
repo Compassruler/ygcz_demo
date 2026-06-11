@@ -15,7 +15,7 @@ uint8 remote_right_01_now_flag = 0;
 int flash_task_flag = 0;
 
 float KP_DIS = 4.0f;
-int MAX_SPEED = 200;
+int MAX_SPEED = 400;
 float DIST_TH = 0.05f;
 int MIN_SPEED = 0;
 float YAW_TH = 1.0f; 

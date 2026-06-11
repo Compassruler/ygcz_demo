@@ -198,27 +198,31 @@ void leg_control(void)
     // X 方向：俯仰偏移计算
     float target_offset = banlance.speed_pid.output * 0.1f * pid_scale;
     speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;
-    speed_to_x_offset = func_limit_ab(speed_offset_filter, -45.0f, 45.0f);
+    speed_to_x_offset = func_limit_ab(speed_offset_filter, -30.0f, 30.0f);
     
+    // X方向：目标坐标计算
+    float target_X_left = X_left + X_OFFSET - speed_to_x_offset;
+    float target_X_right = X_right + X_OFFSET - speed_to_x_offset;    
+
     // Y 方向：横滚偏移计算
-//    float roll_target_offset = 0;
-    float roll_target_offset = banlance.roll_angle_pid.output * 5.0f * pid_scale;
+    float roll_target_offset = 0;
+    roll_target_offset = banlance.roll_angle_pid.output * 5.0f * pid_scale;
     if(fabs(roll_filter.filtering_angle) < 1.0f) roll_target_offset = 0;
     roll_offset_filter = (roll_offset_filter * 19.0f + roll_target_offset) / 20.0f;
     balance_to_y_offset = func_limit_ab(roll_offset_filter, -80.0f, 80.0f);
      
-    // X方向：目标坐标计算
-    float target_X_left = X_left + X_OFFSET - speed_to_x_offset;
-    float target_X_right = X_right + X_OFFSET - speed_to_x_offset;
-  
-    // Y 方向：只做伸长
-//    float target_Y_left  = Y_left  + Y_OFFSET + (balance_to_y_offset > 0.0f ? balance_to_y_offset : 0.0f);
-//    float target_Y_right = Y_right + Y_OFFSET - (balance_to_y_offset > 0.0f ? 0.0f : balance_to_y_offset);
-    
-    // Y 方向：一边伸长 一边收缩（效果好）
+    // Y 方向：目标坐标计算 一边伸长 一边收缩（默认压弯）
+//    float target_Y_left  = Y_left  + Y_OFFSET + balance_to_y_offset;
+//    float target_Y_right = Y_right + Y_OFFSET - balance_to_y_offset;    
+
+    // Y 方向：目标坐标计算 一边伸长 一边收缩（效果好）
     float target_Y_left  = Y_left  + Y_OFFSET + balance_to_y_offset;
     float target_Y_right = Y_right + Y_OFFSET - balance_to_y_offset;
-    
+
+    // Y 方向：目标坐标计算 只做伸长
+//    float target_Y_left  = Y_left  + Y_OFFSET + (balance_to_y_offset > 0.0f ? balance_to_y_offset : 0.0f);
+//    float target_Y_right = Y_right + Y_OFFSET - (balance_to_y_offset > 0.0f ? 0.0f : balance_to_y_offset);
+        
     // 输出限幅
     target_Y_left  = func_limit_ab(target_Y_left,  30.0f, 80.0f); // 25为y轴最低值（零点）留5mm余裕
     target_Y_right = func_limit_ab(target_Y_right, 30.0f, 80.0f);
@@ -282,7 +286,6 @@ void jump_step_a(int step_num)
       servoLeftRear_jump   = servo_step(servoLeftRear_jump, 90, 1);
       servoRightFront_jump = servo_step(servoRightFront_jump, 90, 1);
       servoRightRear_jump  = servo_step(servoRightRear_jump, 90, 1);
-
       Set_angle(servoLeftFront_jump, servoLeftRear_jump, servoRightFront_jump, servoRightRear_jump);
     }break;
 

@@ -44,15 +44,14 @@ void pit0_ch0_isr()
       first_order_complementary_filtering(&roll_filter, imu_data.gyro_x, roll_acc2angle);            // 输出roll_filter.filtering_angle
       pid_pos_calc(&banlance.pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&banlance.roll_angle_pid, 0, roll_filter.filtering_angle);
-      if (remote_right_01_now_flag == 1)
-        pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle);
+
+      if (remote_right_01_now_flag == 1) pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle);
       
       else 
       {
         target_yaw_remote += remote_left_right_ctrl() * 0.002f;
-        pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);// 航向角PID 没使用
-         
-    }
+        pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
+      }
         //      pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
       leg_control(); // 5ms调用一次      
     }
@@ -62,12 +61,10 @@ void pit0_ch0_isr()
     // 角速度环
     pid_pos_calc(&banlance.pitch_gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y); // 俯仰角
     
-//    pid_pos_calc(&banlance.yaw_gyro_pid, remote_left_right_ctrl() * 1.0f, imu_data.gyro_z);
     pid_pos_calc(&banlance.yaw_gyro_pid,  banlance.yaw_angle_pid.output, imu_data.gyro_z);
 
     int balance_out = (int)banlance.pitch_gyro_pid.output;
     int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
-//    int yaw_out     = (int)banlance.yaw_angle_pid.output; 
 
     if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
       {

@@ -2,6 +2,7 @@
 
 uint8_t flash_yaw_flag = 0;      // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
 uint8_t flash_xy_flag = 0; // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
+uint8_t flash_turn_flag = 0; // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志
 // 存路径数据
 void flash_road_memery_store(void)
 {
@@ -496,6 +497,12 @@ void flash_road_memery_get_Plus(void)
     flash_xy_flag = 4;
 }
 
+
+void flash_turn_memery_store()
+{
+
+
+}
 //
 //void flash_task()
 //{

@@ -34,9 +34,9 @@ void banlance_init(void)
 
     // 偏航角度环 PID 初始化
     // 原始参数: kp=20.0, ki=0.0, kd=0.0, maxIntegral=0, maxOutput=100, K=1.0
-    banlance.yaw_angle_pid.kp = 10.0f;             // 比例系数
+    banlance.yaw_angle_pid.kp = 15.0f;             // 比例系数
     banlance.yaw_angle_pid.ki = 0.0f;             // 积分系数
-    banlance.yaw_angle_pid.kd = 0.0f;             // 微分系数
+    banlance.yaw_angle_pid.kd = 0.2f;             // 微分系数
     banlance.yaw_angle_pid.maxIntegral = 0;       // 积分限幅
     banlance.yaw_angle_pid.maxOutput = 1000;         // 输出限幅
     banlance.yaw_angle_pid.K = 1.0f;              // 缩放系数

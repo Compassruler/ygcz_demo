@@ -39,6 +39,7 @@ extern int path_index;
 extern float x;
 extern float y;
 extern float yaw;
+extern float yaw_error;
 
 extern float vx;
 extern float vy;
@@ -48,6 +49,7 @@ extern float x_now;
 extern float y_now;
 extern float target_x;
 extern float target_y;
+extern float target_v;
 extern float dt;  // ins调用周期（s）
 
 // 初始化

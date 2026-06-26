@@ -1,7 +1,7 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
 #define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
-#define NEAREST_SELECT_NUM 10       // 搜索最近点范围
+#define NEAREST_SELECT_NUM 1       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 //#define TURN_NUM        3    //
 float x_last = 0.0f;
@@ -173,7 +173,7 @@ void Track_update(void)
     //--------------------------------------------------
     // 计算航向误差（连续角度，Yaw_load 已连续累积）
     //--------------------------------------------------
-    yaw_error = target_yaw - yaw_angle;  
+    
     if(fabs(yaw_angle - angle) >= 30)
     {
       target_yaw = yaw_angle + 30;
@@ -181,6 +181,7 @@ void Track_update(void)
        return;
     }
     target_yaw = angle;
+    yaw_error = target_yaw - yaw_angle;  
 //    if(yaw_error <= 20)
 //    {
 //      target_yaw = angle;
@@ -207,12 +208,12 @@ void Track_update(void)
     //--------------------------------------------------
     // 后退逻辑
     //--------------------------------------------------
-    if(fabsf(yaw_error) > 90.0f)
-    {
+//    if(fabsf(yaw_error) > 90.0f)
+//    {
         // 改为倒车
         float yaw_error_rad = yaw_error * PI / 180.0f;
         target_v = target_v * cosf(yaw_error_rad);
-    }
+//    }
 
     //--------------------------------------------------
     // 转 rpm

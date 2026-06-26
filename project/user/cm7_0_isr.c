@@ -66,7 +66,8 @@ void pit0_ch0_isr()
     int balance_out = (int)banlance.pitch_gyro_pid.output;
     int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
 
-    if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
+//    if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
+      if(fabs(pitch_filter.filtering_angle) > 70.0f) // 自动保护
       {
         auto_protect_flag = 1;
       }

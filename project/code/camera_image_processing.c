@@ -449,7 +449,7 @@ uint8 camera_image_check_jump_strict(uint8 image[MT9V03X_H][MT9V03X_W], uint16 c
 }
 
 
-// 跳跃触发冷却时间检�?
+// 跳跃触发冷却时间检�?
 uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, uint8 jump_detected)
 {
     static uint32 last_jump_time = 0;
@@ -473,8 +473,17 @@ uint8 camera_image_jump_trigger_filter(uint32 time_ms, uint32 cooldown_time_ms, 
 
 uint8 camera_dot_type_switch(void)
 {
-    jump_trigger_count++;
-    return (uint8)dot_type_list[jump_trigger_count % CAMERA_DOT_TYPE_LIST_COUNT];
+    if(jump_trigger_count < CAMERA_DOT_TYPE_LIST_COUNT)
+    {
+        jump_trigger_count++;
+    }
+
+    if(jump_trigger_count >= CAMERA_DOT_TYPE_LIST_COUNT)
+    {
+        return (uint8)dot_type_list[CAMERA_DOT_TYPE_LIST_COUNT - 1];
+    }
+
+    return (uint8)dot_type_list[jump_trigger_count];
 }
 
 uint32 camera_dot_type_get_steps(void)
@@ -486,4 +495,49 @@ uint8 camera_dot_type_reset(void)
 {
     jump_trigger_count = 0;
     return (uint8)dot_type_list[0];
+}
+
+
+
+// ����Ӧ
+const CameraRowSpeedRule_t camera_row_speed_rules[CAMERA_ROW_SPEED_RULE_COUNT] =
+{
+    {116u, 115u},
+    {127u, 105u},
+    {141u, 95u},
+    {162u, 85u},
+    {200u, 75u},
+};
+
+uint16 camera_check_row_from_speed(uint16 car_speed, int8 aggressive_coeff)
+{
+    int16 row_bias = (int16)aggressive_coeff * (int16)CAMERA_ROW_AGGRESSIVE_BIAS;
+    uint8 i = 0;
+
+    for(i = 0; i < CAMERA_ROW_SPEED_RULE_COUNT; i++)
+    {
+        int16 max_speed = (int16)camera_row_speed_rules[i].max_speed;
+
+        if(i < (CAMERA_ROW_SPEED_RULE_COUNT - 1u))
+        {
+            max_speed += row_bias;
+        }
+
+        if(car_speed <= max_speed)
+        {
+            return camera_row_speed_rules[i].check_row;
+        }
+    }
+
+    return camera_row_speed_rules[CAMERA_ROW_SPEED_RULE_COUNT - 1u].check_row;
+}
+
+void camera_jump_params_set_row_by_speed(JumpDetectParams_t *jump_params, uint16 car_speed, int8 aggressive_coeff)
+{
+    if(NULL == jump_params)
+    {
+        return;
+    }
+
+    jump_params->check_row = camera_check_row_from_speed(car_speed, aggressive_coeff);
 }

@@ -311,6 +311,6 @@ void screen_show_data_table(const screen_data_item_t *items, uint8 count);
 void screen_show_table_t1(void);
 
 // 显示固定列表 2
-void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_jump);
+void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_jump, uint16 carspd);
 
 #endif

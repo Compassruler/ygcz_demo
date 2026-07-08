@@ -332,6 +332,12 @@ uint8 camera_processing(uint32 time_ms, JumpDetectParams_t *jump_params)
         return 0;
     }
 
+    if(jump_params->steps >= CAMERA_DOT_TYPE_LIST_COUNT)
+    {
+        multi_frame_count = 0;
+        return 0;
+    }
+
     if(!camera_copy_and_process_frame())
     {
         return 0;
@@ -402,12 +408,6 @@ uint8 camera_processing(uint32 time_ms, JumpDetectParams_t *jump_params)
     {
         jump_params->dot_type = camera_dot_type_switch();
         jump_params->steps = camera_dot_type_get_steps();
-
-        if (jump_params->steps == CAMERA_DOT_TYPE_LIST_COUNT)
-        {
-            jump_params->dot_type = camera_dot_type_reset();
-            jump_params->steps = camera_dot_type_get_steps();
-        }
         
         return 1;
     }
@@ -423,6 +423,12 @@ uint8 camera_processing_roi(uint32 time_ms, JumpDetectParams_t *jump_params)
 
     if(NULL == jump_params)
     {
+        return 0;
+    }
+
+    if(jump_params->steps >= CAMERA_DOT_TYPE_LIST_COUNT)
+    {
+        multi_frame_count = 0;
         return 0;
     }
 
@@ -492,12 +498,6 @@ uint8 camera_processing_roi(uint32 time_ms, JumpDetectParams_t *jump_params)
     {
         jump_params->dot_type = camera_dot_type_switch();
         jump_params->steps = camera_dot_type_get_steps();
-
-        if (jump_params->steps == CAMERA_DOT_TYPE_LIST_COUNT)
-        {
-            jump_params->dot_type = camera_dot_type_reset();
-            jump_params->steps = camera_dot_type_get_steps();
-        }
 
         return 1;
     }

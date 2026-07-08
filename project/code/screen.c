@@ -433,7 +433,7 @@ void screen_show_table_t1(void)
     screen_show_data_table(screen_table_1, (uint8)(sizeof(screen_table_1) / sizeof(screen_table_1[0])));
 }
 
-void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_jump)
+void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_jump, uint16 carspd)
 {
     char str_roi_info[32];            // ROI范围显示用字符串
     char str_area_info[32];           // 识别矩形框信息显示用字符串
@@ -442,7 +442,7 @@ void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_
     
     sprintf(str_roi_info,     "%d | %d | %d | %d", jump_params.otsu_roi_row, jump_params.otsu_roi_column, jump_params.otsu_roi_row_count, jump_params.otsu_roi_column_count);
     sprintf(str_area_info,    "%d | %d | %d | %d", jump_params.check_row,    jump_params.check_column,    jump_params.check_row_count,    jump_params.check_column_count);
-    sprintf(str_limit_info,   "Frame %d | CD %d",          jump_params.multi_frame,  jump_params.cooldown_time_ms);
+    sprintf(str_limit_info,   "Spd %d | CD %d",          carspd,  jump_params.cooldown_time_ms);
     sprintf(str_dot_info,     "%d | (%d)%s",               jump_params.dot_count,    jump_params.steps,           (jump_params.dot_type) ? "White" : "Black");
     screen_table_2[0].value.str_value   = (is_jump) ? "JUMP" : "Waiting...";
     screen_table_2[1].value.uint_value  = fps;

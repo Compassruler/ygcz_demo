@@ -4,15 +4,17 @@
 #include "appipc.h"
 
 /*
-核0 最简使用示例
+核0 使用示例，固定速度或使用遥控器需要修改 核0 的中断，不在这里修改
 
 #include "zf_common_headfile.h"
 #include "appipc.h"
 
-volatile uint8 is_jump_from_core1 = 0;  // 来自 核1 的跳跃标志位值
-volatile uint8 is_jump_updated = 0;     // 数据更新标志位
+volatile uint8 is_jump_from_core1 = 0;
+volatile uint8 is_jump_updated = 0;
 
-// IPC 接收回调函数：当接收到另一核心发送的数据时被调用
+volatile int32 spd = 0;
+uint32 jump_count = 0;
+
 static void appipc_callback(uint32 data)
 {
     is_jump_from_core1 = (uint8)(data & 0x01);
@@ -21,15 +23,52 @@ static void appipc_callback(uint32 data)
 
 int main(void)
 {
-    appipc_rx_init(appipc_callback);  // 初始化 IPC
+    clock_init(SYSTEM_CLOCK_250M);
+    debug_init();
+    servo_init();
+    filter_init();
+    banlance_init();
+    imu660rb_init();
+    small_driver_uart_init();
+    remote_control_init();
+    pit_ms_init(PIT_CH0, 1);
+    flash_init();
+
+    appipc_rx_init(appipc_callback);
 
     while(true)
-    {   
+    {
+        remote_update();
+
+        uint16 speed_for_row;
+
+        // 通过IPC 只能发送 无符号整数，要先处理负号
+        if(car_speed >= 0)
+        {
+            speed_for_row = (uint16)car_speed;
+        }
+        else
+        {
+            speed_for_row = (uint16)(-car_speed);
+        }
+
+        appipc_send_speed_u32((uint32)speed_for_row);
+
         if(is_jump_updated)
         {
-            is_jump_updated = 0;  // 需要手动复位
+            is_jump_updated = 0;
 
-            // 在这里使用 is_jump_from_core1 标志位, 1 为跳跃 0 为不跳跃，自动更新，无需手动复位
+            if(is_jump_from_core1)
+            {
+                // 只能跳 3 次
+                if(jump_count >= 3)
+                {
+                    continue;
+                }
+
+                jump_flag = 1;
+                jump_count++;
+            }
         }
     }
 }
@@ -43,7 +82,7 @@ int main(void)
 #define ENABLE_ASSISTANT_PARAM  (0)                             // 2 启动 WiFi SPI 但不使用调参 | 1 开启 WiFi SPI 并启动调参 | 0 彻底关闭 WiFi SPI
 
 //=========================== 显示模式选择 ===========================
-#define IMAGE_DEBUG_TYPE        (1)                             // 0 无显示 | 1 仅屏幕 | 2 仅 WiFi 图传 | 3 同时显示
+#define IMAGE_DEBUG_TYPE        (0)                             // 0 无显示 | 1 仅屏幕 | 2 仅 WiFi 图传 | 3 同时显示
                                                                 // 注意 当使用 WiFi 图传时 上面的 ENABLE_ASSISTANT_PARAM 是否设置为 1 或 2
 
 //=========================== WiFi SPI 配置 ===========================
@@ -67,8 +106,7 @@ int main(void)
 #define OTSU_ROI_COLUMN         (20)                            // ROI 区域列起始
 #define OTSU_ROI_COLUMN_TOTAL   (148)                           // ROI 区域向上列计数
 
-#define JUMP_DOT_TYPE           (CAMERA_IMAGE_DOT_BLACK)        // 检测点类型
-#define JUMP_DOT_COUNT          (837)                           // 矩形内点阈值
+#define JUMP_DOT_COUNT          (1600)                          // 矩形内点阈值
 
 #define JUMP_COOLDOWN_MS        (450)                           // 跳跃触发一次后的禁止重复触发时间
 
@@ -77,13 +115,23 @@ int main(void)
 
 volatile uint32 sys_ms = 0;  // 毫秒计时器
 
+static volatile uint16 core0_car_speed = 0;              // 实际车速
+static volatile uint8  core0_speed_updated = 0;          // 车速更新标志位
+
+// IPC 接收 核0 的车速
+static void appipc_speed_callback(uint32 data)
+{
+    core0_car_speed = (uint16)(data & 0xFFFFu);
+    core0_speed_updated = 1;
+}
+
 // 屏幕显示函数
 void debug_image_screen_display(JumpDetectParams_t jump_params)
 {
     #if IMAGE_DEBUG_TYPE == 1 || IMAGE_DEBUG_TYPE == 3
     camera_debug_on_screen();                            // 在显示屏上显示摄像头图像
     screen_show_detect_threshold_bar(jump_params);       // 识别矩形框 绘制四个绿色标识线
-    screen_show_roi_threshold_bar(jump_params);          // ROI矩形框 绘制四个粉色标识线
+    // screen_show_roi_threshold_bar(jump_params);          // ROI矩形框 绘制四个粉色标识线
     #endif
 }
 
@@ -111,18 +159,12 @@ static void jump_param_update_from_assistant(JumpDetectParams_t *jump_params)
 }
 
 // 统一更新函数
-void updates(uint32 sys_ms, JumpDetectParams_t *jump_params, uint32 fps, uint32 is_jump, uint8 ipc_result, uint32 *frame_count)
+void updates(uint32 sys_ms, JumpDetectParams_t *jump_params, uint32 fps, uint32 is_jump, uint8 ipc_result, uint16 carspd)
 {
-    button_update();                                   // 按钮状态更新
-    screen_show_table_t2(*jump_params, fps, is_jump);  // 屏幕显示参数更新
-
-    // 图像信息更新时
-    if (camera_has_frame())
-    {
-        (*frame_count)++;                              // 更新帧计数
-        debug_image_screen_display(*jump_params);      // 使用屏幕显示图像
-        debug_image_wifispi_display();                 // 使用 WiFi SPI 发送图像
-    }
+    button_update();                                            // 按钮状态更新
+    #if IMAGE_DEBUG_TYPE == 1 || IMAGE_DEBUG_TYPE == 3
+    screen_show_table_t2(*jump_params, fps, is_jump, carspd);   // 屏幕显示参数更新
+    #endif
     
     // 更新按钮状态，当检测到 按钮1 被按下后，重置检测序列
     if (button_flag[BTN_1])
@@ -150,7 +192,7 @@ int main(void)
     .otsu_roi_row_count       = OTSU_ROI_ROW_TOTAL,
     .otsu_roi_column          = OTSU_ROI_COLUMN,
     .otsu_roi_column_count    = OTSU_ROI_COLUMN_TOTAL,
-    .dot_type                 = JUMP_DOT_TYPE,
+    .dot_type                 = dot_type_list[0],
     .dot_count                = JUMP_DOT_COUNT,
     .cooldown_time_ms         = JUMP_COOLDOWN_MS,
     .multi_frame              = JUMP_MULTI_FRAME,
@@ -160,12 +202,17 @@ int main(void)
     uint8  ipc_result   = APPIPC_BUSY;        // IPC发送结果：APPIPC_OK 成功，APPIPC_BUSY 失败或超时
     uint32 frame_count  = 0;                  // 帧计数
     uint32 fps          = 0;                  // FPS
+    uint8  jump_uart_latched = 0;             // 串口发送的跳跃标志位
+    uint32 uart_last_ms = 0;                  // 串口更新计时
+    char txt[64];
 
-    clock_init(SYSTEM_CLOCK_250M);            // 系统 初始化
-    screen_init();                            // 屏幕 初始化
-    button_init();                            // 主板按钮 初始化
-    camera_init();                            // MT9V03X 摄像头初始化
-    pit_ms_init(PIT_CH1, 1);                  // PIT_CH1 1ms周期中断，用于 sys_ms 计时
+    clock_init(SYSTEM_CLOCK_250M);                  // 系统 初始化
+    screen_init();                                  // 屏幕 初始化
+    button_init();                                  // 主板按钮 初始化
+    camera_init();                                  // MT9V03X 摄像头初始化
+    pit_ms_init(PIT_CH1, 1);                        // PIT_CH1 1ms周期中断，用于 sys_ms 计时
+    wireless_uart_init();                           // 无线串口 初始化
+    appipc_speed_rx_init(appipc_speed_callback);    // IPC接收 初始化
     
     #if ENABLE_ASSISTANT_PARAM == 1
     camera_assistant_wifi_spi_init(WIFI_SSID, WIFI_PWD, TARGET_IP, TARGET_PORT, LOCAL_PORT);  // WiFi SPI + 调参 初始化
@@ -176,15 +223,56 @@ int main(void)
 
     while(true)
     {
-        updates(sys_ms, &jump_params, calc_fps(sys_ms, &frame_count, &fps), is_jump, ipc_result, &frame_count);  // 统一更新函数
+        updates(sys_ms, &jump_params, calc_fps(sys_ms, &frame_count, &fps), is_jump, ipc_result, core0_car_speed);  // 统一更新函数
+        
+        // 来自核0 的速度更新后
+        if(core0_speed_updated)
+        {
+            core0_speed_updated = 0;
+
+            // 设置自适应识别距离
+            // 后面的 -2 为识别微调系数，数字为正，更晚切换到低 Row，更偏高 Row，跳跃时间更早；数字为负，更早切换到低 Row，更偏低 Row，跳跃时间越晚
+            // 可进入该函数调整 步长 CAMERA_ROW_AGGRESSIVE_BIAS，当前为 10 可修改为更低的值进行细调
+            jump_params.check_row = camera_check_row_from_speed(core0_car_speed, -2);
+        }
 
         // 当检测到有帧时 且 当计时器时间大于启动时暂停跳跃时间执行
         if (camera_has_frame() && sys_ms > HOLD_MS)
         {
-            is_jump    = camera_processing_roi(sys_ms, &jump_params);  // 检测跳跃（使用ROI）
-            ipc_result = appipc_send_u32((uint32)is_jump);             // 发送 跳跃标志位值
+            frame_count++;                                             // 更新帧计数
+            is_jump    = camera_processing(sys_ms, &jump_params);      // 检测跳跃（不使用ROI, ROI不稳定，效果不大）
+
+            // 只在检测到跳跃时发送更新到核0
+            if(is_jump)
+            {
+                jump_uart_latched = 1;                                  // 串口发送的数据
+                ipc_result = appipc_send_u32(1u);                       // IPC 发送
+            }
+            else
+            {
+                ipc_result = APPIPC_OK;
+            }
+
+            debug_image_screen_display(jump_params);                   // 使用屏幕显示图像
+            debug_image_wifispi_display();                             // 使用 WiFi SPI 发送图像
         }
         
+        // 串口数据发送
+        if((sys_ms - uart_last_ms) >= 50u)
+        {
+            uart_last_ms = sys_ms;
+
+            sprintf(txt,
+                    "Speed:%u   Jump:%u   Row:%u\r\n",
+                    (uint16)core0_car_speed,
+                    (uint8)jump_uart_latched,
+                    (uint16)jump_params.check_row);
+
+            wireless_uart_send_string(txt);
+            jump_uart_latched = 0;
+        }
+
+        /* 已使用自适应，保留手动调参备用
         // 不同跳跃下的识别参数细调
         switch (jump_params.steps)
         {
@@ -196,15 +284,16 @@ int main(void)
 
             // 控制第二次跳跃时的检测参数
             case 1:
-                jump_params.check_row = 110;
+                jump_params.check_row = 80;
                 jump_params.check_row_count= 25;
                 break;
 
             // 控制第三次跳跃时的检测参数
             case 2:
-                jump_params.check_row = 110;
+                jump_params.check_row = 70;
                 jump_params.check_row_count= 25;
                 break;
-        }
+        } 
+        */
     }
 }

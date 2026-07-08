@@ -1,4 +1,4 @@
-﻿#ifndef CAMERA_IMAGE_PROCESSING_H
+#ifndef CAMERA_IMAGE_PROCESSING_H
 #define CAMERA_IMAGE_PROCESSING_H
 
 #include "zf_common_typedef.h"
@@ -9,6 +9,10 @@
 
 #define CAMERA_IMAGE_DOT_BLACK        (0)    // 检测二值图中的黑色像素，像素值为 0
 #define CAMERA_IMAGE_DOT_WHITE        (1)    // 检测二值图中的白色像素，像素值为 255
+
+
+#define CAMERA_ROW_SPEED_RULE_COUNT     (5u)
+#define CAMERA_ROW_AGGRESSIVE_BIAS      (10u)
 
 typedef struct 
 {
@@ -38,6 +42,21 @@ static const uint32 dot_type_list[] =
 };
 
 #define CAMERA_DOT_TYPE_LIST_COUNT     (sizeof(dot_type_list) / sizeof(dot_type_list[0]))
+
+
+
+typedef struct
+{
+    uint16 max_speed;
+    uint16 check_row;
+}CameraRowSpeedRule_t;
+
+extern const CameraRowSpeedRule_t camera_row_speed_rules[CAMERA_ROW_SPEED_RULE_COUNT];
+
+uint16 camera_check_row_from_speed(uint16 car_speed, int8 aggressive_coeff);
+void camera_jump_params_set_row_by_speed(JumpDetectParams_t *jump_params, uint16 car_speed, int8 aggressive_coeff);
+
+
 
 /**
  * @brief 对 MT9V03X 灰度图像进行固定阈值二值化处理。

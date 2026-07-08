@@ -1,500 +1,625 @@
 #include "zf_common_headfile.h"
 
+
+
 uint8_t flash_yaw_flag = 0;      // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
 uint8_t flash_xy_flag = 0; // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
 uint8_t flash_turn_flag = 0; // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志
 // 存路径数据
 void flash_road_memery_store(void)
 {
-    // 第一步清除缓冲区
+    uint32 page_offset = 0;
+
+
+    //================ page11 =================
     flash_buffer_clear();
-    // 第二步把数据存到缓冲区
-    for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
+
+    for(size_t i = 0; i < FLASH_YAW_DATA_LENGTH; i++)
     {
-        flash_union_buffer[i].float_type = Yaw_remember[i]; // 存储偏航角
+        flash_union_buffer[i].float_type = Yaw_remember[page_offset + i];
     }
 
-    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11))
-    { // 判断是否有数据
-        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11);
-    } // 擦除这一页
-    // 第四步存到FLASH指定扇区
-    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11, FLASH_PAGE_LENGTH - 1);
-    
-    
-    
-     // 第一步清除缓冲区
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        Yaw_memery_page_INDEX_11,
+        FLASH_YAW_DATA_LENGTH
+    );
+
+    page_offset += FLASH_YAW_DATA_LENGTH;
+
+
+
+    //================ page12 =================
     flash_buffer_clear();
-    // 第二步把数据存到缓冲区
-    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 2 * FLASH_PAGE_LENGTH; i++, j++)
+
+    for(size_t i = 0; i < FLASH_YAW_DATA_LENGTH; i++)
     {
-        flash_union_buffer[j].float_type = Yaw_remember[i];
+        flash_union_buffer[i].float_type = Yaw_remember[page_offset + i];
     }
 
-    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14))
-    { // 判断是否有数据
-        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14);
-    } // 擦除这一页
-    // 第四步存到FLASH指定扇区
-    flash_union_buffer[FLASH_PAGE_LENGTH - 1].uint16_type = num_index;  // 注意
-    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14, FLASH_PAGE_LENGTH);
-    
-     
-//     // 第一步清除缓冲区
-//    flash_buffer_clear();
-//    // 第二步把数据存到缓冲区
-//    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 3 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = Yaw_remember[i];
-//    }
-//
-//    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-//    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15))
-//    { // 判断是否有数据
-//        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15);
-//    } // 擦除这一页
-//    // 第四步存到FLASH指定扇区
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15, FLASH_PAGE_LENGTH);
-//    
-//     
-//     // 第一步清除缓冲区
-//    flash_buffer_clear();
-//    // 第二步把数据存到缓冲区
-//    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 4 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = Yaw_remember[i];
-//    }
-//
-//    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-//    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16))
-//    { // 判断是否有数据
-//        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16);
-//    } // 擦除这一页
-//    // 第四步存到FLASH指定扇区
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16, FLASH_PAGE_LENGTH);
-//    
-//    
-//    
-//     
-//     // 第一步清除缓冲区
-//    flash_buffer_clear();
-//    // 第二步把数据存到缓冲区
-//    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 5 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = Yaw_remember[i];
-//    }
-//
-//    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-//    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17))
-//    { // 判断是否有数据
-//        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17);
-//    } // 擦除这一页
-//    // 第四步存到FLASH指定扇区
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17, FLASH_PAGE_LENGTH);
-//    
-//    
-//    
-//     
-//     // 第一步清除缓冲区
-//    flash_buffer_clear();
-//    // 第二步把数据存到缓冲区
-//    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 6 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = Yaw_remember[i];
-//    }
-//
-//    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-//    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18))
-//    { // 判断是否有数据
-//        flash_erase_page(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18);
-//    } // 擦除这一页
-//    // 第四步存到FLASH指定扇区
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18, FLASH_PAGE_LENGTH);
-      
-    // 存取过程结束 —— 成功存取
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        Yaw_memery_page_INDEX_12,
+        FLASH_YAW_DATA_LENGTH
+    );
+
+    page_offset += FLASH_YAW_DATA_LENGTH;
+
+
+
+    //================ page13 =================
+    flash_buffer_clear();
+
+    for(size_t i = 0; i < FLASH_YAW_DATA_LENGTH; i++)
+    {
+        flash_union_buffer[i].float_type = Yaw_remember[page_offset + i];
+    }
+
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        Yaw_memery_page_INDEX_13,
+        FLASH_YAW_DATA_LENGTH
+    );
+
+    page_offset += FLASH_YAW_DATA_LENGTH;
+
+
+
+    //================ page14 =================
+    flash_buffer_clear();
+
+    for(size_t i = 0; i < FLASH_YAW_DATA_LENGTH; i++)
+    {
+        flash_union_buffer[i].float_type = Yaw_remember[page_offset + i];
+    }
+
+
+    // 最后一个位置存路径长度
+    flash_union_buffer[FLASH_PAGE_LENGTH-1].uint16_type = num_index;
+
+
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        Yaw_memery_page_INDEX_14,
+        FLASH_PAGE_LENGTH
+    );
+
+
     flash_yaw_flag = 3;
-    
-    
 }
-
 // 取路径数据
 void flash_road_memery_get(void)
 {
-    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11)) // 检查flash里面是否存了数据
+    uint32 page_offset = 0;
+
+
+    //================ page11 =================
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11))
     {
-        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_11, FLASH_PAGE_LENGTH - 1);
-        for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            Yaw_memery_page_INDEX_11,
+            FLASH_YAW_DATA_LENGTH
+        );
+
+
+        for(size_t i = 0; i < FLASH_YAW_DATA_LENGTH; i++)
         {
-            Yaw_load[i] = flash_union_buffer[i].float_type; // 取出历史偏航角
+            Yaw_load[page_offset + i] =
+                flash_union_buffer[i].float_type;
         }
-    }
-    
-    
-    /*取路径数据*/
-    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14)) // 检查flash里面是否存了数据
-    {
-        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14, FLASH_PAGE_LENGTH);
-        for (size_t i = 0, j = FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-        {
-            Yaw_load[j] = flash_union_buffer[i].float_type; //
-        }
+
+        page_offset += FLASH_YAW_DATA_LENGTH;
     }
 
-//    /*取路径数据*/
-//    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15)) // 检查flash里面是否存了数据
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_15, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 2 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            Yaw_load[j] = flash_union_buffer[i].float_type; //
-//        }
-//    }
-//
-//    // 取路径数据
-//    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_16, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 3 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            Yaw_load[j] = flash_union_buffer[i].float_type;
-//        }
-//    }
-//
-//    // 取路径数据
-//    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_17, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 4 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            Yaw_load[j] = flash_union_buffer[i].float_type;
-//        }
-//    }
-//
-//    // 取路径数据
-//    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_18, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 5 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            Yaw_load[j] = flash_union_buffer[i].float_type;
-//        }
-//        // 从最后一页读取路径终点值
-        road_destination = flash_union_buffer[FLASH_PAGE_LENGTH - 1].uint16_type;
-//    }
-    
+
+
+    //================ page12 =================
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_12))
+    {
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            Yaw_memery_page_INDEX_12,
+            FLASH_YAW_DATA_LENGTH
+        );
+
+
+        for(size_t i = 0; i < FLASH_YAW_DATA_LENGTH; i++)
+        {
+            Yaw_load[page_offset + i] =
+                flash_union_buffer[i].float_type;
+        }
+
+        page_offset += FLASH_YAW_DATA_LENGTH;
+    }
+
+
+
+    //================ page13 =================
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_13))
+    {
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            Yaw_memery_page_INDEX_13,
+            FLASH_YAW_DATA_LENGTH
+        );
+
+
+        for(size_t i = 0; i < FLASH_YAW_DATA_LENGTH; i++)
+        {
+            Yaw_load[page_offset + i] =
+                flash_union_buffer[i].float_type;
+        }
+
+        page_offset += FLASH_YAW_DATA_LENGTH;
+    }
+
+
+
+    //================ page14 =================
+    if (flash_check(FLASH_SECTION_INDEX, Yaw_memery_page_INDEX_14))
+    {
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            Yaw_memery_page_INDEX_14,
+            FLASH_PAGE_LENGTH
+        );
+
+
+        for(size_t i = 0; i < FLASH_YAW_DATA_LENGTH; i++)
+        {
+            Yaw_load[page_offset + i] =
+                flash_union_buffer[i].float_type;
+        }
+
+
+        //读取最后一个数据
+        road_destination =
+            flash_union_buffer[FLASH_PAGE_LENGTH-1].uint16_type;
+    }
+
+
+
     flash_yaw_flag = 4;
 }
 
+// 存xy数据
 void flash_road_memery_store_Plus(void)
 {
 
-    /*存x轴数据分三个扇区依次存*/
+    uint32 page_offset = 0;
 
-    // 第一步清除缓冲区
+
+    /***********************
+     *       X轴存储
+     ***********************/
+
+
+    //================ X page1 ================
     flash_buffer_clear();
-    // 第二步把数据存到缓冲区
-    for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
+
+    for(size_t i = 0; i < FLASH_XY_DATA_LENGTH; i++)
     {
-        flash_union_buffer[i].float_type = X_remember[i];
+        flash_union_buffer[i].float_type =
+            X_remember[page_offset+i];
     }
 
-    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_1))
-    { // 判断是否有数据
-        flash_erase_page(FLASH_SECTION_INDEX, X_memery_page_INDEX_1);
-    } // 擦除这一页
-    // 第四步存到FLASH指定扇区
-    flash_write_page_from_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_1, FLASH_PAGE_LENGTH);
 
-    
-    
-    // 第一步清除缓冲区
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        X_memery_page_INDEX_1,
+        FLASH_XY_DATA_LENGTH
+    );
+
+
+    page_offset += FLASH_XY_DATA_LENGTH;
+
+
+
+    //================ X page2 ================
     flash_buffer_clear();
-    // 第二步把数据存到缓冲区
-    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 2 * FLASH_PAGE_LENGTH; i++, j++)
+
+
+    for(size_t i = 0; i < FLASH_XY_DATA_LENGTH; i++)
     {
-        flash_union_buffer[j].float_type = X_remember[i];
+        flash_union_buffer[i].float_type =
+            X_remember[page_offset+i];
     }
 
-    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_3))
-    { // 判断是否有数据
-        flash_erase_page(FLASH_SECTION_INDEX, X_memery_page_INDEX_3);
-    } // 擦除这一页
-    // 第四步存到FLASH指定扇区
-    flash_write_page_from_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_3, FLASH_PAGE_LENGTH);
 
-//    // 第一步清除缓冲区
-//    flash_buffer_clear();
-//    // 第二步把数据存到缓冲区
-//    for (size_t i = 2 * FLASH_PAGE_LENGTH, j = 0; i < 3 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = X_remember[i];
-//    }
-//
-//    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-//    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_5))
-//    { // 判断是否有数据
-//        flash_erase_page(FLASH_SECTION_INDEX, X_memery_page_INDEX_5);
-//    } // 擦除这一页
-//    // 第四步存到FLASH指定扇区
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_5, FLASH_PAGE_LENGTH);
-//
-//    // 新增X轴数据存储，扇区 7
-//    flash_buffer_clear();
-//    for (size_t i = 3 * FLASH_PAGE_LENGTH, j = 0; i < 4 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = X_remember[i];
-//    }
-//    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_7))
-//    {
-//        flash_erase_page(FLASH_SECTION_INDEX, X_memery_page_INDEX_7);
-//    }
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_7, FLASH_PAGE_LENGTH);
-//
-//    // 新增X轴数据存储，扇区 9
-//    flash_buffer_clear();
-//    for (size_t i = 4 * FLASH_PAGE_LENGTH, j = 0; i < 5 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = X_remember[i];
-//    }
-//    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_9))
-//    {
-//        flash_erase_page(FLASH_SECTION_INDEX, X_memery_page_INDEX_9);
-//    }
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_9, FLASH_PAGE_LENGTH);
-//
-//    // 新增X轴数据存储，扇区 13
-//    flash_buffer_clear();
-//    for (size_t i = 5 * FLASH_PAGE_LENGTH, j = 0; i < 6 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = X_remember[i];
-//    }
-//    // 在最后一页的最后一个位置存储NUM_L_Plus，用于记录实际数据长度即路径终点
-//    flash_union_buffer[FLASH_PAGE_LENGTH - 1].uint16_type = num_index;
-//    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_13))
-//    {
-//        flash_erase_page(FLASH_SECTION_INDEX, X_memery_page_INDEX_13);
-//    }
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_13, FLASH_PAGE_LENGTH);
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        X_memery_page_INDEX_2,
+        FLASH_XY_DATA_LENGTH
+    );
 
-    /*存y轴数据  分三个扇区依次存*/
 
-    // 第一步清除缓冲区
+    page_offset += FLASH_XY_DATA_LENGTH;
+
+
+
+    //================ X page3 ================
     flash_buffer_clear();
-    // 第二步把数据存到缓冲区
-    for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
+
+
+    for(size_t i = 0; i < FLASH_XY_DATA_LENGTH; i++)
     {
-        flash_union_buffer[i].float_type = Y_remember[i];
+        flash_union_buffer[i].float_type =
+            X_remember[page_offset+i];
     }
 
-    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_2))
-    { // 判断是否有数据
-        flash_erase_page(FLASH_SECTION_INDEX, Y_memery_page_INDEX_2);
-    } // 擦除这一页
-    // 第四步存到FLASH指定扇区
-    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_2, FLASH_PAGE_LENGTH);
 
-    // 第一步清除缓冲区
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        X_memery_page_INDEX_3,
+        FLASH_XY_DATA_LENGTH
+    );
+
+
+    page_offset += FLASH_XY_DATA_LENGTH;
+
+
+
+    //================ X page4 ================
     flash_buffer_clear();
-    // 第二步把数据存到缓冲区
-    for (size_t i = FLASH_PAGE_LENGTH, j = 0; i < 2 * FLASH_PAGE_LENGTH; i++, j++)
+
+
+    for(size_t i = 0; i < FLASH_XY_DATA_LENGTH; i++)
     {
-        flash_union_buffer[j].float_type = Y_remember[i];
+        flash_union_buffer[i].float_type =
+            X_remember[page_offset+i];
     }
 
-    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_4))
-    { // 判断是否有数据
-        flash_erase_page(FLASH_SECTION_INDEX, Y_memery_page_INDEX_4);
-    } // 擦除这一页
-    // 第四步存到FLASH指定扇区
-    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_4, FLASH_PAGE_LENGTH);
 
-//    // 第一步清除缓冲区
-//    flash_buffer_clear();
-//    // 第二步把数据存到缓冲区
-//    for (size_t i = 2 * FLASH_PAGE_LENGTH, j = 0; i < 3 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = Y_remember[i];
-//    }
-//
-//    // 第三步判断FLASH里有没有数据，有就把FLASH数据擦除/把数据存到缓冲区
-//    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_6))
-//    { // 判断是否有数据
-//        flash_erase_page(FLASH_SECTION_INDEX, Y_memery_page_INDEX_6);
-//    } // 擦除这一页
-//    // 第四步存到FLASH指定扇区
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_6, FLASH_PAGE_LENGTH);
-//
-//    // 新增Y轴数据存储，扇区 8
-//    flash_buffer_clear();
-//    for (size_t i = 3 * FLASH_PAGE_LENGTH, j = 0; i < 4 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = Y_remember[i];
-//    }
-//    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_8))
-//    {
-//        flash_erase_page(FLASH_SECTION_INDEX, Y_memery_page_INDEX_8);
-//    }
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_8, FLASH_PAGE_LENGTH);
-//
-//    // 新增Y轴数据存储，扇区 10
-//    flash_buffer_clear();
-//    for (size_t i = 4 * FLASH_PAGE_LENGTH, j = 0; i < 5 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = Y_remember[i];
-//    }
-//    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_10))
-//    {
-//        flash_erase_page(FLASH_SECTION_INDEX, Y_memery_page_INDEX_10);
-//    }
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_10, FLASH_PAGE_LENGTH);
-//
-//    // 新增Y轴数据存储，扇区 12
-//    flash_buffer_clear();
-//    for (size_t i = 5 * FLASH_PAGE_LENGTH, j = 0; i < 6 * FLASH_PAGE_LENGTH; i++, j++)
-//    {
-//        flash_union_buffer[j].float_type = Y_remember[i];
-//    }
-//    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_12))
-//    {
-//        flash_erase_page(FLASH_SECTION_INDEX, Y_memery_page_INDEX_12);
-//    }
-//    flash_write_page_from_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_12, FLASH_PAGE_LENGTH);
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        X_memery_page_INDEX_4,
+        FLASH_XY_DATA_LENGTH
+    );
 
-    // 存取过程结束 —— 成功存取
+
+
+    /***********************
+     *       Y轴存储
+     ***********************/
+
+
+    page_offset = 0;
+
+
+
+    //================ Y page6 ================
+    flash_buffer_clear();
+
+
+    for(size_t i = 0; i < FLASH_XY_DATA_LENGTH; i++)
+    {
+        flash_union_buffer[i].float_type =
+            Y_remember[page_offset+i];
+    }
+
+
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        Y_memery_page_INDEX_6,
+        FLASH_XY_DATA_LENGTH
+    );
+
+
+    page_offset += FLASH_XY_DATA_LENGTH;
+
+
+
+    //================ Y page7 ================
+    flash_buffer_clear();
+
+
+    for(size_t i = 0; i < FLASH_XY_DATA_LENGTH; i++)
+    {
+        flash_union_buffer[i].float_type =
+            Y_remember[page_offset+i];
+    }
+
+
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        Y_memery_page_INDEX_7,
+        FLASH_XY_DATA_LENGTH
+    );
+
+
+    page_offset += FLASH_XY_DATA_LENGTH;
+
+
+
+    //================ Y page8 ================
+    flash_buffer_clear();
+
+
+    for(size_t i = 0; i < FLASH_XY_DATA_LENGTH; i++)
+    {
+        flash_union_buffer[i].float_type =
+            Y_remember[page_offset+i];
+    }
+
+
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        Y_memery_page_INDEX_8,
+        FLASH_XY_DATA_LENGTH
+    );
+
+
+    page_offset += FLASH_XY_DATA_LENGTH;
+
+
+
+    //================ Y page9 ================
+    flash_buffer_clear();
+
+
+    for(size_t i = 0; i < FLASH_XY_DATA_LENGTH; i++)
+    {
+        flash_union_buffer[i].float_type =
+            Y_remember[page_offset+i];
+    }
+
+
+    flash_write_page_from_buffer(
+        FLASH_SECTION_INDEX,
+        Y_memery_page_INDEX_9,
+        FLASH_XY_DATA_LENGTH
+    );
+
+
     flash_xy_flag = 3;
+
 }
 
+
+// 读xy数据
 void flash_road_memery_get_Plus(void)
 {
+    uint32 page_offset = 0;
 
-    /*取x轴数据,分三个扇区取*/
-    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_1)) // 检查flash里面是否存了数据
+
+    /***********************
+     *       X轴读取
+     ***********************/
+
+
+    //================ X page1 ================
+    if(flash_check(FLASH_SECTION_INDEX,
+                   X_memery_page_INDEX_1))
     {
-        flash_read_page_to_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_1, FLASH_PAGE_LENGTH);
-        for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
+
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            X_memery_page_INDEX_1,
+            FLASH_XY_DATA_LENGTH
+        );
+
+
+        for(size_t i=0;i<FLASH_XY_DATA_LENGTH;i++)
         {
-            X_load[i] = flash_union_buffer[i].float_type; //
+            X_load[page_offset+i] =
+                flash_union_buffer[i].float_type;
+        }
+
+
+        page_offset += FLASH_XY_DATA_LENGTH;
+    }
+
+
+
+    //================ X page2 ================
+    if(flash_check(FLASH_SECTION_INDEX,
+                   X_memery_page_INDEX_2))
+    {
+
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            X_memery_page_INDEX_2,
+            FLASH_XY_DATA_LENGTH
+        );
+
+
+        for(size_t i=0;i<FLASH_XY_DATA_LENGTH;i++)
+        {
+            X_load[page_offset+i] =
+                flash_union_buffer[i].float_type;
+        }
+
+
+        page_offset += FLASH_XY_DATA_LENGTH;
+    }
+
+
+
+    //================ X page3 ================
+    if(flash_check(FLASH_SECTION_INDEX,
+                   X_memery_page_INDEX_3))
+    {
+
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            X_memery_page_INDEX_3,
+            FLASH_XY_DATA_LENGTH
+        );
+
+
+        for(size_t i=0;i<FLASH_XY_DATA_LENGTH;i++)
+        {
+            X_load[page_offset+i] =
+                flash_union_buffer[i].float_type;
+        }
+
+
+        page_offset += FLASH_XY_DATA_LENGTH;
+    }
+
+
+
+    //================ X page4 ================
+    if(flash_check(FLASH_SECTION_INDEX,
+                   X_memery_page_INDEX_4))
+    {
+
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            X_memery_page_INDEX_4,
+            FLASH_XY_DATA_LENGTH
+        );
+
+
+        for(size_t i=0;i<FLASH_XY_DATA_LENGTH;i++)
+        {
+            X_load[page_offset+i] =
+                flash_union_buffer[i].float_type;
         }
     }
 
-    /*取x轴数据*/
-    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_3)) // 检查flash里面是否存了数据
+
+
+
+    /***********************
+     *       Y轴读取
+     ***********************/
+
+
+    page_offset = 0;
+
+
+    //================ Y page6 ================
+    if(flash_check(FLASH_SECTION_INDEX,
+                   Y_memery_page_INDEX_6))
     {
-        flash_read_page_to_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_3, FLASH_PAGE_LENGTH);
-        for (size_t i = 0, j = FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
+
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            Y_memery_page_INDEX_6,
+            FLASH_XY_DATA_LENGTH
+        );
+
+
+        for(size_t i=0;i<FLASH_XY_DATA_LENGTH;i++)
         {
-            X_load[j] = flash_union_buffer[i].float_type; //
+            Y_load[page_offset+i] =
+                flash_union_buffer[i].float_type;
         }
+
+
+        page_offset += FLASH_XY_DATA_LENGTH;
     }
 
-//    /*取x轴数据*/
-//    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_5)) // 检查flash里面是否存了数据
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_5, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 2 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            X_load[j] = flash_union_buffer[i].float_type; //
-//        }
-//    }
-//
-//    // 新增X轴数据读取，扇区 7
-//    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_7))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_7, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 3 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            X_load[j] = flash_union_buffer[i].float_type;
-//        }
-//    }
-//
-//    // 新增X轴数据读取，扇区 9
-//    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_9))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_9, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 4 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            X_load[j] = flash_union_buffer[i].float_type;
-//        }
-//    }
-//
-//    // 新增X轴数据读取，扇区 13
-//    if (flash_check(FLASH_SECTION_INDEX, X_memery_page_INDEX_13))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, X_memery_page_INDEX_13, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 5 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            X_load[j] = flash_union_buffer[i].float_type;
-//        }
-//        
-//    }
 
-    /*取y轴数据,分三个扇区取*/
-    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_2)) // 检查flash里面是否存了数据
+
+    //================ Y page7 ================
+    if(flash_check(FLASH_SECTION_INDEX,
+                   Y_memery_page_INDEX_7))
     {
-        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_2, FLASH_PAGE_LENGTH);
-        for (size_t i = 0; i < FLASH_PAGE_LENGTH; i++)
+
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            Y_memery_page_INDEX_7,
+            FLASH_XY_DATA_LENGTH
+        );
+
+
+        for(size_t i=0;i<FLASH_XY_DATA_LENGTH;i++)
         {
-            Y_load[i] = flash_union_buffer[i].float_type; //
+            Y_load[page_offset+i] =
+                flash_union_buffer[i].float_type;
         }
+
+
+        page_offset += FLASH_XY_DATA_LENGTH;
     }
 
-    /*取y轴数据*/
-    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_4)) // 检查flash里面是否存了数据
+
+
+    //================ Y page8 ================
+    if(flash_check(FLASH_SECTION_INDEX,
+                   Y_memery_page_INDEX_8))
     {
-        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_4, FLASH_PAGE_LENGTH);
-        for (size_t i = 0, j = FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
+
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            Y_memery_page_INDEX_8,
+            FLASH_XY_DATA_LENGTH
+        );
+
+
+        for(size_t i=0;i<FLASH_XY_DATA_LENGTH;i++)
         {
-            Y_load[j] = flash_union_buffer[i].float_type; //
+            Y_load[page_offset+i] =
+                flash_union_buffer[i].float_type;
         }
+
+
+        page_offset += FLASH_XY_DATA_LENGTH;
     }
 
-//    /*取y轴数据*/
-//    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_6)) // 检查flash里面是否存了数据
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_6, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 2 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            Y_load[j] = flash_union_buffer[i].float_type; //
-//        }
-//    }
-//
-//    // 新增Y轴数据读取，扇区 8
-//    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_8))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_8, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 3 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            Y_load[j] = flash_union_buffer[i].float_type;
-//        }
-//    }
-//
-//    // 新增Y轴数据读取，扇区 10
-//    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_10))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_10, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 4 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            Y_load[j] = flash_union_buffer[i].float_type;
-//        }
-//    }
-//
-//    // 新增Y轴数据读取，扇区 12
-//    if (flash_check(FLASH_SECTION_INDEX, Y_memery_page_INDEX_12))
-//    {
-//        flash_read_page_to_buffer(FLASH_SECTION_INDEX, Y_memery_page_INDEX_12, FLASH_PAGE_LENGTH);
-//        for (size_t i = 0, j = 5 * FLASH_PAGE_LENGTH; i < FLASH_PAGE_LENGTH; i++, j++)
-//        {
-//            Y_load[j] = flash_union_buffer[i].float_type;
-//        }
-//    }
+
+
+    //================ Y page9 ================
+    if(flash_check(FLASH_SECTION_INDEX,
+                   Y_memery_page_INDEX_9))
+    {
+
+        flash_read_page_to_buffer(
+            FLASH_SECTION_INDEX,
+            Y_memery_page_INDEX_9,
+            FLASH_XY_DATA_LENGTH
+        );
+
+
+        for(size_t i=0;i<FLASH_XY_DATA_LENGTH;i++)
+        {
+            Y_load[page_offset+i] =
+                flash_union_buffer[i].float_type;
+        }
+
+    }
+
 
     flash_xy_flag = 4;
+
+}
+
+
+/**
+ * @brief 清除路径存储Flash区域
+ * @note 上电初始化时调用
+ *       清除 X/Y/Yaw 所使用的Flash页
+ */
+void flash_road_memory_clear(void)
+{
+    // 清除X轴数据页 1~5
+    for(uint32 page = X_memery_page_INDEX_1;
+        page <= X_memery_page_INDEX_5;
+        page++)
+    {
+        flash_erase_page(FLASH_SECTION_INDEX, page);
+    }
+
+
+    // 清除Y轴数据页 6~10
+    for(uint32 page = Y_memery_page_INDEX_6;
+        page <= Y_memery_page_INDEX_10;
+        page++)
+    {
+        flash_erase_page(FLASH_SECTION_INDEX, page);
+    }
+
+
+    // 清除Yaw数据页 11~15
+    for(uint32 page = Yaw_memery_page_INDEX_11;
+        page <= Yaw_memery_page_INDEX_15;
+        page++)
+    {
+        flash_erase_page(FLASH_SECTION_INDEX, page);
+    }
 }
 
 

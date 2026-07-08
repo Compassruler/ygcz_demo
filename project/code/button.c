@@ -1,5 +1,5 @@
 #include "button.h"
-
+#include "flag_value.h"
 // 按键释放时为高电平，按下时为低电平。
 #define BUTTON_RELEASE_LEVEL        (GPIO_HIGH)
 
@@ -52,5 +52,9 @@ void button_update(void)
         }
 
         button_last_pressed[i] = now_pressed;
+    }
+    if(button_flag[3] == 1)
+    {
+      remote_right_01_now_flag = 1;
     }
 }

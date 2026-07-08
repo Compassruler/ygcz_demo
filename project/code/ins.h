@@ -17,7 +17,7 @@ typedef struct {
 
 
 
-#define Use_page         (2) // 使用flash的页数
+#define Use_page         (4) // 使用flash的页数
 
 
 extern float X_remember[FLASH_PAGE_LENGTH * Use_page];

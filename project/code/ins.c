@@ -1,7 +1,7 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
 #define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
-#define NEAREST_SELECT_NUM 1       // 搜索最近点范围
+#define NEAREST_SELECT_NUM 10       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 //#define TURN_NUM        3    //
 float x_last = 0.0f;
@@ -50,10 +50,9 @@ void ins_update(void)
 //  yaw = round(yaw * 100.0f) / 100.0f;
      
     // 确保不会越界访问数组
-    if (remote_left_01_now_flag !=2 && (num_index >= FLASH_PAGE_LENGTH * 2 - 2 || flash_yaw_flag == 1))
+    if (remote_left_01_now_flag !=2 && (num_index >= FLASH_PAGE_LENGTH * 4 - 2 || flash_yaw_flag == 1))
     {
         road_memery_flag = 2; // 路径记忆完成标志位
-        
         return;                           // 直接返回，不再记录新的点
     }
     
@@ -242,6 +241,8 @@ void Track_update(void)
             remote_right_01_now_flag = 2;
             banlance.yaw_angle_pid.K = 1.0;
             road_memery_flag = 2;
+            target_yaw_remote = target_yaw;
+            buzzer_beep(3,100);
 //        }
     }
 }

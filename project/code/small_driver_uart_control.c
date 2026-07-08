@@ -211,6 +211,17 @@ void small_driver_get_location(small_device_value_struct *driver_value)
     uart_write_buffer(driver_value->driver_uart, driver_value->send_data_buffer, 7);
 }
 
+/**
+ * @brief 电机失能/停止输出
+ * @param driver_value 电机驱动结构体
+ */
+void small_driver_disable(small_device_value_struct *driver_value)
+{
+    // 左右电机输出0
+    small_driver_set_duty(driver_value, 0, 0);
+}
+
+
 //-------------------------------------------------------------------------------------------------------------------
 // 函数简介     无刷驱动 串口通讯初始化
 // 参数说明     void

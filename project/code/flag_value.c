@@ -19,7 +19,7 @@ bool turn_flag = 0;
 
 
 
-float KP_DIS = 4.0f;
+float KP_DIS = 5.5f;
 int MAX_SPEED = 3000;
 float DIST_TH = 0.05f;
 int MIN_SPEED = 0;

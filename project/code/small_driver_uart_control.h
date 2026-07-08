@@ -53,6 +53,8 @@ void small_driver_get_angle(small_device_value_struct *driver_value);           
 
 void small_driver_get_location(small_device_value_struct *driver_value);                                // 无刷驱动 获取 电机当前通过减速结构后的输出角度 
 
+void small_driver_disable(small_device_value_struct *driver_value);
+
 void small_driver_uart_init(void);                                                                      // 无刷驱动 串口通讯初始化
 
 #endif

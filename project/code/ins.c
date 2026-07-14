@@ -36,7 +36,7 @@ float distance, target_v;
 float yaw_error;
 int target_speed;
 
-float dt = 0.020;  // ins调用周期（s）
+float dt = 0.020;  // ins调用周期（s） 
 
 void ins_init(void)
 {
@@ -67,7 +67,7 @@ void ins_update(void)
      dx_ins = x - x_last;
      dy_ins = y - y_last;
      distance_ins = sqrtf(dx_ins * dx_ins + dy_ins * dy_ins);
-    if (distance_ins >= DISTANCE_STEP)
+    if (distance_ins >= DISTANCE_STEP && pause_flag)
     {
         // 超过打点间距，记录点
         X_remember[num_index] = x;

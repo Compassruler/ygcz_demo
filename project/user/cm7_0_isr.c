@@ -17,7 +17,7 @@ void pit0_ch0_isr()
     {
       small_driver_get_speed(&small_driver_value);
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
-      if (remote_right_01_now_flag == 1)
+      if (remote_right_01_now_flag == 1 && pause_flag)
       {
         Track_update();
         pid_pos_calc(&banlance.speed_pid, target_speed, car_speed);

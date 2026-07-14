@@ -17,7 +17,7 @@ extern uint8 remote_left_01_now_flag;
 extern uint8 remote_right_01_now_flag;
 
 extern int flash_task_flag;
-extern bool turn_flag;
+extern bool pause_flag;            // ¹ßµ¼ÖÐ¶Ïflag
 
 
 extern float KP_DIS;

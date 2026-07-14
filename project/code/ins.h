@@ -5,15 +5,6 @@
 #include "zf_driver_flash.h"
 #define MAX_PATH_POINTS 2000   // 最大记录点数，可根据 MCU 内存调整
 
-typedef struct {
-    bool enabled;
-    float x;    // 世界坐标 X
-    float y;    // 世界坐标 Y
-    float yaw;  // 偏航角
-
-    float vx;   // 世界坐标速度 X
-    float vy;   // 世界坐标速度 Y
-} INS_t;
 
 
 
@@ -29,7 +20,6 @@ extern float Y_load[FLASH_PAGE_LENGTH * Use_page];
 extern float Yaw_load[FLASH_PAGE_LENGTH * Use_page];
 
 extern uint8 road_memery_flag;   // 路径记忆完成标志位
-extern INS_t ins;
 extern  uint16 num_index;
 extern  uint16 safe_index;
 extern uint16_t road_destination;
@@ -52,6 +42,9 @@ extern float target_y;
 extern float target_v;
 extern float dt;  // ins调用周期（s）
 
+extern uint16_t element_index[];
+extern float distance_recover;
+extern bool pause_flag;
 // 初始化
 void ins_init(void);
 void ins_enable(bool on_off);
@@ -62,4 +55,10 @@ void ins_update(void);
 
 // 轨迹复现更新
 void Track_update(void);
+
+// 检测打断点
+void path_element_check(void);
+
+// 检测是否该恢复了
+void element_recover_check(void);
 #endif

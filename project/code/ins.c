@@ -3,21 +3,25 @@
 #define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
 #define NEAREST_SELECT_NUM 10       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
+#define MAX_ELEMENT_NUM 10              // 打断点数量
+#define INTERRUPT_DISTANCE 0.5         //打断惯导的判断距离
+#define RECOVER_DISTANCE 0.05           // 恢复惯导的判断距离
+uint16_t element_index[MAX_ELEMENT_NUM];        // 打断点索引
+uint8 element_num = 0;     // 已经记录的打断点数量
+uint8 current_element = 0;  // 目前到哪个打断点了 
 //#define TURN_NUM        3    //
 float x_last = 0.0f;
 float y_last = 0.0f;
 
-float X_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
+float X_remember[FLASH_PAGE_LENGTH * Use_page] = {0};   // 记录点数组
 float Y_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
 float Yaw_remember[FLASH_PAGE_LENGTH * Use_page] = {0};
-//bool turn_remember[TURN_NUM] = {0};
 
-float X_load[FLASH_PAGE_LENGTH * Use_page] = {0}; //不×6，先调试
+
+float X_load[FLASH_PAGE_LENGTH * Use_page] = {0}; // 读取点数组
 float Y_load[FLASH_PAGE_LENGTH * Use_page] = {0};
 float Yaw_load[FLASH_PAGE_LENGTH * Use_page] = {0};
-//bool turn_load[TURN_NUM] = {0};
 
-INS_t ins;
 uint8 road_memery_flag = 1; // 路径记忆标志位 0为初始状态 1为记录开始 2为记录完成  
 uint16_t road_destination = 0;        // 记录路径的终点
 uint16 num_index = 0;
@@ -38,6 +42,8 @@ int target_speed;
 
 float dt = 0.020;  // ins调用周期（s） 
 
+
+float distance_recover = 0;   // 判断恢复点的距离(写在这里为了调试)
 void ins_init(void)
 {
   road_memery_flag = 1;
@@ -63,11 +69,16 @@ void ins_update(void)
     vy = true_speed * sinf(yaw_ins);
     x += vx * dt;
     y += vy * dt;
+        // 元素通过检测
+    if(!pause_flag)
+    {
+        element_recover_check();
+    }
     // 计算和上一个记录点的距离
      dx_ins = x - x_last;
      dy_ins = y - y_last;
      distance_ins = sqrtf(dx_ins * dx_ins + dy_ins * dy_ins);
-    if (distance_ins >= DISTANCE_STEP && pause_flag)
+    if (distance_ins >= DISTANCE_STEP && pause_flag && remote_right_01_now_flag != 2)
     {
         // 超过打点间距，记录点
         X_remember[num_index] = x;
@@ -154,7 +165,15 @@ void Track_update(void)
     }
 
     find_lookahead_point(find_nearest_point(path_index));
-
+    
+    // 判断是否该打断点了
+    if(current_element < element_num)
+{ 
+    if(path_index >= element_index[current_element]-10) // 减几就是提前几个点关闭
+    {
+        pause_flag = false;
+    }
+}
     //--------------------------------------------------
     // 计算距离
     //--------------------------------------------------
@@ -181,24 +200,6 @@ void Track_update(void)
     }
     target_yaw = angle;
     yaw_error = target_yaw - yaw_angle;  
-//    if(yaw_error <= 20)
-//    {
-//      target_yaw = angle;
-////      banlance.yaw_angle_pid.K = 1.0f;
-//      yaw_ready = true;
-//    }    
-//else
-//    {
-//      target_speed = 0;
-//      target_yaw = yaw_angle;
-//      if(fabs(yaw_angle - angle) >= 10)
-//      {
-//        target_yaw = yaw_angle + 10;      
-//      }
-////      banlance.yaw_angle_pid.K = 0.05f;
-//      yaw_ready = false;
-//      return;
-//    }
       //--------------------------------------------------
     // 距离控制
     //--------------------------------------------------
@@ -233,18 +234,76 @@ void Track_update(void)
     //--------------------------------------------------
     if(path_index >= road_destination - 2)
     { 
-//        float dx_end = X_load[road_destination - 1] - x_now;
-//        float dy_end = Y_load[road_destination - 1] - y_now;
-//        if(sqrtf(dx_end*dx_end + dy_end*dy_end) < 0.05f)
-//        {
+
             target_speed = 0;
             remote_right_01_now_flag = 2;
             banlance.yaw_angle_pid.K = 1.0;
             road_memery_flag = 2;
             target_yaw_remote = target_yaw;
             buzzer_beep(3,100);
-//        }
     }
 }
  
+//  检测是否该打断惯导了（查打断点）
+void path_element_check(void)
+{
+    element_num = 0;     // 已经记录的打断点数量
+
+    for(int i=0;i<road_destination-1;i++)
+    {
+        float dx_check = X_load[i+1]-X_load[i];
+        float dy_check = Y_load[i+1]-Y_load[i];
+
+        float dis_check = sqrtf(dx_check*dx_check + dy_check*dy_check);
+
+
+        // 正常2cm
+        // 元素停止打点产生大间隔
+        if(dis_check > INTERRUPT_DISTANCE)
+        {
+            if(element_num < MAX_ELEMENT_NUM)
+            {
+                element_index[element_num]=i;
+                element_num++;
+                if ( element_num ==  MAX_ELEMENT_NUM)
+                  return;
+            }
+        }
+    }
+}
+
+//  检测是否该恢复惯导了
+void element_recover_check(void)
+{
+    if(current_element >= element_num)
+        return;
+
+
+    uint16_t recover_index =
+        element_index[current_element] + 1;
+
+
+    float dx_recover =
+        X_load[recover_index] - x;
+
+    float dy_recover =
+        Y_load[recover_index] - y;
+
+
+     distance_recover =
+        sqrtf(dx_recover*dx_recover +
+              dy_recover*dy_recover);
+
+
+    if(distance_recover < RECOVER_DISTANCE)
+    {
+        path_index = recover_index;
+
+
+        current_element++;
+
+
+        pause_flag = true;
+    }
+}
  

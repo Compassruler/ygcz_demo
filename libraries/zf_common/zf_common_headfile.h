@@ -53,6 +53,7 @@
 #include "flag_value.h"
 #include "button.h"
 #include "buzzer.h"
+#include "appipc.h"
 //===================================================Ð¾Æ¬ SDK µ×²ã===================================================
 #include "cy_project.h"
 #include "cy_device_headers.h"

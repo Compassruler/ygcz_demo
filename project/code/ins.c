@@ -1,11 +1,11 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
 #define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
-#define NEAREST_SELECT_NUM 10       // 搜索最近点范围
+#define NEAREST_SELECT_NUM 4       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 #define MAX_ELEMENT_NUM 10              // 打断点数量
 #define INTERRUPT_DISTANCE 0.5         //打断惯导的判断距离
-#define RECOVER_DISTANCE 0.05           // 恢复惯导的判断距离
+#define RECOVER_DISTANCE 0.15           // 恢复惯导的判断距离
 uint16_t element_index[MAX_ELEMENT_NUM];        // 打断点索引
 uint8 element_num = 0;     // 已经记录的打断点数量
 uint8 current_element = 0;  // 目前到哪个打断点了 
@@ -40,6 +40,9 @@ float distance, target_v;
 float yaw_error;
 int target_speed;
 
+int pause_time = 0; // 恢复惯导时间
+
+
 float dt = 0.020;  // ins调用周期（s） 
 
 
@@ -72,7 +75,10 @@ void ins_update(void)
         // 元素通过检测
     if(!pause_flag)
     {
-        element_recover_check();
+//        element_recover_check();
+      pause_time ++;
+      if (pause_time > 100)
+        pause_flag = true;
     }
     // 计算和上一个记录点的距离
      dx_ins = x - x_last;
@@ -169,7 +175,7 @@ void Track_update(void)
     // 判断是否该打断点了
     if(current_element < element_num)
 { 
-    if(path_index >= element_index[current_element]-10) // 减几就是提前几个点关闭
+    if(path_index >= element_index[current_element]-6) // 减几就是提前几个点关闭
     {
         pause_flag = false;
     }

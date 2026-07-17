@@ -183,6 +183,19 @@ void show_string_demo(void);
 // 矩形识别边框显示函数
 void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params);
 
+/**
+ * @brief 在摄像头图像显示区域上绘制单边桥拟合右边线。
+ *
+ * 函数使用 `CameraBridgeResult_t` 中的 `edge_x1/edge_y1` 和
+ * `edge_x2/edge_y2` 作为拟合线端点，将摄像头图像坐标加上
+ * `IMAGE_X`、`IMAGE_Y` 显示偏移后，以绿色 2 像素粗直线绘制到 IPS200。
+ *
+ * @param bridge_result 单边桥识别结果。指针为空、结果无效或端点越界时不绘制。
+ *
+ * @note 应先显示摄像头图像，再调用本函数，否则拟合线可能被图像刷新覆盖。
+ */
+void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result);
+
 // 矩形ROI边框显示函数
 void screen_show_roi_threshold_bar(JumpDetectParams_t jump_params);
 

@@ -14,6 +14,27 @@
 // WiFi SPI 图传默认分频：2 表示每 2 帧发送 1 帧
 #define CAMERA_WIFI_IMAGE_SEND_DIV_DEFAULT     (2U)
 
+// 单边桥跨帧滤波默认参数
+#define CAMERA_BRIDGE_FILTER_ALPHA                         (0.25f) // 正常结果低通系数，越小越稳定但响应越慢
+#define CAMERA_BRIDGE_FILTER_MAX_ANGLE_JUMP_D10            (50)    // 单帧允许的最大角度跳变，单位 0.1 度
+#define CAMERA_BRIDGE_FILTER_MAX_POSITION_JUMP_PX          (8)     // 单帧允许的最大位置跳变，单位像素
+#define CAMERA_BRIDGE_FILTER_PENDING_ANGLE_TOLERANCE_D10   (20)    // 待确认结果之间允许的角度差，单位 0.1 度
+#define CAMERA_BRIDGE_FILTER_PENDING_POSITION_TOLERANCE_PX (4)     // 待确认结果之间允许的位置差，单位像素
+#define CAMERA_BRIDGE_FILTER_JUMP_CONFIRM_FRAMES           (3U)    // 大跳变连续出现多少帧后才接受
+#define CAMERA_BRIDGE_FILTER_INVALID_RESET_FRAMES          (3U)    // 连续无效多少帧后复位滤波状态
+
+/**
+ * @brief 摄像头帧率统计结构体。
+ *
+ * 用于在主循环中独立统计视觉处理帧率，不依赖屏幕显示函数。
+ */
+typedef struct
+{
+    uint32 last_time_ms;       // 上一次完成 FPS 更新的系统时间，单位 ms
+    uint32 frame_count;        // 当前 1 秒统计窗口内已经处理的帧数
+    uint32 fps;                // 最近一次计算得到的 FPS
+} fps_counter_t;
+
 
 /**
  * @brief 查询摄像头是否采集到新的一帧图像。
@@ -189,36 +210,27 @@ uint8 camera_assistant_parameter_read_uint32(uint8 channel, uint32 *value, uint3
 void camera_init(void);
 
 /**
- * @brief 处理一帧摄像头图像并显示到 IPS200 屏幕，用于图像调试观察。
+ * @brief 将最近一次处理完成的摄像头图像显示到 IPS200 屏幕。
  *
- * 如果检测到摄像头有新帧，本函数会先复制新图像到内部副本，并完成：
- * 1. 大津法自动阈值二值化；
- * 2. 黑色/白色孤立噪点过滤；
- * 3. 将处理后的图像显示到 IPS200 指定位置。
- *
- * 如果当前没有新帧，但内部已经有处理过的图像副本，本函数会继续显示最近一次处理结果。
- *
- * // 一般无需调整，已固定在函数中
- * @param x               图像显示区域左上角 x 坐标。
- * @param y               图像显示区域左上角 y 坐标。
- * @param display_width   图像显示宽度。
- * @param display_height  图像显示高度。
+ * 本函数只把内部最近一次已经处理完成的 `image_copy` 显示到 IPS200，
+ * 不会重新获取摄像头帧，也不会再次执行二值化。这样可以保证屏幕图像与
+ * `camera_bridge_processing()` 或 `camera_processing()` 得到的识别结果来自同一帧。
  *
  * @return void
  *
- * @note 本函数只负责屏幕显示调试，不进行跳跃检测，也不进行无线发送。
- * @note 若需要同时检测与显示，建议先调用 `camera_processing()`，再调用本函数显示同一帧处理结果。
+ * @note 本函数只负责屏幕显示调试，不进行取帧、图像处理、跳跃检测或无线发送。
+ * @note 调用本函数前必须先成功执行一个摄像头处理函数，否则内部没有有效图像可显示。
+ * @note 若需要同时检测与显示，应先调用识别函数，再调用本函数显示同一帧处理结果。
  * @note 本函数会显示处理后的二值图像，原始 `mt9v03x_image` 不会被直接修改。
  */
-void camera_debug_on_screen();  // (uint16 x, uint16 y, uint16 display_width, uint16 display_height);
+void camera_debug_on_screen(void);
 
 
 /**
  * @brief 将处理后的摄像头图像通过 WiFi SPI 发送到逐飞助手上位机。
  *
- * 本函数的封装方式类似 `camera_debug_on_screen()`：
- * 如果当前存在新帧，会先复制并处理新帧；如果没有新帧，但内部已有处理后的图像，
- * 则直接复用最近一次处理结果进行发送。
+ * 本函数的封装方式类似 `camera_debug_on_screen()`：只发送内部最近一次已经完成处理的
+ * `image_copy`，不会再次获取或处理摄像头帧，从而保证图传画面与视觉结果来自同一帧。
  *
  * @param send_div 图传分频系数：
  *                 - 0 或 1：每次调用都尝试发送；
@@ -228,15 +240,78 @@ void camera_debug_on_screen();  // (uint16 x, uint16 y, uint16 display_width, ui
  * @return void
  *
  * @note 调用本函数前必须先调用 `camera_wifi_spi_init()`。
- * @note 若需要同时执行视觉判断、屏幕显示和 WiFi 图传，建议先调用 `camera_processing()`，
- *       再调用 `camera_debug_on_screen()` 和本函数，这样三者共用同一帧处理后的 `image_copy`。
+ * @note 调用本函数前还必须先成功执行一个摄像头处理函数，否则没有有效图像可发送。
+ * @note 若需要同时执行视觉判断、屏幕显示和 WiFi 图传，应先调用对应的视觉处理函数，
+ *       再调用 `camera_debug_on_screen()` 和本函数，使三者共用同一帧 `image_copy`。
  * @note WiFi SPI 带宽高于无线串口，但整帧图像仍可能占用时间，建议使用分频发送。
  */
 void camera_debug_on_wifi_spi(uint16 send_div);
 
 
+/**
+ * @brief 初始化摄像头 FPS 统计器。
+ *
+ * @param counter 需要初始化的 FPS 统计结构体指针。
+ * @param time_ms 当前系统毫秒时间。
+ *
+ * @return void
+ *
+ * @note 建议在主循环开始前调用一次，例如 `camera_fps_counter_init(&fps_counter, sys_ms)`。
+ */
+void camera_fps_counter_init(fps_counter_t *counter, uint32 time_ms);
+
+
+/**
+ * @brief 更新摄像头 FPS 统计器。
+ *
+ * 每完成一帧图像处理后调用一次本函数。函数会自动累计帧数，
+ * 当距离上一次更新时间达到 1000ms 时，更新一次 FPS 结果。
+ *
+ * @param counter FPS 统计结构体指针。
+ * @param time_ms 当前系统毫秒时间。
+ *
+ * @return uint32 最近一次计算得到的 FPS。
+ *
+ * @note 如果希望统计“摄像头采集帧率”，应在确认有新帧后调用。
+ * @note 如果希望统计“视觉算法处理帧率”，应在 `camera_processing()` 执行完成后调用。
+ */
+uint32 camera_fps_counter_update(fps_counter_t *counter, uint32 time_ms);
+
 // 计算帧率
 uint32 calc_fps(uint32 time_ms, uint32 *frame_count, uint32 *fps);
+
+/**
+ * @brief 处理一帧摄像头图像并执行单边桥简化识别。
+ *
+ * 如果摄像头存在新帧，本函数会将原始图像复制到内部 `image_copy`，
+ * 使用 `bridge_params->binary_threshold` 完成固定阈值二值化，然后调用
+ * `camera_image_bridge_detect()` 识别最靠近画面下方的独立黑色区域并稳健拟合右边线。
+ * 空间拟合完成后，本函数还会对固定参考行位置和边线斜率执行跨帧低通滤波；
+ * 超过允许范围的大跳变必须连续出现指定帧数后才会被接受。
+ *
+ * @param bridge_params 单边桥识别参数，包括二值化阈值、搜索范围、候选尺寸下限、
+ *                      相邻行连接范围、固定参考行、稳健拟合限制和右边线目标横坐标。
+ * @param bridge_result 单边桥识别结果输出地址。
+ *
+ * @return uint8
+ *         - 1：已经取得并处理一帧新图像；
+ *         - 0：参数指针为空，或者当前没有新帧可处理。
+ *
+ * @note 返回 1 只表示完成了一帧处理，是否识别成功应检查
+ *       `bridge_result->valid`。
+ * @note 本函数不显示图像，也不发送 IPC、无线串口或 WiFi 数据。
+ * @note 处理结果保存在内部 `image_copy` 中，随后可以调用
+ *       `camera_debug_on_screen()` 或 `camera_debug_on_wifi_spi()` 复用同一帧。
+ */
+uint8 camera_bridge_processing(const CameraBridgeParams_t *bridge_params, CameraBridgeResult_t *bridge_result);
+
+/**
+ * @brief 复位单边桥跨帧滤波状态。
+ *
+ * 切换识别模式、重新开始比赛、修改单边桥搜索区域或更换目标后，可调用本函数，
+ * 使下一帧有效识别结果直接成为新的滤波初值。
+ */
+void camera_bridge_filter_reset(void);
 
 /**
  * @brief 处理一帧摄像头图像并返回跳跃检测结果。

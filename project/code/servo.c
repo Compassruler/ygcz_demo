@@ -11,18 +11,24 @@ float X_L = 0.0f, Y_L = 0.0f;    // 左腿当前坐标
 float X_R = 0.0f, Y_R = 0.0f;    // 右腿当前坐标
 
 // 当前舵机角度
-float servoLeftFront_now  = 90.0f;
-float servoLeftRear_now   = 90.0f;
-float servoRightFront_now = 90.0f;
-float servoRightRear_now  = 90.0f;
+float servoLeftFront_now  = 70.0f;
+float servoLeftRear_now   = 70.0f;
+float servoRightFront_now = 70.0f;
+float servoRightRear_now  = 70.0f;
 
 float speed_to_x_offset, balance_to_y_offset;
 
-// 目标舵机坐标 20（90度）
+// 目标舵机坐标
+// Y 坐标:50mm 舵机:113度
+// Y 坐标:40mm 舵机:测试值105-107
+// Y 坐标:30mm 舵机:100度
+// Y 坐标:20mm 舵机:90度
+// Y 坐标:10mm 舵机:80度
+// Y 坐标:0mm  舵机:70度
 float X_left = 0.0f;
-float Y_left = 20.0f;
+float Y_left = 0.0f;
 float X_right = 0.0f;
-float Y_right = 20.0f;
+float Y_right = 0.0f;
 
 // 当前实际坐标（0为初始值）
 float XLeft = 0.0f, YLeft = 0.0f;
@@ -214,7 +220,11 @@ void leg_control(void)
     // Y 方向：目标坐标计算 一边伸长 一边收缩（默认压弯）
 //    float target_Y_left  = Y_left  + Y_OFFSET + balance_to_y_offset;
 //    float target_Y_right = Y_right + Y_OFFSET - balance_to_y_offset;    
+//
+//    float target_Y_left  = 0;
+//    float target_Y_right = 0;
 
+    
     // Y 方向：目标坐标计算 一边伸长 一边收缩（效果好）
     float target_Y_left  = Y_left  + Y_OFFSET + balance_to_y_offset;
     float target_Y_right = Y_right + Y_OFFSET - balance_to_y_offset;

@@ -23,7 +23,15 @@ void pit0_ch0_isr()
         pid_pos_calc(&banlance.speed_pid, target_speed, car_speed);
         
       }
-      else pid_pos_calc(&banlance.speed_pid, remote_front_rear_ctrl() , car_speed);
+      else if (vision_detect_mode == 1 || vision_detect_mode == 2)  // 单边桥 或 跳跃
+      {
+        pid_pos_calc(&banlance.speed_pid, vision_target_speed, car_speed);
+      }
+      else 
+      {
+        pid_pos_calc(&banlance.speed_pid, remote_front_rear_ctrl() , car_speed);
+      }
+
       
       if (road_memery_flag == 1 || remote_right_01_now_flag == 1)
       {
@@ -45,8 +53,17 @@ void pit0_ch0_isr()
       pid_pos_calc(&banlance.pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&banlance.roll_angle_pid, 0, roll_filter.filtering_angle);
 
-      if (remote_right_01_now_flag == 1) pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle);
+      if (remote_right_01_now_flag == 1 && pause_flag) pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle);
       
+      else if (vision_detect_mode == 1) // 单边桥
+      {
+        target_yaw_remote += vision_target_yaw * 0.002f;
+        pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
+      }
+      else if (vision_detect_mode == 2) // 跳跃
+      {
+        // 跳跃暂时不用改变航向角
+      }
       else 
       {
         target_yaw_remote += remote_left_right_ctrl() * 0.002f;

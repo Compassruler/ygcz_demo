@@ -380,6 +380,57 @@ void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params)
     );
 }
 
+void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
+{
+    int16 delta_x = 0;
+    int16 delta_y = 0;
+    int16 offset_x = 0;
+    int16 offset_y = 0;
+
+    if((0 == bridge_result) || !bridge_result->valid)
+    {
+        return;
+    }
+
+    if((bridge_result->edge_x1 >= MT9V03X_W) ||
+       (bridge_result->edge_x2 >= MT9V03X_W) ||
+       (bridge_result->edge_y1 >= MT9V03X_H) ||
+       (bridge_result->edge_y2 >= MT9V03X_H))
+    {
+        return;
+    }
+
+    ips200_draw_line(
+        IMAGE_X + bridge_result->edge_x1,
+        IMAGE_Y + bridge_result->edge_y1,
+        IMAGE_X + bridge_result->edge_x2,
+        IMAGE_Y + bridge_result->edge_y2,
+        RGB565_GREEN
+    );
+
+    delta_x = (int16)bridge_result->edge_x2 - (int16)bridge_result->edge_x1;
+    delta_y = (int16)bridge_result->edge_y2 - (int16)bridge_result->edge_y1;
+
+    if((delta_y < 0 ? -delta_y : delta_y) >= (delta_x < 0 ? -delta_x : delta_x))
+    {
+        offset_x = ((bridge_result->edge_x1 < (MT9V03X_W - 1)) &&
+                    (bridge_result->edge_x2 < (MT9V03X_W - 1))) ? 1 : -1;
+    }
+    else
+    {
+        offset_y = ((bridge_result->edge_y1 < (MT9V03X_H - 1)) &&
+                    (bridge_result->edge_y2 < (MT9V03X_H - 1))) ? 1 : -1;
+    }
+
+    ips200_draw_line(
+        IMAGE_X + bridge_result->edge_x1 + offset_x,
+        IMAGE_Y + bridge_result->edge_y1 + offset_y,
+        IMAGE_X + bridge_result->edge_x2 + offset_x,
+        IMAGE_Y + bridge_result->edge_y2 + offset_y,
+        RGB565_GREEN
+    );
+}
+
 
 void screen_show_roi_threshold_bar(JumpDetectParams_t jump_params)
 {

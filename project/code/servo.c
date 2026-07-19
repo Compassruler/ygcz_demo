@@ -49,10 +49,10 @@ float servoRightFront, servoRightRear;  // 前后舵机角度
 // jump部分
 const jump_control_struct jump_control_config[] = 
 {
-    {  0, 100, jump_step_a, "起跳"     },
-    {100, 170, jump_step_a, "收脚"     },
-    {170, 230, jump_step_a, "准备缓冲" },
-    {230, 430, jump_step_a, "执行缓冲" },
+    {  0, 75, jump_step_a, "起跳"     },
+    {75, 150, jump_step_a, "收脚"     },
+    {150, 200, jump_step_a, "准备缓冲" },
+    {200, 250, jump_step_a, "执行缓冲" },
 };
 
 const uint8 jump_step = sizeof(jump_control_config) / sizeof(jump_control_struct);
@@ -261,6 +261,16 @@ void leg_control(void)
 
     if(jump_flag == 0)
     {
+      // 跳跃时降低重心
+      /*
+       Set_angle(
+        servoLeftFront_now  - 20.0f,
+        servoLeftRear_now   - 20.0f,
+        servoRightFront_now - 20.0f,
+        servoRightRear_now  - 20.0f
+       );
+       */
+      // 正常状态
       Set_angle(servoLeftFront_now, servoLeftRear_now, servoRightFront_now, servoRightRear_now);        // 输出舵机角度
     }
     }
@@ -272,30 +282,30 @@ void jump_step_a(int step_num)
   {
     case 0: // 起跳
     {
-      Set_angle(150, 150, 150, 150);
+      Set_angle(125, 125, 125, 125);
     }break;
 
     case 1: // 收腿
     {
-      Set_angle(105, 105, 105, 105);
+      Set_angle(95, 95, 95, 95);
     }break;
 
     case 2:  // 准备缓冲
     {
 //      Set_angle(90, 90, 90, 90);
       // 初始化当前值
-      servoLeftFront_jump  = 105;
-      servoLeftRear_jump   = 105;
-      servoRightFront_jump = 105;
-      servoRightRear_jump  = 105;
+      servoLeftFront_jump  = 95;
+      servoLeftRear_jump   = 95;
+      servoRightFront_jump = 95;
+      servoRightRear_jump  = 95;
     }break;
 
     case 3: // 执行缓冲（平滑）
     {
-      servoLeftFront_jump  = servo_step(servoLeftFront_jump, 90, 1);
-      servoLeftRear_jump   = servo_step(servoLeftRear_jump, 90, 1);
-      servoRightFront_jump = servo_step(servoRightFront_jump, 90, 1);
-      servoRightRear_jump  = servo_step(servoRightRear_jump, 90, 1);
+      servoLeftFront_jump  = servo_step(servoLeftFront_jump, 70, 1);
+      servoLeftRear_jump   = servo_step(servoLeftRear_jump, 70, 1);
+      servoRightFront_jump = servo_step(servoRightFront_jump, 70, 1);
+      servoRightRear_jump  = servo_step(servoRightRear_jump, 70, 1);
       Set_angle(servoLeftFront_jump, servoLeftRear_jump, servoRightFront_jump, servoRightRear_jump);
     }break;
 

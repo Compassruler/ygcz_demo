@@ -9,7 +9,7 @@ int roll_control_flag = 0;
 
 
 float target_yaw_remote = 0;
-float target_roll = 0;  //æš‚æ—¶æ²¡ç”¨
+float target_roll = 0;  //ÔÝÊ±Ã»ÓÃ
 
 
 
@@ -20,9 +20,11 @@ uint8 remote_right_01_now_flag = 0;
 int flash_task_flag = 0;
 bool pause_flag = true;
 
+int vision_detect_mode = 0;
+int32 vision_target_speed = 0;
+int32 vision_target_yaw = 0;
 
-
-float KP_DIS = 5.5f;
+float KP_DIS = 4.5f;
 int MAX_SPEED = 3000;
 float DIST_TH = 0.05f;
 int MIN_SPEED = 0;

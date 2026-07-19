@@ -6,7 +6,7 @@
 #include "ipc/cy_ipc_config.h"
 #include "zf_common_interrupt.h"
 
-// 通道0：核心1发送跳跃标志，核心0接收。
+// 通道0：核心1发送跳跃标志或视觉数据，核心0接收。
 #define APPIPC_CHANNEL              (CY_IPC_CHAN_PIPE_EP0)
 #define APPIPC_RX_INTR_STRUCT       (CY_IPC_INTR_PIPE_EP0)
 #define APPIPC_RX_CPU_INT           (CPUIntIdx4_IRQn)
@@ -24,6 +24,13 @@
 #define APPIPC_SPEED_CHANNEL_MASK         (1ul << APPIPC_SPEED_CHANNEL)
 #define APPIPC_SPEED_RX_INTR_MASK         (1ul << APPIPC_SPEED_RX_INTR_STRUCT)
 
+#define APPIPC_BRIDGE_VALID_MASK          (0x80000000ul)
+#define APPIPC_BRIDGE_DISTANCE_MASK       (0x00FF0000ul)
+#define APPIPC_BRIDGE_DISTANCE_SHIFT      (16u)
+#define APPIPC_BRIDGE_ANGLE_MASK          (0x0000FFFFul)
+#define APPIPC_BRIDGE_DISTANCE_MAX        (127)
+#define APPIPC_BRIDGE_DISTANCE_MIN        (-127)
+
 static appipc_callback_t appipc_user_callback = (appipc_callback_t)0;
 static volatile stc_IPC_STRUCT_t      *appipc_channel_ptr = (volatile stc_IPC_STRUCT_t *)0;
 static volatile stc_IPC_INTR_STRUCT_t *appipc_intr_ptr    = (volatile stc_IPC_INTR_STRUCT_t *)0;
@@ -35,6 +42,27 @@ static volatile stc_IPC_INTR_STRUCT_t *appipc_speed_intr_ptr    = (volatile stc_
 static void appipc_default_callback(uint32 data)
 {
     (void)data;
+}
+
+static uint32 appipc_pack_bridge_data(uint8 valid, int16 distance_px, int16 angle_d10)
+{
+    if(!valid)
+    {
+        return 0u;
+    }
+
+    if(distance_px > APPIPC_BRIDGE_DISTANCE_MAX)
+    {
+        distance_px = APPIPC_BRIDGE_DISTANCE_MAX;
+    }
+    else if(distance_px < APPIPC_BRIDGE_DISTANCE_MIN)
+    {
+        distance_px = APPIPC_BRIDGE_DISTANCE_MIN;
+    }
+
+    return APPIPC_BRIDGE_VALID_MASK |
+           ((uint32)(uint8)(int8)distance_px << APPIPC_BRIDGE_DISTANCE_SHIFT) |
+           (uint32)(uint16)angle_d10;
 }
 
 static void appipc_read_and_release(void)
@@ -99,6 +127,34 @@ uint8 appipc_send_u32(uint32 data)
     }
 
     return APPIPC_BUSY;
+}
+
+uint8 appipc_send_bridge_data(uint8 valid, int16 distance_px, int16 angle_d10)
+{
+    return appipc_send_u32(appipc_pack_bridge_data(valid, distance_px, angle_d10));
+}
+
+uint8 appipc_decode_bridge_data(uint32 data, appipc_bridge_data_t *bridge_data)
+{
+    if((appipc_bridge_data_t *)0 == bridge_data)
+    {
+        return 0;
+    }
+
+    bridge_data->valid = (uint8)(0u != (data & APPIPC_BRIDGE_VALID_MASK));
+
+    if(!bridge_data->valid)
+    {
+        bridge_data->distance_px = 0;
+        bridge_data->angle_d10 = 0;
+        return 0;
+    }
+
+    bridge_data->distance_px =
+        (int8)((data & APPIPC_BRIDGE_DISTANCE_MASK) >> APPIPC_BRIDGE_DISTANCE_SHIFT);
+    bridge_data->angle_d10 = (int16)(data & APPIPC_BRIDGE_ANGLE_MASK);
+
+    return 1;
 }
 
 static void appipc_speed_read_and_release(void)

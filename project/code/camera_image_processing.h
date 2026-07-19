@@ -10,6 +10,10 @@
 #define CAMERA_IMAGE_DOT_BLACK        (0)    // 检测二值图中的黑色像素，像素值为 0
 #define CAMERA_IMAGE_DOT_WHITE        (1)    // 检测二值图中的白色像素，像素值为 255
 
+#define CAMERA_BRIDGE_REFERENCE_ROW_DEFAULT       ((MT9V03X_H * 3u) / 4u) // 默认在图像高度 3/4 处计算位置偏差
+#define CAMERA_BRIDGE_MIN_EDGE_POINTS_DEFAULT     (15u)                   // 默认至少使用 15 行连续轮廓拟合边线
+#define CAMERA_BRIDGE_FIT_RESIDUAL_PX_DEFAULT     (2u)                    // 默认允许轮廓点偏离拟合线 2 像素
+
 
 #define CAMERA_ROW_SPEED_RULE_COUNT     (5u)
 #define CAMERA_ROW_AGGRESSIVE_BIAS      (10u)
@@ -32,6 +36,53 @@ typedef struct
     uint32 steps;                   // 已执行的识别步骤
 
 } JumpDetectParams_t;               // 跳跃检测参数结构体
+
+/**
+ * @brief 单边桥简化识别参数。
+ *
+ * 核心算法在二值图中从 `search_bottom` 向 `search_top` 扫描，
+ * 寻找左右两侧均为白色、并且能够在相邻行间连续连接的黑色区域。
+ */
+typedef struct
+{
+    uint8 binary_threshold;         // 上层复制摄像头图像后使用的固定二值化阈值
+    uint16 search_left;             // 搜索区域最左列
+    uint16 search_right;            // 搜索区域最右列
+    uint16 search_top;              // 搜索区域最上行
+    uint16 search_bottom;           // 搜索区域最下行
+    uint16 min_width;               // 每一行候选黑段需要达到的最小宽度
+    uint16 min_height;              // 候选区域需要连续达到的最小行数
+    uint32 min_area;                // 候选区域内黑色像素总数下限
+    uint16 connect_gap;             // 相邻两行黑段允许的最大横向间隔
+    uint16 target_edge_x;           // 右边线期望对准的横坐标
+    uint16 reference_row;           // 固定位置测量行；设置为 0 时使用 CAMERA_BRIDGE_REFERENCE_ROW_DEFAULT
+    uint16 min_edge_points;         // 拟合边线的最少连续点数；设置为 0 时使用默认值
+    uint16 fit_residual_px;          // 拟合点最大横向残差；设置为 0 时使用默认值
+} CameraBridgeParams_t;
+
+/**
+ * @brief 单边桥简化识别结果。
+ */
+typedef struct
+{
+    uint8 valid;                    // 1 表示识别成功，0 表示当前图像没有有效目标
+    uint16 left;                    // 候选黑色区域最左坐标
+    uint16 right;                   // 候选黑色区域最右坐标
+    uint16 top;                     // 候选黑色区域最上坐标
+    uint16 bottom;                  // 候选黑色区域最下坐标
+    uint32 area;                    // 跟踪到的候选黑色像素总数
+    uint16 right_edge_x;            // 拟合右边线在固定 reference_row 处的横坐标
+    int16 distance_px;              // 右边线相对 target_edge_x 的有符号像素距离
+    int16 angle_d10;                // 右边线相对垂直方向的角度，单位 0.1 度
+    uint16 edge_x1;                 // 拟合右边线的上端点横坐标
+    uint16 edge_y1;                 // 拟合右边线的上端点纵坐标
+    uint16 edge_x2;                 // 拟合右边线的下端点横坐标
+    uint16 edge_y2;                 // 拟合右边线的下端点纵坐标
+    uint16 reference_row;           // 本次计算 right_edge_x 时使用的固定参考行
+    uint16 edge_point_count;        // 最终参与稳健拟合的右轮廓点数量
+    float edge_slope;               // 拟合模型 x = edge_slope*y + edge_intercept 的斜率
+    float edge_intercept;           // 拟合模型 x = edge_slope*y + edge_intercept 的截距
+} CameraBridgeResult_t;
 
 // 跳跃触发成功后，下一次检测像素类型会按该列表循环切换
 static const uint32 dot_type_list[] =
@@ -162,6 +213,34 @@ void camera_image_filter_isolated_black(uint8 image[MT9V03X_H][MT9V03X_W]);
  * @note 该函数适合去除黑色区域中的零散小白点；如果白色线条很细，过滤强度不宜继续加大。
  */
 void camera_image_filter_isolated_white(uint8 image[MT9V03X_H][MT9V03X_W]);
+
+
+/**
+ * @brief 从二值图中识别最靠近画面下方的独立黑色区域，并拟合其右边线。
+ *
+ * 函数从搜索区域底部向上逐行扫描。每行只保留左右均有白色像素包围、
+ * 且宽度达到 `min_width` 的黑色连续段；相邻行黑段在
+ * `connect_gap` 范围内发生连接时，将其归入同一个候选区域。
+ * 第一个同时达到最小高度和最小面积的候选区域被认为是距离画面下方
+ * 最近的目标。算法收集各行黑段的最右端点，先使用 3 点中值滤波抑制单行锯齿，
+ * 再搜索长度足够、拟合残差较小并且方向更接近垂直的连续轮廓段。
+ * 找到初始线段后会剔除横向残差超限的离群点并执行第二次拟合，避免矩形上边缘、
+ * 下边缘和二值化突出点进入右边线模型。
+ *
+ * @param image  已完成二值化的 MT9V03X 图像，黑色为 0，白色为非 0。
+ * @param params 单边桥识别参数。
+ * @param result 识别结果输出地址。函数会在每次调用开始时清空该结构体。
+ *
+ * @return uint8
+ *         - 1：找到有效候选区域并成功拟合右边线；
+ *         - 0：参数非法、未找到有效目标，或右边线无法拟合。
+ *
+ * @note 本函数不会修改输入图像，也不负责摄像头取帧和二值化。
+ * @note `reference_row`、`min_edge_points` 和 `fit_residual_px` 设置为 0 时使用默认值。
+ * @note `distance_px` 大于 0 表示右边线位于目标横坐标右侧。
+ * @note `angle_d10` 大于 0 表示边线朝画面右下方倾斜。
+ */
+uint8 camera_image_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const CameraBridgeParams_t *params, CameraBridgeResult_t *result);
 
 
 /**

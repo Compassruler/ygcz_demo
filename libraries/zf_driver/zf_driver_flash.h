@@ -47,7 +47,8 @@
 
 #define FLASH_DATA_SIZE             (4)							        // 数据大小为 4 byte
 #define FLASH_PAGE_LENGTH           (FLASH_PAGE_SIZE / 4)         				// 每页可以存 512 个 uint32 类型的数据
-
+#define PATH_POINT_PER_PAGE \
+(FLASH_PAGE_LENGTH*sizeof(uint32_t)/sizeof(PathPoint))                                         // 定义每页写入的路径点数（170）
 
 typedef union                                                                   		// 固定的数据缓冲单元格式
 {

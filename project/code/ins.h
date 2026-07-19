@@ -3,26 +3,38 @@
 
 #include "zf_common_headfile.h"
 #include "zf_driver_flash.h"
+#include "flash.h"
 #define MAX_PATH_POINTS 2000   // 最大记录点数，可根据 MCU 内存调整
-
-
-
-
 #define Use_page         (4) // 使用flash的页数
+#define MAX_SEGMENT_NUM 20              //最大段数
 
 
-extern float X_remember[FLASH_PAGE_LENGTH * Use_page];
-extern float Y_remember[FLASH_PAGE_LENGTH * Use_page];
-extern float Yaw_remember[FLASH_PAGE_LENGTH * Use_page];
 
-extern float X_load[FLASH_PAGE_LENGTH * Use_page];
-extern float Y_load[FLASH_PAGE_LENGTH * Use_page];
-extern float Yaw_load[FLASH_PAGE_LENGTH * Use_page];
+
+typedef struct
+{
+    uint32_t magic;             //校验位
+
+    uint32_t segment_num;      //总段数
+
+    uint32_t total_point_num;  //所有段总点数
+
+}PathHeader;                          // 总的头信息结构体
+
+
+
+
+extern PathPoint record_path[FLASH_PAGE_LENGTH * Use_page];           //记录点结构体
+extern PathPoint replay_point[FLASH_PAGE_LENGTH * Use_page];          //回放点结构体
+extern SegmentHeader segment_header[MAX_SEGMENT_NUM];                   // 段头信息结构体
+extern PathHeader record_header;                                        // 总头信息结构体
 
 extern uint8 road_memery_flag;   // 路径记忆完成标志位
-extern  uint16 num_index;
+extern uint32_t record_total_index;          //记录点总数/索引(总)
+extern uint32_t current_segment_points;      // 记录点总数/索引（段） 
+
 extern  uint16 safe_index;
-extern uint16_t road_destination;
+
 extern int target_speed;
 extern float target_yaw;
 extern int path_index;
@@ -61,4 +73,22 @@ void path_element_check(void);
 
 // 检测是否该恢复了
 void element_recover_check(void);
+
+// 写入数据点到记录结构体数组
+void path_record_add(float x,float y,float yaw);
+
+// 每一段结束后重置
+void path_segment_finish(void);
+
+// 写入头信息（校验位＋点数）
+void path_record_finish(void);
+
+// flash读取总头
+void flash_read_path_header(void);
+
+// flash读取段头
+void flash_read_segment_headers(void);
+
+// flash读取路径点
+void flash_read_all_points(PathPoint *path,uint32_t point_num);
 #endif

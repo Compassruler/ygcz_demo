@@ -66,8 +66,6 @@ int main(void)
   buzzer_init();                                        // 蜂鸣器初始化
 
   appipc_rx_init(appipc_callback);                      // IPC 初始化
-
-//  flash_road_memory_clear();                            // flash清除
     //==========================
     // 变量
     //==========================
@@ -83,8 +81,8 @@ int main(void)
     {"pause_flag",  SCREEN_DATA_INT, {.int_value = 0}, 0},
     {"right_now",  SCREEN_DATA_INT, {.int_value = 0}, 0},
     {"vy",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
-    {"path_index",  SCREEN_DATA_UINT, {.uint_value = 0}, 0},
-    {"target_speed",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
+    {"segment_num ",  SCREEN_DATA_UINT, {.uint_value = 0}, 0},
+    {"path_index",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
     {"distance",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
     {"num", SCREEN_DATA_INT, {.int_value = 0}, 0},
     {"func_type", SCREEN_DATA_INT, {.int_value = 0}, 0},
@@ -112,11 +110,10 @@ int main(void)
         remote_table[3].value.int_value = pause_flag;
         remote_table[4].value.int_value = remote_right_01_now_flag;
         remote_table[5].value.float_value = vy;
-        remote_table[6].value.uint_value = element_index[0];
+        remote_table[6].value.uint_value = record_header.segment_num;
         remote_table[7].value.float_value = path_index;
-//        remote_table[8].value.float_value = distance;
         remote_table[8].value.float_value = distance_recover;
-        remote_table[9].value.int_value = road_destination;
+        remote_table[9].value.int_value = record_header.total_point_num;
         remote_table[10].value.int_value = vision_detect_mode;
         screen_show_data_table(remote_table, 11);
         //==================================================
@@ -127,13 +124,10 @@ int main(void)
         {
           
 //            sprintf(txt, "FLASH STORE...\r\n");
-            wireless_uart_send_string(txt);
-            
+//            wireless_uart_send_string(txt);
+            system_delay_ms(30); // 此处延时是为等待写入头信息（未试过去掉效果）
             // 写入Flash
-            flash_road_memery_store_Plus();
-            flash_road_memery_store();
-            
-            flash_yaw_flag = 1;
+            flash_path_store();          
             buzzer_beep(1,100);
 //            sprintf(txt, "FLASH STORE DONE\r\n");
             wireless_uart_send_string(txt);
@@ -150,8 +144,7 @@ int main(void)
         
             
             // 读取Flash
-            flash_road_memery_get_Plus();
-            flash_road_memery_get();
+            flash_path_load();
             flash_yaw_flag = 2;
             path_element_check();
             buzzer_beep(2,100);
@@ -167,41 +160,6 @@ int main(void)
         //==========================
         remote_left_01_last_flag = remote_left_01_now_flag;
 
-        //==================================================
-        // 打印读取后的数据
-        //==================================================
-        if(flash_yaw_flag == 2)
-        {
-            if(i < sizeof(X_load) / sizeof(X_load[0]))
-            {
-//                sprintf(txt,
-//                        "LOAD:(%.3f,%.3f),%d,%f\r\n",
-//                        
-//                        X_load[i],
-//                        Y_load[i],
-//                        element_index[0],distance_recover);
-//              
-//                sprintf(txt,
-//                        "path:%d)\r\n",path_index);
-
-                wireless_uart_send_string(txt);
-                i++;
-            }
-            else 
-              i = 0;
-        }
-        else if(flash_yaw_flag == 0)
-        {
-          
-          sprintf(txt,"distance%f\r\n",
-                    distance_recover);
-          j++;          
-          wireless_uart_send_string(txt);
-          if(j >= sizeof(X_remember)/sizeof(X_remember[0]))
-      {
-          j = 0;
-      }
-        }
         system_delay_ms(20);
 //        sprintf(txt, "target|now:%.6f,%.6f,%.6f\r\n",pitch_filter.filtering_angle,yaw_angle,yaw_error);
 //        wireless_uart_send_string(txt);

@@ -85,7 +85,7 @@ int main(void)
     {"path_index",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
     {"distance",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
     {"num", SCREEN_DATA_INT, {.int_value = 0}, 0},
-    {"func_type", SCREEN_DATA_INT, {.int_value = 0}, 0},
+    {"current_seg", SCREEN_DATA_INT, {.int_value = 0}, 0},
 };
     //==========================
     // 主循环
@@ -114,7 +114,7 @@ int main(void)
         remote_table[7].value.float_value = path_index;
         remote_table[8].value.float_value = distance_recover;
         remote_table[9].value.int_value = record_header.total_point_num;
-        remote_table[10].value.int_value = vision_detect_mode;
+        remote_table[10].value.int_value = current_segment;//vision_detect_mode
         screen_show_data_table(remote_table, 11);
         //==================================================
         // 01left: 0->1写入flash
@@ -129,7 +129,7 @@ int main(void)
             // 写入Flash
             flash_path_store();          
             buzzer_beep(1,100);
-//            sprintf(txt, "FLASH STORE DONE\r\n");
+            sprintf(txt, "FLASH STORE DONE\r\n");
             wireless_uart_send_string(txt);
         }
 
@@ -146,12 +146,13 @@ int main(void)
             // 读取Flash
             flash_path_load();
             flash_yaw_flag = 2;
-            path_element_check();
+            
+            track_init();
             buzzer_beep(2,100);
             // 从头开始显示
             i = 0;
             
-//            sprintf(txt, "FLASH LOAD DONE\r\n");
+            sprintf(txt, "FLASH LOAD DONE\r\n");
             wireless_uart_send_string(txt);
         }
 
@@ -161,8 +162,33 @@ int main(void)
         remote_left_01_last_flag = remote_left_01_now_flag;
 
         system_delay_ms(20);
-//        sprintf(txt, "target|now:%.6f,%.6f,%.6f\r\n",pitch_filter.filtering_angle,yaw_angle,yaw_error);
-//        wireless_uart_send_string(txt);
+        
+            // 元素通过检测（目前用延时做测试）
+    if(!pause_flag)
+    {
+//        element_recover_check();
+      pause_time ++;
+      x = 0;
+      y = 0;
+      x_last = 0;
+      y_last = 0;
+      if (pause_time > 100)
+      {
+        pause_flag = true;
+        pause_time = 0;
+      }
+        
+    }
+        
+        
+        if(!replay_point[i].x)
+          i=0;
+//        sprintf(txt, "tar|now:(%.3f,%.3f),(%.3f,%.3f)\r\n",target_x,target_y,x,y); 
+        
+        sprintf(txt, "x,y,yaw:%3f,%3f,%3f\r\n",replay_point[i].x,replay_point[i].y,replay_point[i].yaw); 
+        
+        i++;
+        wireless_uart_send_string(txt);
 
     
 // =========================================================== 视觉部分 ==========================================================

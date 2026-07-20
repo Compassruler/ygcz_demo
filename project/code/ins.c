@@ -28,6 +28,17 @@ uint32_t current_segment_points;      // 记录点总数/索引（段）
 uint32_t segment_point_num[MAX_SEGMENT_NUM]; //记录每一段的点数
 uint32_t segment_num = 0;                       //段数（表示有多少段）
 
+uint32_t current_segment = 0;                           // 当前回放段编号
+
+uint32_t segment_start_index = 0;                       // 当前段开始点索引
+
+uint32_t segment_end_index = 0;                         // 当前段结束点索引
+
+uint8_t segment_finish_flag = 0;                        // 当前段是否完成
+
+
+
+
 uint8 road_memery_flag = 1; // 路径记忆标志位 0为初始状态 1为记录开始 2为记录完成  
 uint8_t dir = 0;  // 0:前进  1:倒车(方向)
 // ------------------ 初始化 ------------------
@@ -51,10 +62,10 @@ float dt = 0.020;  // ins调用周期（s）
 
 float distance_recover = 0;   // 判断恢复点的距离(写在这里为了调试)
 
+// ins初始化
 void ins_init(void)
 {
     road_memery_flag = 1;
-
 
     record_total_index = 0;
 
@@ -62,6 +73,18 @@ void ins_init(void)
 
     segment_num = 0;
 
+}
+
+// 回放初始化
+void track_init(void)
+{
+    current_segment = 0;
+
+    segment_start_index = 0;
+
+    segment_end_index = segment_header[0].point_num - 1;
+
+    segment_finish_flag = 0;
 }
 
 // 写入数据点到记录结构体数组
@@ -84,42 +107,28 @@ void path_record_add(float x,float y,float yaw)
 }
 
 
-// 每一段结束后重置
+// 每一段打点结束后重置
 void path_segment_finish(void)
 {
-    if(current_segment_points == 0)
+    if(current_segment_points == 0) // 没有点就不再记录
         return;
 
 
-    if(segment_num >= MAX_SEGMENT_NUM)
+    if(segment_num >= MAX_SEGMENT_NUM)  // 边界判断,超过最大段数就不再记录
         return;
 
 
     //生成这一段头信息
     segment_header[segment_num].magic = PATH_SEGMENT_MAGIC;
 
-    segment_header[segment_num].point_num 
-        = current_segment_points;
+    segment_header[segment_num].point_num = current_segment_points; // 记录该段点数
 
 
-    segment_num++;
+    segment_num++;  // 段数加一
 
 
     //当前段清零
     current_segment_points = 0;
-
-
-    //坐标重新建立
-    x = 0;
-    y = 0;
-
-    x_last = 0;
-    y_last = 0;
-
-
-    //重新等待稳定（再看）
-    pause_flag = false;
-    pause_time = 0;
 
 }
 
@@ -149,13 +158,14 @@ void ins_update(void)
     if(remote_right_01_now_flag == 2 &&remote_right_01_last_flag == 0) // 遥控打断时写入一段的头信息
     {
       path_segment_finish();
+     pause_flag = false;
       return;
     }
     
     // 确保不会越界访问数组/
     if (remote_left_01_now_flag !=2 && (record_total_index >= FLASH_PAGE_LENGTH * Use_page || remote_left_01_now_flag == 1))
     {
-        path_record_finish();   //写入头信息
+        path_record_finish();   //写入总头信息
         road_memery_flag = 2; // 路径记忆完成标志位
         return;                           // 直接返回，不再记录新的点
     }
@@ -167,19 +177,22 @@ void ins_update(void)
     vy = true_speed * sinf(yaw_ins);
     x += vx * dt;
     y += vy * dt;
-        // 元素通过检测
+    // 元素通过检测（目前用延时做测试）
     if(!pause_flag)
     {
 //        element_recover_check();
       pause_time ++;
       if (pause_time > 100)
+      {
         pause_flag = true;
+        pause_time = 0;}
+        
     }
     // 计算和上一个记录点的距离
      dx_ins = x - x_last;
      dy_ins = y - y_last;
      distance_ins = sqrtf(dx_ins * dx_ins + dy_ins * dy_ins);
-    if (distance_ins >= DISTANCE_STEP && pause_flag && remote_right_01_now_flag != 2)
+    if (distance_ins >= DISTANCE_STEP && pause_flag && remote_right_01_now_flag != 2) //pause_flag为回放时的判断，remote_right_01_now_flag为遥控打断时的判断
     {
         // 超过打点间距，记录点
         path_record_add(x,y,yaw_angle);
@@ -193,20 +206,24 @@ void ins_update(void)
 int find_nearest_point(int start_index)
 {
     float min_dist = 9999.0f;
+    
     int nearest_index = start_index;
-    for(int i = start_index; i < record_header.total_point_num; i++)
+
+    for(int i = start_index; i <= segment_end_index; i++)
     {
         dx = replay_point[i].x - x_now;
+
         dy = replay_point[i].y - y_now;
+
         float dist = sqrtf(dx*dx + dy*dy);
+
         if(dist < min_dist && yaw_ready)
         {
             min_dist = dist;
             nearest_index = i;
         }
-
-        // 限制搜索范围，防止耗时
-        if(i - start_index > NEAREST_SELECT_NUM)  
+        //限制搜索范围
+        if(i-start_index >= NEAREST_SELECT_NUM)
             break;
     }
     return nearest_index;
@@ -215,32 +232,46 @@ int find_nearest_point(int start_index)
 //----------------- 找到前视点 -----------------
 void find_lookahead_point(int nearest_index)
 {
-    for(int i = nearest_index; i < record_header.total_point_num; i++)
+
+    for(int i = nearest_index; i <= segment_end_index; i++)
     {
+
         dx = replay_point[i].x - x_now;
+
         dy = replay_point[i].y - y_now;
+
 
         distance = sqrtf(dx*dx + dy*dy);
 
+
         if(distance >= LOOK_AHEAD_DISTANCE)
         {
+
             target_x = replay_point[i].x;
+
             target_y = replay_point[i].y;
+
             path_index = i;
+
             return;
         }
+
     }
-    //没有前视点用最后一个点
-    target_x = replay_point[record_header.total_point_num-1].x;
-    target_y = replay_point[record_header.total_point_num-1].y;
-    path_index = record_header.total_point_num - 1;
+
+    // 当前段没有前视点
+    target_x = replay_point[segment_end_index].x;
+
+
+    target_y = replay_point[segment_end_index].y;
+
+
+    path_index = segment_end_index;
+
 }
 
 //----------------- 路径回放 ----------------- 
 void Track_update(void)
 {
-  
-
     // 当前位置
     x_now = x;
     y_now = y;
@@ -258,17 +289,19 @@ void Track_update(void)
 
         return;
     }
-
+    segment_check(); // 检测当前段是否结束
+    if(!pause_flag) return; // 如果暂停标志为false，则不进行路径回放
     find_lookahead_point(find_nearest_point(path_index));
-    
-    // 判断是否该打断点了
-    if(current_element < element_num)
-    { 
-        if(path_index >= element_index[current_element]-6)
-        {
-            pause_flag = false;
-        }
-    }
+ 
+    // 检测当前段跑完没
+//    // 判断是否该打断点了
+//    if(current_element < element_num)
+//    { 
+//        if(path_index >= element_index[current_element]-6)
+//        {
+//            pause_flag = false;
+//        }
+//    }
 
     //--------------------------------------------------
     // 计算距离
@@ -279,14 +312,10 @@ void Track_update(void)
     distance = sqrtf(dx * dx + dy * dy);
     
     float target_move_yaw = atan2f(dy, dx) * 180.0f / PI; //目标运动方向
-
-
     //--------------------------------------------------
     // 目标角度：直接使用记录的连续 yaw
     //--------------------------------------------------
     float angle = replay_point[path_index].yaw;
-
-
     //--------------------------------------------------
     // 航向误差
     //--------------------------------------------------
@@ -296,19 +325,15 @@ void Track_update(void)
         target_speed = 0;
         return;
     }
-
     target_yaw = angle;
     yaw_error = target_yaw - yaw_angle;
-
 
     //--------------------------------------------------
     // 距离控制
     //--------------------------------------------------
     target_v = KP_DIS * distance;
-
-
     //--------------------------------------------------
-    // 后退逻辑（增加滞回区）
+    // 后退逻辑（滞回区）
     //--------------------------------------------------
 
     // 将目标方向调整到当前连续yaw附近
@@ -376,42 +401,28 @@ void Track_update(void)
     //--------------------------------------------------
     if(path_index >= record_header.total_point_num - 2)
     { 
-
         target_speed = 0;
         remote_right_01_now_flag = 2;
-        banlance.yaw_angle_pid.K = 1.0;
         road_memery_flag = 2;
         target_yaw_remote = target_yaw;
         buzzer_beep(3,100);
     }
 }
- 
-//  检测是否该打断惯导了（查打断点）
-void path_element_check(void)
+
+// 检测当前段是否需要停止惯导
+void segment_pause_check(void)
 {
-    element_num = 0;     // 已经记录的打断点数量
 
-    for(int i=0;i<record_header.total_point_num-1;i++)
+    // 最后一段不需要停止
+    if(current_segment >= record_header.segment_num-1)
+        return;
+
+    //提前几个点停止
+    if(path_index >= segment_end_index-6)
     {
-        float dx_check = replay_point[i+1].x -replay_point[i].x;
-        float dy_check = replay_point[i+1].y -replay_point[i].y;
-
-        float dis_check = sqrtf(dx_check*dx_check + dy_check*dy_check);
-
-
-        // 正常2cm
-        // 元素停止打点产生大间隔
-        if(dis_check > INTERRUPT_DISTANCE)
-        {
-            if(element_num < MAX_ELEMENT_NUM)
-            {
-                element_index[element_num]=i;
-                element_num++;
-                if ( element_num ==  MAX_ELEMENT_NUM)
-                  return;
-            }
-        }
+        pause_flag = false;
     }
+
 }
 
 //  检测是否该恢复惯导了
@@ -449,3 +460,43 @@ void element_recover_check(void)
     }
 }
  
+// 当前段结束检测函数
+void segment_check(void)
+{
+    //最后一段不用切换
+    if(current_segment >= record_header.segment_num-1)
+    {
+        return;
+    }
+
+    //到达当前段尾
+    if(path_index >= segment_end_index)
+    {
+        segment_finish_flag = 1;
+    }
+
+
+
+    if(segment_finish_flag)
+    {
+
+        // 停止惯导
+        pause_flag = false;
+
+        //  
+        current_segment++;
+        //下一段开始位置
+        segment_start_index = segment_end_index + 1;
+
+        //下一段结束位置
+        segment_end_index =segment_start_index + segment_header[current_segment].point_num - 1;
+        //防止索引跳回       
+        path_index = segment_start_index;    
+        
+        segment_finish_flag = 0;
+
+    }
+
+}
+
+

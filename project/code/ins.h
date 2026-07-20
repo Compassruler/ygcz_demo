@@ -32,13 +32,15 @@ extern PathHeader record_header;                                        // ×ÜÍ·Ğ
 extern uint8 road_memery_flag;   // Â·¾¶¼ÇÒäÍê³É±êÖ¾Î»
 extern uint32_t record_total_index;          //¼ÇÂ¼µã×ÜÊı/Ë÷Òı(×Ü)
 extern uint32_t current_segment_points;      // ¼ÇÂ¼µã×ÜÊı/Ë÷Òı£¨¶Î£© 
-
+extern uint32_t current_segment;                //µ±Ç°¶ÎË÷Òı   
 extern  uint16 safe_index;
 
 extern int target_speed;
 extern float target_yaw;
-extern int path_index;
-extern float x;
+extern int path_index;          // µ±Ç°»Ø·ÅµãË÷Òı
+extern float x;                 // ins x×ø±ê
+extern float x_last;
+extern float y_last;
 extern float y;
 extern float yaw;
 extern float yaw_error;
@@ -47,13 +49,13 @@ extern float vx;
 extern float vy;
 
 extern float distance;
-extern float x_now;
+extern float x_now;             // µ±Ç°»Ø·Åµã×ø±ê
 extern float y_now;
 extern float target_x;
 extern float target_y;
 extern float target_v;
 extern float dt;  // insµ÷ÓÃÖÜÆÚ£¨s£©
-
+extern int pause_time;
 extern uint16_t element_index[];
 extern float distance_recover;
 extern bool pause_flag;
@@ -61,7 +63,7 @@ extern bool pause_flag;
 void ins_init(void);
 void ins_enable(bool on_off);
 void ins_clear(void);
-
+void track_init(void);
 // dt Ãë£¬yaw ÒÑÂË²¨£¬v_enc ±àÂëÆ÷ÏßËÙ¶È m/s
 void ins_update(void);
 
@@ -69,7 +71,7 @@ void ins_update(void);
 void Track_update(void);
 
 // ¼ì²â´ò¶Ïµã
-void path_element_check(void);
+void segment_check(void);
 
 // ¼ì²âÊÇ·ñ¸Ã»Ö¸´ÁË
 void element_recover_check(void);
@@ -91,4 +93,8 @@ void flash_read_segment_headers(void);
 
 // flash¶ÁÈ¡Â·¾¶µã
 void flash_read_all_points(PathPoint *path,uint32_t point_num);
+
+// µ±Ç°¶Î½áÊø¼ì²âº¯Êı
+void segment_check(void);
+
 #endif

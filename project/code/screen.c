@@ -1,7 +1,7 @@
 ﻿#include "screen.h"
+#include "flag_value.h"
+#include "imu.h"
 #include "zf_device_mt9v03x.h"
-#include "camera.h"
-#include "camera_image_processing.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -47,6 +47,16 @@ screen_data_item_t screen_table_2[] =
     {"Area",     SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
     {"Limits",   SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
     {"DotCount", SCREEN_DATA_STRING,   {.str_value  = ""}, 0},
+}; 
+
+// ========================= 固定显示内容列表 3 =========================
+screen_data_item_t screen_table_3[] =
+{
+    {"FnOpt",      SCREEN_DATA_UINT,    {.uint_value = 0},  0},
+    {"State",      SCREEN_DATA_UINT,    {.uint_value = 0 }, 0},
+    {"DotCount",   SCREEN_DATA_UINT,    {.uint_value = 0},  0},
+    {"Area",       SCREEN_DATA_STRING,  {.str_value  = ""}, 0},
+    {"FPS",        SCREEN_DATA_UINT,    {.uint_value = 0},  0},
 }; 
 
 // ========================= 内部辅助函数 =========================
@@ -503,4 +513,18 @@ void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_
     screen_table_2[5].value.str_value   = str_dot_info;
 
     screen_show_data_table(screen_table_2, (uint8)(sizeof(screen_table_2) / sizeof(screen_table_2[0])));
+}
+
+void screen_show_table_t3(BridgeAccessParams_t bridge_params, uint8 func_opt, uint32 fps)
+{
+    char str_area_info[32];  // 识别矩形框信息显示用字符串
+    
+    sprintf(str_area_info,    "%d | %d | %d | %d", bridge_params.check_row, bridge_params.check_column, bridge_params.check_row_count, bridge_params.check_column_count);
+    screen_table_3[0].value.uint_value   = func_opt;
+    screen_table_3[1].value.uint_value   = bridge_params.state;
+    screen_table_3[2].value.uint_value   = bridge_params.dot_count; 
+    screen_table_3[3].value.str_value    = str_area_info;
+    screen_table_3[4].value.uint_value   = fps;
+
+    screen_show_data_table(screen_table_3, (uint8)(sizeof(screen_table_3) / sizeof(screen_table_3[0])));
 }

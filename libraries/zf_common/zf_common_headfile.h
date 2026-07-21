@@ -46,6 +46,7 @@
 #include "pid.h"
 #include "filter.h"
 #include "small_driver_uart_control.h"
+#include "camera.h"
 #include "screen.h"
 #include "ins.h"
 #include "remote_control.h"

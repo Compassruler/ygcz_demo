@@ -15,7 +15,7 @@
 #define APPIPC_CHANNEL_MASK         (1ul << APPIPC_CHANNEL)
 #define APPIPC_RX_INTR_MASK         (1ul << APPIPC_RX_INTR_STRUCT)
 
-// 通道1：核心0发送速度，核心1接收。
+// 通道1：核心0发送车速和视觉工作模式，核心1接收。
 #define APPIPC_SPEED_CHANNEL              (CY_IPC_CHAN_PIPE_EP1)
 #define APPIPC_SPEED_RX_INTR_STRUCT       (CY_IPC_INTR_PIPE_EP1)
 #define APPIPC_SPEED_RX_CPU_INT           (CPUIntIdx4_IRQn)
@@ -25,11 +25,14 @@
 #define APPIPC_SPEED_RX_INTR_MASK         (1ul << APPIPC_SPEED_RX_INTR_STRUCT)
 
 #define APPIPC_BRIDGE_VALID_MASK          (0x80000000ul)
-#define APPIPC_BRIDGE_DISTANCE_MASK       (0x00FF0000ul)
-#define APPIPC_BRIDGE_DISTANCE_SHIFT      (16u)
-#define APPIPC_BRIDGE_ANGLE_MASK          (0x0000FFFFul)
-#define APPIPC_BRIDGE_DISTANCE_MAX        (127)
-#define APPIPC_BRIDGE_DISTANCE_MIN        (-127)
+#define APPIPC_BRIDGE_ALIGNED_MASK        (0x40000000ul)
+#define APPIPC_BRIDGE_BOTTOM_MASK         (0x00FF0000ul)
+#define APPIPC_BRIDGE_BOTTOM_SHIFT        (16u)
+#define APPIPC_BRIDGE_CONTROL_MASK        (0x0000FFFFul)
+
+#define APPIPC_CORE0_SPEED_MASK            (0x0000FFFFul)
+#define APPIPC_CORE0_MODE_MASK             (0x00FF0000ul)
+#define APPIPC_CORE0_MODE_SHIFT            (16u)
 
 static appipc_callback_t appipc_user_callback = (appipc_callback_t)0;
 static volatile stc_IPC_STRUCT_t      *appipc_channel_ptr = (volatile stc_IPC_STRUCT_t *)0;
@@ -44,25 +47,17 @@ static void appipc_default_callback(uint32 data)
     (void)data;
 }
 
-static uint32 appipc_pack_bridge_data(uint8 valid, int16 distance_px, int16 angle_d10)
+static uint32 appipc_pack_bridge_data(uint8 valid, uint8 aligned, uint8 bottom_y, int16 control_value)
 {
     if(!valid)
     {
         return 0u;
     }
 
-    if(distance_px > APPIPC_BRIDGE_DISTANCE_MAX)
-    {
-        distance_px = APPIPC_BRIDGE_DISTANCE_MAX;
-    }
-    else if(distance_px < APPIPC_BRIDGE_DISTANCE_MIN)
-    {
-        distance_px = APPIPC_BRIDGE_DISTANCE_MIN;
-    }
-
     return APPIPC_BRIDGE_VALID_MASK |
-           ((uint32)(uint8)(int8)distance_px << APPIPC_BRIDGE_DISTANCE_SHIFT) |
-           (uint32)(uint16)angle_d10;
+           (aligned ? APPIPC_BRIDGE_ALIGNED_MASK : 0u) |
+           ((uint32)bottom_y << APPIPC_BRIDGE_BOTTOM_SHIFT) |
+           (uint32)(uint16)control_value;
 }
 
 static void appipc_read_and_release(void)
@@ -129,9 +124,9 @@ uint8 appipc_send_u32(uint32 data)
     return APPIPC_BUSY;
 }
 
-uint8 appipc_send_bridge_data(uint8 valid, int16 distance_px, int16 angle_d10)
+uint8 appipc_send_bridge_data(uint8 valid, uint8 aligned, uint8 bottom_y, int16 control_value)
 {
-    return appipc_send_u32(appipc_pack_bridge_data(valid, distance_px, angle_d10));
+    return appipc_send_u32(appipc_pack_bridge_data(valid, aligned, bottom_y, control_value));
 }
 
 uint8 appipc_decode_bridge_data(uint32 data, appipc_bridge_data_t *bridge_data)
@@ -142,17 +137,19 @@ uint8 appipc_decode_bridge_data(uint32 data, appipc_bridge_data_t *bridge_data)
     }
 
     bridge_data->valid = (uint8)(0u != (data & APPIPC_BRIDGE_VALID_MASK));
+    bridge_data->aligned = (uint8)(0u != (data & APPIPC_BRIDGE_ALIGNED_MASK));
 
     if(!bridge_data->valid)
     {
-        bridge_data->distance_px = 0;
-        bridge_data->angle_d10 = 0;
+        bridge_data->aligned = 0;
+        bridge_data->bottom_y = 0;
+        bridge_data->control_value = 0;
         return 0;
     }
 
-    bridge_data->distance_px =
-        (int8)((data & APPIPC_BRIDGE_DISTANCE_MASK) >> APPIPC_BRIDGE_DISTANCE_SHIFT);
-    bridge_data->angle_d10 = (int16)(data & APPIPC_BRIDGE_ANGLE_MASK);
+    bridge_data->bottom_y =
+        (uint8)((data & APPIPC_BRIDGE_BOTTOM_MASK) >> APPIPC_BRIDGE_BOTTOM_SHIFT);
+    bridge_data->control_value = (int16)(data & APPIPC_BRIDGE_CONTROL_MASK);
 
     return 1;
 }
@@ -219,4 +216,35 @@ uint8 appipc_send_speed_u32(uint32 data)
     }
 
     return APPIPC_BUSY;
+}
+
+uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode)
+{
+    uint32 data;
+
+    data = ((uint32)vision_detect_mode << APPIPC_CORE0_MODE_SHIFT) |
+           (uint32)car_speed;
+
+    return appipc_send_speed_u32(data);
+}
+
+uint8 appipc_decode_core0_data(uint32 data, appipc_core0_data_t *core0_data)
+{
+    uint8 vision_detect_mode;
+
+    if((appipc_core0_data_t *)0 == core0_data)
+    {
+        return 0;
+    }
+
+    vision_detect_mode = (uint8)((data & APPIPC_CORE0_MODE_MASK) >> APPIPC_CORE0_MODE_SHIFT);
+    if(vision_detect_mode > APPIPC_VISION_MODE_JUMP)
+    {
+        return 0;
+    }
+
+    core0_data->car_speed = (uint16)(data & APPIPC_CORE0_SPEED_MASK);
+    core0_data->vision_detect_mode = vision_detect_mode;
+
+    return 1;
 }

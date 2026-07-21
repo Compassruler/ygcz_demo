@@ -4,7 +4,7 @@
 #include "zf_common_typedef.h"
 #include "zf_common_font.h"
 #include "zf_device_ips200.h"
-#include "camera_image_processing.h"
+#include "camera.h"
 
 /**
  * 固定显示列表使用方法：
@@ -325,5 +325,8 @@ void screen_show_table_t1(void);
 
 // 显示固定列表 2
 void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_jump, uint16 carspd);
+
+// 显示固定列表 3
+void screen_show_table_t3(BridgeAccessParams_t bridge_params, uint8 func_opt, uint32 fps);
 
 #endif

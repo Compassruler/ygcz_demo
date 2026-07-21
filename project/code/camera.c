@@ -118,48 +118,57 @@ uint8 camera_bridge_calculate_control(const CameraBridgeResult_t *bridge_result,
     return camproc_bridge_calc_ctrl(bridge_result, control_params, control_result);
 }
 
-uint8 camera_bridge_access_processing(BridgeAccessParams_t *bridge_access_params)
+uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params)
 {
-    uint8 bridge_detected = 0;  // 是否检测到单边桥
+    uint8 white_detected = 0;  // 当前帧的白色像素是否达到阈值
 
     // 如果没有有效结构体
-    if(NULL == bridge_access_params)
+    if(NULL == bridge_exit_params)
     {
         return 0;
     }
 
-    // state = 0 未进入单边桥 | state = 1 进入单边桥 | state = 2 离开单边桥
-    if(bridge_access_params->state >= 2)
+    // 离开状态锁存后始终返回 1，便于 IPC 发送失败时继续重试
+    if(bridge_exit_params->exited)
     {
-        mt9v03x_finish_flag = 0;    // 丢弃当前新帧，避免标志位一直保持为 1
-        return 0;
-    }
-
-    // 是否有效进行 摄像头新帧复制并进行最基本二值化处理
-    if(!camera_frame_cpy_and_basic_processing(CAMERA_BINARY_THRESHOLD_DEFAULT))
-    {
-        return 0;
-    }
-
-    // 矩形检测：统计指定区域内的黑色或白色像素总数
-    bridge_detected = camproc_pub_check_area(
-        image_copy,
-        bridge_access_params->check_row,
-        bridge_access_params->check_row_count,
-        bridge_access_params->check_column,
-        bridge_access_params->check_column_count,
-        bridge_access_params->dot_count,
-        0 // 固定检测黑色
-    );
-
-    // 最终确认
-    if(bridge_detected)
-    {
-        bridge_access_params->state += 1;  // 更新状态
         return 1;
     }
 
-    return 0;
+    // 是否有效进行 摄像头新帧复制并进行最基本二值化处理
+    if(!camera_frame_cpy_and_basic_processing(bridge_exit_params->binary_threshold))
+    {
+        return 0;
+    }
+
+    // 固定统计矩形区域内的白色像素总数
+    white_detected = camproc_pub_check_area(
+        image_copy,
+        bridge_exit_params->check_row,
+        bridge_exit_params->check_row_count,
+        bridge_exit_params->check_column,
+        bridge_exit_params->check_column_count,
+        bridge_exit_params->white_dot_count,
+        CAMERA_IMAGE_DOT_WHITE
+    );
+
+    // 任意一帧不满足要求，连续帧计数立即清零
+    if(!white_detected)
+    {
+        bridge_exit_params->continuous_frame_count = 0;
+        return 0;
+    }
+
+    if(bridge_exit_params->continuous_frame_count < bridge_exit_params->confirm_frame_count)
+    {
+        bridge_exit_params->continuous_frame_count++;
+    }
+
+    if(bridge_exit_params->continuous_frame_count >= bridge_exit_params->confirm_frame_count)
+    {
+        bridge_exit_params->exited = 1;
+    }
+
+    return bridge_exit_params->exited;
 }
 
 uint8 camera_jump_processing(uint32 time_ms, JumpDetectParams_t *jump_params)

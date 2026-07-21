@@ -49,6 +49,8 @@ typedef struct
     uint16 min_height;              // 候选连通区域及其右边线的最小纵向高度
     uint16 min_edge_length;         // 拟合右边线允许的最小实际长度，单位像素
     uint16 max_edge_length;         // 拟合右边线允许的最大实际长度，单位像素
+    uint16 min_edge_x;              // 拟合右边线端点允许的最小横坐标
+    uint16 max_edge_x;              // 拟合右边线端点允许的最大横坐标
     uint32 min_area;                // 候选连通区域内黑色像素总数下限
     uint16 connect_gap;             // 相邻两行黑色像素允许的横向连接间隔
     uint16 target_edge_x;           // 右边线期望对齐的横坐标
@@ -103,16 +105,19 @@ typedef struct
     int16 control_value;            // 最终底盘 angle 控制量
 } CameraBridgeControlResult_t;
 
-// 单边桥识别参数
+// 单边桥离开检测参数
 typedef struct
 {
+    uint8 binary_threshold;         // 固定二值化阈值
     uint16 check_row;               // 检测矩形的起始行，后续从该行向上检查
     uint16 check_row_count;         // 从起始行向上检查的行数量
     uint16 check_column;            // 检测矩形的起始列，后续从该列向右检查
     uint16 check_column_count;      // 从起始列向右检查的列数量
-    uint32 dot_count;               // 矩形检测区域内的目标颜色像素总数阈值
-    uint8  state;                   // 当前状态
-} BridgeAccessParams_t;
+    uint32 white_dot_count;         // 矩形检测区域内的白色像素总数阈值
+    uint8 confirm_frame_count;      // 确认离开所需的连续有效帧数
+    uint8 continuous_frame_count;   // 当前已经连续检测到白色的帧数
+    uint8 exited;                   // 1 表示已经确认离开单边桥
+} BridgeExitParams_t;
 
 
 // =================================== 函数 ===================================
@@ -149,12 +154,13 @@ uint8 camera_bridge_processing(const CameraBridgeParams_t *bridge_params, Camera
 uint8 camera_bridge_calculate_control(const CameraBridgeResult_t *bridge_result, const CameraBridgeControlParams_t *control_params, CameraBridgeControlResult_t *control_result);
 
 /**
- * 单边桥进出识别接口（有很多Bug）
- * @param bridge_access_params 单边桥识别结构体
- * 
- * @return 1 进入或者离开 | 0 无状态更新
+ * 单边桥离开检测接口
+ * 固定统计检测区域内的白色像素，连续满足指定帧数后锁存离开状态。
+ * @param bridge_exit_params 单边桥离开检测参数结构体
+ *
+ * @return 1 已经确认离开单边桥 | 0 尚未离开或当前没有新帧
  */
-uint8 camera_bridge_access_processing(BridgeAccessParams_t *bridge_access_params);
+uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params);
 
 /**
  * 跳跃检测接口

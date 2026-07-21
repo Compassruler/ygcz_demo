@@ -490,6 +490,8 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
     float edge_length_squared = 0.0f;
     float min_edge_length_squared = 0.0f;
     float max_edge_length_squared = 0.0f;
+    float fitted_upper_x = 0.0f;
+    float fitted_lower_x = 0.0f;
     float expected_x = 0.0f;
     float point_distance = 0.0f;
     float angle_d10 = 0.0f;
@@ -520,6 +522,9 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
        (params->min_height < 2u) ||
        (0 == params->min_edge_length) ||
        (params->min_edge_length > params->max_edge_length) ||
+       (params->min_edge_x >= MT9V03X_W) ||
+       (params->max_edge_x >= MT9V03X_W) ||
+       (params->min_edge_x > params->max_edge_x) ||
        (0 == params->min_area) ||
        (params->connect_gap >= MT9V03X_W) ||
        (params->target_edge_x >= MT9V03X_W) ||
@@ -719,6 +724,18 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
 
             if((edge_length_squared < min_edge_length_squared) ||
                (edge_length_squared > max_edge_length_squared))
+            {
+                continue;
+            }
+
+            // 任意拟合线端点超出允许的横坐标范围时，排除当前候选。
+            fitted_upper_x = right_slope * (float)right_upper_point.y + right_intercept;
+            fitted_lower_x = right_slope * (float)right_lower_point.y + right_intercept;
+
+            if((fitted_upper_x < (float)params->min_edge_x) ||
+               (fitted_upper_x > (float)params->max_edge_x) ||
+               (fitted_lower_x < (float)params->min_edge_x) ||
+               (fitted_lower_x > (float)params->max_edge_x))
             {
                 continue;
             }

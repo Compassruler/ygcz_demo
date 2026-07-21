@@ -8,12 +8,12 @@
 #define KEY4                    (P20_3)
 
 #define BRIDGE_ALIGNED_CONFIRM_COUNT    (3u)        // Á¬Ðø¶ÔÆëÈ·ÈÏ´ÎÊý
-#define BRIDGE_ALIGN_START_Y            (60u)       // ½øÈëµÍËÙ¾«È·¶ÔÆëÇøÓòµÄ»­Ãæ×Ý×ø±ê
-#define BRIDGE_CROSS_START_Y            (90u)       // ÔÊÐíËø´æ³åÇÅ×´Ì¬µÄ»­Ãæ×Ý×ø±ê
-#define BRIDGE_FAR_SPEED                (35)        // ¾àÀë½ÏÔ¶Ê±µÄ´Öµ÷ËÙ¶È
-#define BRIDGE_ALIGN_SPEED              (15)        // ¾àÀë½Ï½üÇÒÎ´¶ÔÆëÊ±µÄÏ¸µ÷ËÙ¶È
-#define BRIDGE_ALIGNED_SPEED            (10)        // ÒÑ¶ÔÆëµ«Î´µ½³åÇÅÎ»ÖÃÊ±µÄ±£³ÖËÙ¶È
-#define BRIDGE_CROSS_SPEED              (120)       // ¶ÔÆëºó³å¹ýµ¥±ßÇÅµÄËÙ¶È
+#define BRIDGE_ALIGN_START_Y            (35)       // ½øÈëµÍËÙ¾«È·¶ÔÆëÇøÓòµÄ»­Ãæ×Ý×ø±ê
+#define BRIDGE_CROSS_START_Y            (80)       // ÔÊÐíËø´æ³åÇÅ×´Ì¬µÄ»­Ãæ×Ý×ø±ê
+#define BRIDGE_FAR_SPEED                (40)        // ¾àÀë½ÏÔ¶Ê±µÄ´Öµ÷ËÙ¶È
+#define BRIDGE_ALIGN_SPEED              (25)        // ¾àÀë½Ï½üÇÒÎ´¶ÔÆëÊ±µÄÏ¸µ÷ËÙ¶È
+#define BRIDGE_ALIGNED_SPEED            (40)        // ÒÑ¶ÔÆëµ«Î´µ½³åÇÅÎ»ÖÃÊ±µÄ±£³ÖËÙ¶È
+#define BRIDGE_CROSS_SPEED              (150)       // ¶ÔÆëºó³å¹ýµ¥±ßÇÅµÄËÙ¶È
 
 
 char txt[128];
@@ -27,7 +27,8 @@ volatile uint8 bridge_bottom_y_from_core1 = 0;      // µ¥±ßÇÅ×îÏÂ¶Ë×Ý×ø±ê£¬ÓÃÓÚ¹
 volatile int16 bridge_control_from_core1 = 0;       // µ¥±ßÇÅ¿ØÖÆº½Ïò½ÇÊý¾Ý
 volatile uint8 bridge_control_updated = 0;          // µ¥±ßÇÅ¿ØÖÆ¸üÐÂ±êÖ¾Î»
 volatile uint8 bridge_aligned_count = 0;            // Á¬ÐøÊÕµ½Ê¶±ðÓÐÐ§ÇÒÒÑ¾­¶ÔÆëµÄ´ÎÊý
-volatile uint8 bridge_cross_latched = 0;            // µ¥±ßÇÅ³åÇÅ×´Ì¬Ëø´æ±êÖ¾Î»
+volatile uint8 bridge_exited_from_core1 = 0;         // ºË1È·ÈÏÒÑ¾­Àë¿ªµ¥±ßÇÅµÄ±êÖ¾Î»
+volatile uint8 bridge_phase = APPIPC_BRIDGE_PHASE_ALIGN; // µ¥±ßÇÅ¹¤×÷×Ó×´Ì¬£¬ÓÉºË0Í³Ò»¿ØÖÆ
 uint32 jump_count = 0;                              // ÌøÔ¾¼ÆÊý
 
 // ½ÓÊÕºËÐÄ1·¢ËÍµÄÊý¾Ý
@@ -46,6 +47,7 @@ static void appipc_callback(uint32 data)
         {
             bridge_valid_from_core1 = bridge_data.valid;
             bridge_aligned_from_core1 = bridge_data.aligned;
+            bridge_exited_from_core1 = bridge_data.exited;
             bridge_bottom_y_from_core1 = bridge_data.bottom_y;
             bridge_control_from_core1 = bridge_data.control_value;
         }
@@ -53,12 +55,13 @@ static void appipc_callback(uint32 data)
         {
             bridge_valid_from_core1 = 0;
             bridge_aligned_from_core1 = 0;
+            bridge_exited_from_core1 = 0;
             bridge_bottom_y_from_core1 = 0;
             bridge_control_from_core1 = 0;
         }
 
-        // Á¬ÐøÈý´ÎÊÕµ½¡°Ê¶±ðÓÐÐ§ÇÒÒÑ¾­¶ÔÆë¡±ºóËø´æ³åÇÅ×´Ì¬¡£
-        if(!bridge_cross_latched)
+        // ¶ÔÆë½×¶ÎÁ¬ÐøÈ·ÈÏ³É¹¦ºó£¬½øÈë³åÇÅºÍÀëÇÅ¼ì²â½×¶Î
+        if(bridge_phase == APPIPC_BRIDGE_PHASE_ALIGN)
         {
             if(bridge_valid_from_core1 && bridge_aligned_from_core1)
             {
@@ -70,13 +73,17 @@ static void appipc_callback(uint32 data)
                 if((bridge_aligned_count >= BRIDGE_ALIGNED_CONFIRM_COUNT) &&
                    (bridge_bottom_y_from_core1 >= BRIDGE_CROSS_START_Y))
                 {
-                    bridge_cross_latched = 1;
+                    bridge_phase = APPIPC_BRIDGE_PHASE_EXIT_CHECK;
                 }
             }
             else
             {
                 bridge_aligned_count = 0;
             }
+        }
+        else if((bridge_phase == APPIPC_BRIDGE_PHASE_EXIT_CHECK) && bridge_exited_from_core1)
+        {
+            bridge_phase = APPIPC_BRIDGE_PHASE_COMPLETE;
         }
 
         bridge_control_updated = 1;
@@ -203,19 +210,19 @@ int main(void)
 
         system_delay_ms(20);
         
-            // ÔªËØÍ¨¹ý¼ì²â£¨Ä¿Ç°ÓÃÑÓÊ±×ö²âÊÔ£©
+            // ÔªËØÍ¨¹ý¼ì²â£¨ÊÓ¾õ¼ì²âÀë¿ªµ¥±ßÇÅ£©
     if(!pause_flag)
     {
 //        element_recover_check();
-      pause_time ++;
+      // pause_time ++;
       x = 0;
       y = 0;
       x_last = 0;
       y_last = 0;
-      if (pause_time > 100)
+
+      if (bridge_phase == APPIPC_BRIDGE_PHASE_COMPLETE)
       {
         pause_flag = true;
-        pause_time = 0;
       }
         
     }
@@ -242,7 +249,7 @@ int main(void)
         vision_detect_mode = APPIPC_VISION_MODE_IDLE;
     }
 
-    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode);  // ·¢ËÍ³µËÙºÍÊÓ¾õÄ£Ê½µ½ºË1
+    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, bridge_phase);  // ·¢ËÍ³µËÙ¡¢ÊÓ¾õÄ£Ê½ºÍµ¥±ßÇÅ×Ó×´Ì¬µ½ºË1
     
     //=========================== ÌøÔ¾Ä£Ê½ ===========================
         if(vision_detect_mode == APPIPC_VISION_MODE_JUMP)
@@ -282,18 +289,21 @@ int main(void)
         //=========================== µ¥±ßÇÅÄ£Ê½ =========================
         else if(vision_detect_mode == APPIPC_VISION_MODE_BRIDGE)
         {
-            if(bridge_control_updated)
+            Y_left = 30.0f;
+            Y_right = 30.0f;
+            if(bridge_phase == APPIPC_BRIDGE_PHASE_EXIT_CHECK)
+            {
+                bridge_control_updated = 0;
+                vision_target_speed = BRIDGE_CROSS_SPEED;  // ±£³Ö¶ÔÆëºóµÄº½Ïò²¢³å¹ýµ¥±ßÇÅ
+                vision_target_yaw = 0;
+            }
+            else if((bridge_phase == APPIPC_BRIDGE_PHASE_ALIGN) && bridge_control_updated)
             {
                 bridge_control_updated = 0;
 
-                if(bridge_cross_latched)
+                if(bridge_valid_from_core1)
                 {
-                    vision_target_speed = BRIDGE_CROSS_SPEED;  // ÒÑÈ·ÈÏ¶ÔÆë£ºËø´æÖ±ÐÐ³åÇÅ
-                    vision_target_yaw = 0;
-                }
-                else if(bridge_valid_from_core1)
-                {
-                    if(bridge_bottom_y_from_core1 < BRIDGE_ALIGN_START_Y)
+                    if(10 < bridge_bottom_y_from_core1 && bridge_bottom_y_from_core1 < BRIDGE_ALIGN_START_Y)
                     {
                         vision_target_speed = BRIDGE_FAR_SPEED;      // ¾àÀë½ÏÔ¶£º½Ï¸ßËÙ¶È´Öµ÷
                     }

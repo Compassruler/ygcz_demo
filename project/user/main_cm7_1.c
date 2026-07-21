@@ -33,6 +33,8 @@
 #define BRIDGE_MIN_HEIGHT           (5)                         // 连续黑色线上下最低宽度
 #define BRIDGE_MIN_EDGE_LENGTH      (10)                        // 拟合右边线最小实际长度，单位像素
 #define BRIDGE_MAX_EDGE_LENGTH      (100)                       // 拟合右边线最大实际长度，单位像素
+#define BRIDGE_MIN_EDGE_X           (30)                        // 拟合右边线端点允许的最小横坐标
+#define BRIDGE_MAX_EDGE_X           (140)                       // 拟合右边线端点允许的最大横坐标
 #define BRIDGE_MIN_AREA             (400)                        // 黑色块最小面积
 #define BRIDGE_CONNECT_GAP          (5)                         // 行间黑色矩形错开长度
 
@@ -66,9 +68,20 @@
 #define BRIDGE_CONTROL_GAIN_PER_DEG    (5.0f)  // 每1度视觉航向偏差转换成多少angle控制量
 #define BRIDGE_CONTROL_DIRECTION       (1.0f)  // 底盘控制方向，控制方向相反时修改正负号
 #define BRIDGE_CONTROL_LIMIT           (60)     // angle控制量的最大绝对值
+
+//=========================== 单边桥离开检测参数 ===========================
+#define BRIDGE_EXIT_BINARY_THRESHOLD   (100)    // 离桥检测固定二值化阈值
+#define BRIDGE_EXIT_CHECK_ROW          (100)    // 离桥检测矩形起始行
+#define BRIDGE_EXIT_CHECK_ROW_COUNT    (25)     // 从起始行向上检查的行数
+#define BRIDGE_EXIT_CHECK_COLUMN       (55)     // 离桥检测矩形起始列
+#define BRIDGE_EXIT_CHECK_COLUMN_COUNT (73)     // 从起始列向右检查的列数
+#define BRIDGE_EXIT_WHITE_DOT_COUNT    (1400)   // 判断离桥所需的白色像素数量
+#define BRIDGE_EXIT_CONFIRM_FRAMES     (5)      // 连续满足要求的帧数
+#define BRIDGE_EXIT_CHECK_DELAY_MS     (150)    // 冲桥后延迟开始离桥检测的时间
 //================================================================
 
 volatile uint8 function_option                  = APPIPC_VISION_MODE_IDLE;      // 核心0同步的视觉工作模式
+volatile uint8 bridge_phase                     = APPIPC_BRIDGE_PHASE_ALIGN;    // 核心0同步的单边桥工作子状态
 volatile uint32 sys_ms                          = 0;                            // 毫秒计时器
 static volatile uint16 core0_car_speed          = 0;                            // 实际车速
 static volatile uint8  core0_speed_updated      = 0;                            // 车速更新标志位
@@ -82,6 +95,7 @@ static void appipc_speed_callback(uint32 data)
     {
         core0_car_speed = core0_data.car_speed;
         function_option = core0_data.vision_detect_mode;
+        bridge_phase = core0_data.bridge_phase;
         core0_speed_updated = 1;
     }
 }
@@ -90,7 +104,7 @@ static void appipc_speed_callback(uint32 data)
 void debug_image_screen_display(
     JumpDetectParams_t jump_params, 
     const CameraBridgeResult_t *bridge_result, 
-    BridgeAccessParams_t bridge_params, 
+    BridgeExitParams_t bridge_exit_params,
     uint32 fps, 
     uint16 carspd
 )
@@ -107,8 +121,11 @@ void debug_image_screen_display(
     {
         #if IMAGE_DEBUG_TYPE == 1 
         camera_debug_on_screen();
-        screen_show_bridge_fitted_line(bridge_result);              // 绘制绿色拟合曲线
-        screen_show_table_t3(bridge_params, function_option, fps);  // 显示信息 - 单边桥
+        if(bridge_phase == APPIPC_BRIDGE_PHASE_ALIGN)
+        {
+            screen_show_bridge_fitted_line(bridge_result);          // 对齐阶段绘制绿色拟合曲线
+        }
+        screen_show_table_t3(bridge_exit_params, function_option, fps); // 显示信息 - 单边桥
         #endif
     }
 }
@@ -132,14 +149,17 @@ int main(void)
         .multi_frame              = JUMP_MULTI_FRAME,
         .steps                    = 0
     };                                                // 跳跃检测参数结构体
-    BridgeAccessParams_t bridge_access_params = 
+    BridgeExitParams_t bridge_exit_params =
     {
-        .check_row                = 100,
-        .check_row_count          = JUMP_ROW_TOTAL,
-        .check_column             = JUMP_COLUMN,
-        .check_column_count       = JUMP_COLUMN_TOTAL,
-        .dot_count                = 50,
-        .state                    = 0 
+        .binary_threshold         = BRIDGE_EXIT_BINARY_THRESHOLD,
+        .check_row                = BRIDGE_EXIT_CHECK_ROW,
+        .check_row_count          = BRIDGE_EXIT_CHECK_ROW_COUNT,
+        .check_column             = BRIDGE_EXIT_CHECK_COLUMN,
+        .check_column_count       = BRIDGE_EXIT_CHECK_COLUMN_COUNT,
+        .white_dot_count          = BRIDGE_EXIT_WHITE_DOT_COUNT,
+        .confirm_frame_count      = BRIDGE_EXIT_CONFIRM_FRAMES,
+        .continuous_frame_count   = 0,
+        .exited                   = 0
     };
     CameraBridgeParams_t bridge_params =
     {
@@ -152,6 +172,8 @@ int main(void)
         .min_height               = BRIDGE_MIN_HEIGHT,
         .min_edge_length          = BRIDGE_MIN_EDGE_LENGTH,
         .max_edge_length          = BRIDGE_MAX_EDGE_LENGTH,
+        .min_edge_x               = BRIDGE_MIN_EDGE_X,
+        .max_edge_x               = BRIDGE_MAX_EDGE_X,
         .min_area                 = BRIDGE_MIN_AREA,
         .connect_gap              = BRIDGE_CONNECT_GAP,
         .target_edge_x            = BRIDGE_TARGET_EDGE_X
@@ -180,10 +202,12 @@ int main(void)
     uint32 uart_last_ms         = 0;                  // 串口更新计时
     uint8  actual_jump_count    = 0;                  // 实际跳跃次数计数
     uint8  bridge_aligned       = 0;                  // 单边桥是否已经对齐
+    uint8  last_bridge_phase    = APPIPC_BRIDGE_PHASE_ALIGN; // 上一次执行的单边桥子状态
+    uint32 bridge_exit_start_ms = 0;                  // 进入离桥检测阶段的时间
     char txt[128];                                    // 串口发送文本
 
     clock_init(SYSTEM_CLOCK_250M);                    // 系统 初始化
-    screen_init();                                    // 屏幕 初始化 核0 已
+    // screen_init();                                    // 屏幕 初始化 核0 已
     camera_init();                                    // MT9V03X 摄像头初始化
     pit_ms_init(PIT_CH1, 1);                          // PIT_CH1 1ms周期中断，用于 sys_ms 计时
     appipc_speed_rx_init(appipc_speed_callback);      // IPC接收 初始化
@@ -195,25 +219,51 @@ int main(void)
         //=========================== 执行单边桥检测程序 ===========================
         if (function_option == APPIPC_VISION_MODE_BRIDGE)
         {
-            if(camera_bridge_processing(&bridge_params, &bridge_result))
+            if(last_bridge_phase != bridge_phase)
+            {
+                last_bridge_phase = bridge_phase;
+
+                if(bridge_phase == APPIPC_BRIDGE_PHASE_EXIT_CHECK)
+                {
+                    bridge_exit_start_ms = sys_ms;
+                }
+            }
+
+            if((bridge_phase == APPIPC_BRIDGE_PHASE_ALIGN) &&
+               camera_bridge_processing(&bridge_params, &bridge_result))
             {
                 independent_fps      = camera_fps_counter_update(&camera_fps, sys_ms);
                 camera_bridge_calculate_control(&bridge_result, &bridge_control_params, &bridge_control_result);
                 bridge_aligned = (uint8)(
                     bridge_result.valid &&
-                    (-10 <= bridge_result.distance_px) && 
-                    (bridge_result.distance_px <= 10) &&
-                    (-50 <= bridge_result.angle_d10) && 
+                    (-30 <= bridge_result.distance_px) &&
+                    (bridge_result.distance_px <= 8) &&
+                    (-100 <= bridge_result.angle_d10) &&
                     (bridge_result.angle_d10 <= 50)
                 );
 
-                appipc_send_bridge_data(bridge_result.valid, bridge_aligned,
+                appipc_send_bridge_data(bridge_result.valid, bridge_aligned, 0,
                                         (uint8)bridge_result.bottom, bridge_control_result.control_value);
                 sprintf(txt, "Valid %d |Aligned %d |Bottom %d |Distance %d |Angle %d |CtrlAng %d |FPS %d\r\n",
                         bridge_result.valid, bridge_aligned, bridge_result.bottom,
                         bridge_result.distance_px, bridge_result.angle_d10,
                         bridge_control_result.control_value, independent_fps);
                 wireless_uart_send_string(txt);
+            }
+            else if((bridge_phase == APPIPC_BRIDGE_PHASE_EXIT_CHECK) &&
+                    ((sys_ms - bridge_exit_start_ms) >= BRIDGE_EXIT_CHECK_DELAY_MS))
+            {
+                if(camera_has_frame())
+                {
+                    independent_fps = camera_fps_counter_update(&camera_fps, sys_ms);
+                    camera_bridge_exit_processing(&bridge_exit_params);
+                }
+
+                // 离桥状态会保持为 1，IPC 忙时可在后续循环继续发送
+                if(bridge_exit_params.exited)
+                {
+                    appipc_send_bridge_data(0, 0, 1, 0, 0);
+                }
             }
         }
 
@@ -245,7 +295,7 @@ int main(void)
                 }
             }
         }
-        debug_image_screen_display(jump_params, &bridge_result, bridge_access_params, independent_fps, core0_car_speed);
+        // debug_image_screen_display(jump_params, &bridge_result, bridge_exit_params, independent_fps, core0_car_speed);
     }
 }
 
@@ -323,7 +373,8 @@ int main(void)
 
         appipc_send_core0_data(
             (uint16)fabsf(car_speed),
-            (uint8)vision_detect_mode
+            (uint8)vision_detect_mode,
+            APPIPC_BRIDGE_PHASE_ALIGN
         );
 
         //=========================== 跳跃模式 ===========================

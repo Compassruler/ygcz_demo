@@ -327,6 +327,6 @@ void screen_show_table_t1(void);
 void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_jump, uint16 carspd);
 
 // 显示固定列表 3
-void screen_show_table_t3(BridgeAccessParams_t bridge_params, uint8 func_opt, uint32 fps);
+void screen_show_table_t3(BridgeExitParams_t bridge_params, uint8 func_opt, uint32 fps);
 
 #endif

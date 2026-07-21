@@ -33,7 +33,7 @@ void pit0_ch0_isr()
       }
 
       
-      if (road_memery_flag == 1 || remote_right_01_now_flag == 1)
+      if ((road_memery_flag == 1 && pause_flag) || remote_right_01_now_flag == 0)
       {
         true_speed = rpmtotrue(car_speed); 
         ins_update();  // ins数据更新       

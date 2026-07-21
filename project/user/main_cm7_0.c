@@ -7,42 +7,82 @@
 #define KEY3                    (P20_2)
 #define KEY4                    (P20_3)
 
+#define BRIDGE_ALIGNED_CONFIRM_COUNT    (3u)        // 连续对齐确认次数
+#define BRIDGE_ALIGN_START_Y            (60u)       // 进入低速精确对齐区域的画面纵坐标
+#define BRIDGE_CROSS_START_Y            (90u)       // 允许锁存冲桥状态的画面纵坐标
+#define BRIDGE_FAR_SPEED                (35)        // 距离较远时的粗调速度
+#define BRIDGE_ALIGN_SPEED              (15)        // 距离较近且未对齐时的细调速度
+#define BRIDGE_ALIGNED_SPEED            (10)        // 已对齐但未到冲桥位置时的保持速度
+#define BRIDGE_CROSS_SPEED              (120)       // 对齐后冲过单边桥的速度
+
+
 char txt[128];
 
 
 volatile uint8 is_jump_from_core1 = 0;              // 核1发送是否跳跃标志位
 volatile uint8 is_jump_updated = 0;                 // 跳跃更新标志位
 volatile uint8 bridge_valid_from_core1 = 0;         // 单边桥是否识别标志位
+volatile uint8 bridge_aligned_from_core1 = 0;       // 单边桥是否已经对齐标志位
+volatile uint8 bridge_bottom_y_from_core1 = 0;      // 单边桥最下端纵坐标，用于估算前向距离
 volatile int16 bridge_control_from_core1 = 0;       // 单边桥控制航向角数据
 volatile uint8 bridge_control_updated = 0;          // 单边桥控制更新标志位
+volatile uint8 bridge_aligned_count = 0;            // 连续收到识别有效且已经对齐的次数
+volatile uint8 bridge_cross_latched = 0;            // 单边桥冲桥状态锁存标志位
 uint32 jump_count = 0;                              // 跳跃计数
 
 // 接收核心1发送的数据
 static void appipc_callback(uint32 data)
 {
-    if(vision_detect_mode == 2)
+    if(vision_detect_mode == APPIPC_VISION_MODE_JUMP)
     {
         is_jump_from_core1 = (uint8)(data & 0x01);
         is_jump_updated = 1;
     }
-    else if(vision_detect_mode == 1)
+    else if(vision_detect_mode == APPIPC_VISION_MODE_BRIDGE)
     {
         appipc_bridge_data_t bridge_data;
 
         if(appipc_decode_bridge_data(data, &bridge_data))
         {
             bridge_valid_from_core1 = bridge_data.valid;
-            bridge_control_from_core1 = bridge_data.angle_d10;
+            bridge_aligned_from_core1 = bridge_data.aligned;
+            bridge_bottom_y_from_core1 = bridge_data.bottom_y;
+            bridge_control_from_core1 = bridge_data.control_value;
         }
         else
         {
             bridge_valid_from_core1 = 0;
+            bridge_aligned_from_core1 = 0;
+            bridge_bottom_y_from_core1 = 0;
             bridge_control_from_core1 = 0;
+        }
+
+        // 连续三次收到“识别有效且已经对齐”后锁存冲桥状态。
+        if(!bridge_cross_latched)
+        {
+            if(bridge_valid_from_core1 && bridge_aligned_from_core1)
+            {
+                if(bridge_aligned_count < BRIDGE_ALIGNED_CONFIRM_COUNT)
+                {
+                    bridge_aligned_count++;
+                }
+
+                if((bridge_aligned_count >= BRIDGE_ALIGNED_CONFIRM_COUNT) &&
+                   (bridge_bottom_y_from_core1 >= BRIDGE_CROSS_START_Y))
+                {
+                    bridge_cross_latched = 1;
+                }
+            }
+            else
+            {
+                bridge_aligned_count = 0;
+            }
         }
 
         bridge_control_updated = 1;
     }
 }
+
 
 
 int main(void)
@@ -193,19 +233,19 @@ int main(void)
     
 // =========================================================== 视觉部分 ==========================================================
 
-    appipc_send_speed_u32((uint32)fabsf(car_speed));  // 发送小车速度到核1
-    
-    if (pause_flag == false)
+     if (pause_flag == false)
     {
-        vision_detect_mode = 1;
+        vision_detect_mode = APPIPC_VISION_MODE_BRIDGE;
     }
     else
     {
-        vision_detect_mode = 0;
+        vision_detect_mode = APPIPC_VISION_MODE_IDLE;
     }
+
+    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode);  // 发送车速和视觉模式到核1
     
     //=========================== 跳跃模式 ===========================
-        if(vision_detect_mode == 2)
+        if(vision_detect_mode == APPIPC_VISION_MODE_JUMP)
         {   
             // 速度控制
             switch (jump_count)
@@ -240,20 +280,37 @@ int main(void)
 
 
         //=========================== 单边桥模式 =========================
-        else if(vision_detect_mode == 1)
+        else if(vision_detect_mode == APPIPC_VISION_MODE_BRIDGE)
         {
             if(bridge_control_updated)
             {
                 bridge_control_updated = 0;
 
-                if(bridge_valid_from_core1)
+                if(bridge_cross_latched)
                 {
-                    vision_target_speed = 60;                             // 识别有效：固定低速前进
-                    vision_target_yaw   = bridge_control_from_core1;      // 将核心1计算的视觉偏差转换成航向偏转加权量
+                    vision_target_speed = BRIDGE_CROSS_SPEED;  // 已确认对齐：锁存直行冲桥
+                    vision_target_yaw = 0;
+                }
+                else if(bridge_valid_from_core1)
+                {
+                    if(bridge_bottom_y_from_core1 < BRIDGE_ALIGN_START_Y)
+                    {
+                        vision_target_speed = BRIDGE_FAR_SPEED;      // 距离较远：较高速度粗调
+                    }
+                    else if(!bridge_aligned_from_core1)
+                    {
+                        vision_target_speed = BRIDGE_ALIGN_SPEED;    // 距离较近且未对齐：低速细调
+                    }
+                    else
+                    {
+                        vision_target_speed = BRIDGE_ALIGNED_SPEED;  // 已对齐：保持低速接近冲桥位置
+                    }
+
+                    vision_target_yaw = bridge_control_from_core1;
                 }
                 else
                 {
-                    vision_target_speed = 0;  // 识别丢失或者进入单边桥
+                    vision_target_speed = 0;  // 识别丢失：停车
                     vision_target_yaw = 0;
                 }
             }

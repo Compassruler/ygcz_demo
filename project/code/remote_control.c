@@ -127,20 +127,14 @@ void remote_right_01_switch_ctrl(void)
 //  road_memery_flag = 1;
   }
        else if (remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH)>=200 && remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH) < 1500)
-       {remote_right_01_now_flag = 0;
-         vision_detect_mode = 0;
+       {
+        remote_right_01_now_flag = 0;        
        }
        else 
        {
-         remote_right_01_now_flag = 2;
-         vision_detect_mode = 1;
+        remote_right_01_now_flag = 2;
        }
          
-   if(remote_right_01_last_flag == 0 && remote_right_01_now_flag == 1)
-    {
-      x = 0.0f;
-      y = 0.0f;
-    }
 }
 
 void remote_right_02_switch_ctrl(void)

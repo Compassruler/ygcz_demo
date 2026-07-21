@@ -155,10 +155,10 @@ void ins_update(void)
 {
 //  yaw = round(yaw * 100.0f) / 100.0f; 
   
-    if(remote_right_01_now_flag == 2 &&remote_right_01_last_flag == 0) // 遥控打断时写入一段的头信息
+    if(remote_right_01_now_flag != remote_right_01_last_flag) // 遥控打断时写入一段的头信息,检测跳变
     {
       path_segment_finish();
-     pause_flag = false;
+      pause_flag = false;
       return;
     }
     
@@ -177,17 +177,7 @@ void ins_update(void)
     vy = true_speed * sinf(yaw_ins);
     x += vx * dt;
     y += vy * dt;
-    // 元素通过检测（目前用延时做测试）
-    if(!pause_flag)
-    {
-//        element_recover_check();
-      pause_time ++;
-      if (pause_time > 100)
-      {
-        pause_flag = true;
-        pause_time = 0;}
-        
-    }
+    
     // 计算和上一个记录点的距离
      dx_ins = x - x_last;
      dy_ins = y - y_last;

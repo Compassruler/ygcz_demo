@@ -77,7 +77,7 @@
 #define BRIDGE_EXIT_CHECK_COLUMN_COUNT (73)     // 从起始列向右检查的列数
 #define BRIDGE_EXIT_WHITE_DOT_COUNT    (1400)   // 判断离桥所需的白色像素数量
 #define BRIDGE_EXIT_CONFIRM_FRAMES     (5)      // 连续满足要求的帧数
-#define BRIDGE_EXIT_CHECK_DELAY_MS     (150)    // 冲桥后延迟开始离桥检测的时间
+#define BRIDGE_EXIT_CHECK_DELAY_MS     (3000)    // 冲桥后延迟开始离桥检测的时间
 //================================================================
 
 volatile uint8 function_option                  = APPIPC_VISION_MODE_IDLE;      // 核心0同步的视觉工作模式
@@ -204,6 +204,7 @@ int main(void)
     uint8  bridge_aligned       = 0;                  // 单边桥是否已经对齐
     uint8  last_bridge_phase    = APPIPC_BRIDGE_PHASE_ALIGN; // 上一次执行的单边桥子状态
     uint32 bridge_exit_start_ms = 0;                  // 进入离桥检测阶段的时间
+    uint8  bridge_exit_ipc_sent = 0;
     char txt[128];                                    // 串口发送文本
 
     clock_init(SYSTEM_CLOCK_250M);                    // 系统 初始化
@@ -253,16 +254,19 @@ int main(void)
             else if((bridge_phase == APPIPC_BRIDGE_PHASE_EXIT_CHECK) &&
                     ((sys_ms - bridge_exit_start_ms) >= BRIDGE_EXIT_CHECK_DELAY_MS))
             {
-                if(camera_has_frame())
+                if(!bridge_exit_params.exited && camera_has_frame())
                 {
                     independent_fps = camera_fps_counter_update(&camera_fps, sys_ms);
                     camera_bridge_exit_processing(&bridge_exit_params);
                 }
 
                 // 离桥状态会保持为 1，IPC 忙时可在后续循环继续发送
-                if(bridge_exit_params.exited)
+                if(bridge_exit_params.exited && !bridge_exit_ipc_sent)
                 {
-                    appipc_send_bridge_data(0, 0, 1, 0, 0);
+                    if(APPIPC_OK == appipc_send_bridge_data(0, 0, 1, 0, 0))
+                    {
+                        bridge_exit_ipc_sent = 1;
+                    }
                 }
             }
         }

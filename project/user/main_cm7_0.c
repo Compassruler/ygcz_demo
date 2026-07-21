@@ -222,6 +222,8 @@ int main(void)
 
       if (bridge_phase == APPIPC_BRIDGE_PHASE_COMPLETE)
       {
+        Y_left = 0.0f;
+        Y_right = 0.0f;
         pause_flag = true;
       }
         

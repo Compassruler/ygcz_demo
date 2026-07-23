@@ -171,6 +171,27 @@ uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params)
     return bridge_exit_params->exited;
 }
 
+uint8 camera_bump_exit_processing(BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled)
+{
+    if(NULL == bump_exit_params)
+    {
+        return 0;
+    }
+
+    // 离开状态锁存后始终返回 1，便于 IPC 发送失败时继续重试
+    if(bump_exit_params->exited)
+    {
+        return 1;
+    }
+
+    if(!camera_frame_cpy_and_basic_processing(bump_exit_params->binary_threshold))
+    {
+        return 0;
+    }
+
+    return camproc_bump_exit_detect(image_copy, bump_exit_params, exit_check_enabled);
+}
+
 uint8 camera_jump_processing(uint32 time_ms, JumpDetectParams_t *jump_params)
 {
     // 如果没有有效结构体

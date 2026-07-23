@@ -23,7 +23,7 @@ void pit0_ch0_isr()
         pid_pos_calc(&banlance.speed_pid, target_speed, car_speed);
         
       }
-      else if (vision_detect_mode == 1 || vision_detect_mode == 2)  // 单边桥 或 跳跃
+      else if (vision_detect_mode != VISION_IDLE)  // 视觉控制模式
       {
         pid_pos_calc(&banlance.speed_pid, vision_target_speed, car_speed);
       }
@@ -55,12 +55,12 @@ void pit0_ch0_isr()
 
       if (remote_right_01_now_flag == 1 && pause_flag) pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle);
       
-      else if (vision_detect_mode == 1) // 单边桥
+      else if (vision_detect_mode == VISION_BRIDGE_BUMP) // 需要视觉转向控制的模式
       {
         target_yaw_remote += vision_target_yaw * 0.002f;
         pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
       }
-      else if (vision_detect_mode == 2) // 跳跃
+      else if (vision_detect_mode == VISION_JUMP) // 跳跃
       {
         // 跳跃暂时不用改变航向角
       }

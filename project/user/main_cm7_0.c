@@ -13,7 +13,8 @@
 #define BRIDGE_FAR_SPEED                (40)        // ¾àÀë½ÏÔ¶Ê±µÄ´Öµ÷ËÙ¶È
 #define BRIDGE_ALIGN_SPEED              (25)        // ¾àÀë½Ï½üÇÒÎ´¶ÔÆëÊ±µÄÏ¸µ÷ËÙ¶È
 #define BRIDGE_ALIGNED_SPEED            (40)        // ÒÑ¶ÔÆëµ«Î´µ½³åÇÅÎ»ÖÃÊ±µÄ±£³ÖËÙ¶È
-#define BRIDGE_CROSS_SPEED              (150)       // ¶ÔÆëºó³å¹ýµ¥±ßÇÅµÄËÙ¶È
+#define BRIDGE_CROSS_SPEED              (200)       // ¶ÔÆëºó³å¹ýµ¥±ßÇÅµÄËÙ¶È
+#define BUMP_CROSS_SPEED                (300)        // Í¨¹ýµßô¤Â·¶ÎÊ±µÄ¹Ì¶¨ËÙ¶È
 
 
 char txt[128];
@@ -27,19 +28,19 @@ volatile uint8 bridge_bottom_y_from_core1 = 0;      // µ¥±ßÇÅ×îÏÂ¶Ë×Ý×ø±ê£¬ÓÃÓÚ¹
 volatile int16 bridge_control_from_core1 = 0;       // µ¥±ßÇÅ¿ØÖÆº½Ïò½ÇÊý¾Ý
 volatile uint8 bridge_control_updated = 0;          // µ¥±ßÇÅ¿ØÖÆ¸üÐÂ±êÖ¾Î»
 volatile uint8 bridge_aligned_count = 0;            // Á¬ÐøÊÕµ½Ê¶±ðÓÐÐ§ÇÒÒÑ¾­¶ÔÆëµÄ´ÎÊý
-volatile uint8 bridge_exited_from_core1 = 0;         // ºË1È·ÈÏÒÑ¾­Àë¿ªµ¥±ßÇÅµÄ±êÖ¾Î»
-volatile uint8 bridge_phase = APPIPC_BRIDGE_PHASE_ALIGN; // µ¥±ßÇÅ¹¤×÷×Ó×´Ì¬£¬ÓÉºË0Í³Ò»¿ØÖÆ
+volatile uint8 phase_exited_from_core1 = 0;          // ºË1È·ÈÏÒÑ¾­Àë¿ªµ±Ç°½×¶ÎÂ·¶ÎµÄ±êÖ¾Î»
+volatile uint8 vision_phase_bab = VISION_PHASE_BAB_BRIDGE_ALIGN; // µ¥±ßÇÅÓëµßô¤Â·¶Î×Ó×´Ì¬£¬ÓÉºË0Í³Ò»¿ØÖÆ
 uint32 jump_count = 0;                              // ÌøÔ¾¼ÆÊý
 
 // ½ÓÊÕºËÐÄ1·¢ËÍµÄÊý¾Ý
 static void appipc_callback(uint32 data)
 {
-    if(vision_detect_mode == APPIPC_VISION_MODE_JUMP)
+    if(vision_detect_mode == VISION_JUMP)
     {
         is_jump_from_core1 = (uint8)(data & 0x01);
         is_jump_updated = 1;
     }
-    else if(vision_detect_mode == APPIPC_VISION_MODE_BRIDGE)
+    else if(vision_detect_mode == VISION_BRIDGE_BUMP)
     {
         appipc_bridge_data_t bridge_data;
 
@@ -47,7 +48,7 @@ static void appipc_callback(uint32 data)
         {
             bridge_valid_from_core1 = bridge_data.valid;
             bridge_aligned_from_core1 = bridge_data.aligned;
-            bridge_exited_from_core1 = bridge_data.exited;
+            phase_exited_from_core1 = bridge_data.exited;
             bridge_bottom_y_from_core1 = bridge_data.bottom_y;
             bridge_control_from_core1 = bridge_data.control_value;
         }
@@ -55,13 +56,13 @@ static void appipc_callback(uint32 data)
         {
             bridge_valid_from_core1 = 0;
             bridge_aligned_from_core1 = 0;
-            bridge_exited_from_core1 = 0;
+            phase_exited_from_core1 = 0;
             bridge_bottom_y_from_core1 = 0;
             bridge_control_from_core1 = 0;
         }
 
         // ¶ÔÆë½×¶ÎÁ¬ÐøÈ·ÈÏ³É¹¦ºó£¬½øÈë³åÇÅºÍÀëÇÅ¼ì²â½×¶Î
-        if(bridge_phase == APPIPC_BRIDGE_PHASE_ALIGN)
+        if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN)
         {
             if(bridge_valid_from_core1 && bridge_aligned_from_core1)
             {
@@ -73,7 +74,7 @@ static void appipc_callback(uint32 data)
                 if((bridge_aligned_count >= BRIDGE_ALIGNED_CONFIRM_COUNT) &&
                    (bridge_bottom_y_from_core1 >= BRIDGE_CROSS_START_Y))
                 {
-                    bridge_phase = APPIPC_BRIDGE_PHASE_EXIT_CHECK;
+                    vision_phase_bab = VISION_PHASE_BAB_BRIDGE_EXIT_CHECK;
                 }
             }
             else
@@ -81,9 +82,15 @@ static void appipc_callback(uint32 data)
                 bridge_aligned_count = 0;
             }
         }
-        else if((bridge_phase == APPIPC_BRIDGE_PHASE_EXIT_CHECK) && bridge_exited_from_core1)
+        else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK) && phase_exited_from_core1)
         {
-            bridge_phase = APPIPC_BRIDGE_PHASE_COMPLETE;
+            phase_exited_from_core1 = 0;
+            vision_phase_bab = VISION_PHASE_BAB_BUMP_EXIT_CHECK;
+        }
+        else if((vision_phase_bab == VISION_PHASE_BAB_BUMP_EXIT_CHECK) && phase_exited_from_core1)
+        {
+            phase_exited_from_core1 = 0;
+            vision_phase_bab = VISION_PHASE_BAB_COMPLETE;
         }
 
         bridge_control_updated = 1;
@@ -210,24 +217,26 @@ int main(void)
 
         system_delay_ms(20);
         
-            // ÔªËØÍ¨¹ý¼ì²â£¨ÊÓ¾õ¼ì²âÀë¿ªµ¥±ßÇÅ£©
-    if(!pause_flag)
-    {
-//        element_recover_check();
-      // pause_time ++;
-      x = 0;
-      y = 0;
-      x_last = 0;
-      y_last = 0;
-
-      if (bridge_phase == APPIPC_BRIDGE_PHASE_COMPLETE)
-      {
-        Y_left = 0.0f;
-        Y_right = 0.0f;
-        pause_flag = true;
-      }
-        
-    }
+        // ÊÓ¾õ½×¶Î - ½«¿ØÖÆ´ÓÊÓ¾õ½»½Ó¸ø¹ßµ¼
+        if(!pause_flag)
+        {
+            // element_recover_check();
+            x = 0;
+            y = 0;
+            x_last = 0;
+            y_last = 0;
+                    
+            if (vision_phase_bab == VISION_PHASE_BAB_COMPLETE)
+            {
+                vision_target_speed = 0;
+                vision_target_yaw = 0;
+                Y_left = 0.0f;
+                Y_right = 0.0f;
+                pause_flag = true;
+                
+            }
+            
+        }
         
         
         if(!replay_point[i].x)
@@ -244,17 +253,17 @@ int main(void)
 
      if (pause_flag == false)
     {
-        vision_detect_mode = APPIPC_VISION_MODE_BRIDGE;
+        vision_detect_mode = VISION_BRIDGE_BUMP;
     }
     else
     {
-        vision_detect_mode = APPIPC_VISION_MODE_IDLE;
+        vision_detect_mode = VISION_IDLE;
     }
 
-    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, bridge_phase);  // ·¢ËÍ³µËÙ¡¢ÊÓ¾õÄ£Ê½ºÍµ¥±ßÇÅ×Ó×´Ì¬µ½ºË1
+    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, vision_phase_bab);  // ·¢ËÍ³µËÙ¡¢ÊÓ¾õÄ£Ê½ºÍ BAB ×Ó×´Ì¬µ½ºË1
     
     //=========================== ÌøÔ¾Ä£Ê½ ===========================
-        if(vision_detect_mode == APPIPC_VISION_MODE_JUMP)
+        if(vision_detect_mode == VISION_JUMP)
         {   
             // ËÙ¶È¿ØÖÆ
             switch (jump_count)
@@ -288,20 +297,52 @@ int main(void)
         }
 
 
-        //=========================== µ¥±ßÇÅÄ£Ê½ =========================
-        else if(vision_detect_mode == APPIPC_VISION_MODE_BRIDGE)
+        //=========================== µ¥±ßÇÅÓëµßô¤Â·¶ÎÄ£Ê½ =========================
+        else if(vision_detect_mode == VISION_BRIDGE_BUMP)
         {
+            // ÉèÖÃÍÈÖØÐÄÎª 70¶È
             Y_left = 30.0f;
             Y_right = 30.0f;
-            if(bridge_phase == APPIPC_BRIDGE_PHASE_EXIT_CHECK)
+            
+            // Èç¹ûÍêÈ«Í¨¹ýµ¥±ßÇÅºÍµßô¤Â·¶Î
+            if(vision_phase_bab == VISION_PHASE_BAB_COMPLETE)
             {
+
+                // sprintf(txt, "µ¥±ßÇÅºÍµßô¤Â·¶ÎÈ«²¿Íê³É\n");
+                // wireless_uart_send_string(txt);
+
+                bridge_control_updated = 0;
+                vision_target_speed = 0;             // Íê³ÉºóÁ¢¼´Çå³ýÊÓ¾õËÙ¶È£¬µÈ´ý¿ØÖÆ½»½Ó
+                vision_target_yaw = 0;               // Çå³ý yaw Ëø¶¨
+                vision_detect_mode = VISION_IDLE;
+            }
+            //Èç¹û×´Ì¬Îª Àë¿ªµ¥±ßÇÅ¼ì²é£¬¼´³å´Ì¹ýµ¥±ßÇÅ½×¶Î
+            else if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
+            {
+                // sprintf(txt, "³å´Ìµ¥±ßÇÅ\n");
+                // wireless_uart_send_string(txt);
+
                 bridge_control_updated = 0;
                 vision_target_speed = BRIDGE_CROSS_SPEED;  // ±£³Ö¶ÔÆëºóµÄº½Ïò²¢³å¹ýµ¥±ßÇÅ
                 vision_target_yaw = 0;
             }
-            else if((bridge_phase == APPIPC_BRIDGE_PHASE_ALIGN) && bridge_control_updated)
+            // Èç¹û×´Ì¬Îª Àë¿ªµßô¤Â·¶Î¼ì²é½×¶Î£¬ ¼´³å´Ì¹ýµßô¤Â·¶Î
+            else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_EXIT_CHECK)
+            {
+                // sprintf(txt, "³å´Ìµßô¤Â·¶Î\n");
+                // wireless_uart_send_string(txt);
+
+                bridge_control_updated = 0;
+                vision_target_speed = BUMP_CROSS_SPEED;    // ±£³Öµ¥±ßÇÅ³ö¿Úº½ÏòÍ¨¹ýµßô¤Â·¶Î
+                vision_target_yaw = 0;
+            }
+            // Èç¹û×´Ì¬Îª µ¥±ßÇÅ¶ÔÆë½×¶Î ²¢ÇÒ Êý¾ÝÒÑ¾­¸üÐÂ
+            else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) && bridge_control_updated)
             {
                 bridge_control_updated = 0;
+
+                // sprintf(txt, "¶Ô×¼µ¥±ßÇÅ\n");
+                // wireless_uart_send_string(txt);
 
                 if(bridge_valid_from_core1)
                 {

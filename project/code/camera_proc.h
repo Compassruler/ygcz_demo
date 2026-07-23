@@ -30,9 +30,19 @@ void camproc_pub_thresh_bin(uint8 image[MT9V03X_H][MT9V03X_W], uint8 threshold);
  */
 uint8 camproc_pub_check_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint32 dot_count, uint32 dot_type);
 
+/**
+ * 颠簸路段离开检测，先确认黑色凸起，再连续确认白色出口
+ * @param image              待检测的二值图像数组
+ * @param bump_exit_params   颠簸路段离开检测参数结构体
+ * @param exit_check_enabled 1 允许判断白色出口 | 0 仅确认黑色凸起
+ *
+ * @return 1 已确认离开颠簸路段 | 0 尚未离开
+ */
+uint8 camproc_bump_exit_detect(uint8 image[MT9V03X_H][MT9V03X_W], BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled);
+
 // ==================================================== 单边桥函数 ====================================================
 /**
- * 从二值图中搜索多个黑色连通区域，将候选轮廓简化为四边形，并拟合最佳目标的实际右边线
+ * 从二值图中搜索多个黑色连通区域，将候选轮廓简化为四边形，并按参数拟合左侧或右侧边线
  * @param image  待检测的二值图像数组
  * @param params 单边桥识别参数结构体
  * @param result 识别结果输出结构体，函数会在每次调用开始时清空该结构体

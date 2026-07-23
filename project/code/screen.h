@@ -184,7 +184,7 @@ void show_string_demo(void);
 void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params);
 
 /**
- * @brief 在摄像头图像显示区域上绘制单边桥拟合右边线。
+ * @brief 在摄像头图像显示区域上绘制单边桥拟合边线。
  *
  * 函数使用 `CameraBridgeResult_t` 中的 `edge_x1/edge_y1` 和
  * `edge_x2/edge_y2` 作为拟合线端点，将摄像头图像坐标加上

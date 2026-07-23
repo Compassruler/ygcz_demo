@@ -19,7 +19,7 @@ extern uint8 remote_right_01_now_flag;
 extern int flash_task_flag;
 extern bool pause_flag;            // 惯导中断flag
 
-extern int vision_detect_mode;     // 视觉识别类型 | 0 空状态 | 1 单边桥 | 2 跳跃 | 
+extern int vision_detect_mode;     // 视觉识别类型 | 0 空状态 | 1 单边桥与颠簸路段 | 2 跳跃 |
 extern int32 vision_target_speed;  // 视觉速度
 extern int32 vision_target_yaw;    // 视觉航向角
 

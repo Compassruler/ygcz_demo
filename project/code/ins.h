@@ -104,5 +104,7 @@ void segment_check(void);
 float get_path_turn_angle(uint32_t index);
 
 // Î´À´×ªÍä¼ì²â
-uint8_t check_future_turn(uint32_t index);
+void check_future_turn(uint32_t index);
+
+void check_turn_finish(void);
 #endif

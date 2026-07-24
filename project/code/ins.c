@@ -9,6 +9,7 @@
 #define MAX_PATH_POINT          (FLASH_PAGE_LENGTH * Use_page)             //最大点数
 
 
+#define TURN_SPEED_SCALE 0.35f // 降速比例
 
 uint16_t element_index[MAX_ELEMENT_NUM];        // 打断点索引
 
@@ -36,7 +37,9 @@ uint32_t segment_end_index = 0;                         // 当前段结束点索引
 uint8_t segment_finish_flag = 0;                        // 当前段是否完成
 
 
+int future_turn_index = -1; // 转弯点索引
 
+uint8_t future_turn_flag = 0; // 转弯点标志位（锁定）
 
 uint8 road_memery_flag = 1; // 路径记忆标志位 0为初始状态 1为记录开始 2为记录完成  
 uint8_t dir = 0;  // 0:前进  1:倒车(方向)
@@ -314,12 +317,20 @@ void Track_update(void)
     // 距离控制
     //--------------------------------------------------
     target_v = KP_DIS * distance;
-    
-    path_yaw_change = get_path_turn_angle(path_index);
-    
-    if(check_future_turn(path_index))
+
+
+//检测未来转弯
+check_future_turn(path_index);
+
+
+//检测是否通过转弯点
+check_turn_finish();
+
+
+//如果前方有转弯，降速
+if(future_turn_flag)
 {
-    target_v *= 0.0f;
+    target_v *= TURN_SPEED_SCALE;
 }
     //--------------------------------------------------
     // 后退逻辑（滞回区）
@@ -508,19 +519,61 @@ float get_path_turn_angle(uint32_t index)
     return fabs(angle);
 }
 
-
-uint8_t check_future_turn(uint32_t index)
+// 检测转弯点
+void check_future_turn(uint32_t index)
 {
 
-    float turn_angle =
-        get_path_turn_angle(index);
-
-
-    if(turn_angle > TURN_ANGLE_LIMIT)
+    // 已经锁定转弯点
+    if(future_turn_flag)
     {
-        return 1;
+        return;
     }
 
 
-    return 0;
+    for(int i=index;
+        i<index+TURN_CHECK_POINT;
+        i++)
+    {
+
+        if(i+TURN_CHECK_POINT+1 >= record_header.total_point_num)
+            break;
+
+
+        float turn_angle =
+            get_path_turn_angle(i);
+
+
+        if(turn_angle > TURN_ANGLE_LIMIT)
+        {
+
+            future_turn_index = i + TURN_CHECK_POINT;
+
+            future_turn_flag = 1;
+
+                return;
+        }
+
+    }
+
+}
+
+// 出弯检测
+void check_turn_finish(void)
+{
+
+    if(!future_turn_flag)
+        return;
+
+
+    if(path_index >= future_turn_index)
+    {
+
+        future_turn_flag = 0;
+
+        future_turn_index = -1;
+
+
+        
+    }
+
 }

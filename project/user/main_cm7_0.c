@@ -9,10 +9,9 @@
 
 #define BRIDGE_ALIGNED_CONFIRM_COUNT    (3u)        // 连续对齐确认次数
 #define BRIDGE_ALIGN_START_Y            (35)       // 进入低速精确对齐区域的画面纵坐标
-#define BRIDGE_CROSS_START_Y            (80)       // 允许锁存冲桥状态的画面纵坐标
-#define BRIDGE_FAR_SPEED                (40)        // 距离较远时的粗调速度
-#define BRIDGE_ALIGN_SPEED              (25)        // 距离较近且未对齐时的细调速度
-#define BRIDGE_ALIGNED_SPEED            (40)        // 已对齐但未到冲桥位置时的保持速度
+#define BRIDGE_CROSS_START_Y            (10)       // 允许锁存冲桥状态的画面纵坐标（基本无效）
+
+#define BRIDGE_ALIGN_SPEED              (45)        // 距离较近且未对齐时的细调速度
 #define BRIDGE_CROSS_SPEED              (200)       // 对齐后冲过单边桥的速度
 #define BUMP_CROSS_SPEED                (300)        // 通过颠簸路段时的固定速度
 
@@ -230,8 +229,8 @@ int main(void)
             {
                 vision_target_speed = 0;
                 vision_target_yaw = 0;
-                Y_left = 0.0f;
-                Y_right = 0.0f;
+                //Y_left = 0.0f;
+                //Y_right = 0.0f;
                 pause_flag = true;
                 
             }
@@ -341,29 +340,42 @@ int main(void)
             {
                 bridge_control_updated = 0;
 
-                // sprintf(txt, "对准单边桥\n");
-                // wireless_uart_send_string(txt);
-
                 if(bridge_valid_from_core1)
-                {
-                    if(10 < bridge_bottom_y_from_core1 && bridge_bottom_y_from_core1 < BRIDGE_ALIGN_START_Y)
+                {   
+                    // 如果距离过近则后退
+                    if(50 < bridge_bottom_y_from_core1)
                     {
-                        vision_target_speed = BRIDGE_FAR_SPEED;      // 距离较远：较高速度粗调
+                        vision_target_speed = -60;  // 后退
+                        bridge_control_from_core1 = -bridge_control_from_core1;  // 控制角度取反
+                        
+                        //sprintf(txt, "后退中\n");
+                        //wireless_uart_send_string(txt);
                     }
-                    else if(!bridge_aligned_from_core1)
+                    else  // 如果离单边桥还有一定距离
                     {
-                        vision_target_speed = BRIDGE_ALIGN_SPEED;    // 距离较近且未对齐：低速细调
-                    }
-                    else
-                    {
-                        vision_target_speed = BRIDGE_ALIGNED_SPEED;  // 已对齐：保持低速接近冲桥位置
+                        // 如果没有对齐
+                        if (!bridge_aligned_from_core1)
+                        {
+                            vision_target_speed = BRIDGE_ALIGN_SPEED;
+
+                            //sprintf(txt, "向前靠近对齐\n");
+                            //wireless_uart_send_string(txt);
+                        }
+                        else
+                        {
+                            // 如果已经对齐，不需要进行任何操作
+
+                            //sprintf(txt, "已经对齐\n");
+                            //wireless_uart_send_string(txt);
+                        }
+                        
                     }
 
                     vision_target_yaw = bridge_control_from_core1;
                 }
                 else
                 {
-                    vision_target_speed = 0;  // 识别丢失：停车
+                    vision_target_speed = 40;  // 识别丢失：慢慢向前寻找目标
                     vision_target_yaw = 0;
                 }
             }

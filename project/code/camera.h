@@ -92,12 +92,13 @@ typedef struct
 {
     int16 aligned_angle_d10;        // 小车正确对准时的视觉角度，单位 0.1 度
     int16 aligned_distance_px;      // 小车正确对准时的视觉距离，单位像素
-    float angle_gain;               // 角度误差增益
-    float distance_gain;            // 距离误差增益
-    float angle_direction;          // 角度修正方向
-    float distance_direction;       // 距离修正方向
+    float angle_gain;               // 角度内环误差增益
+    float distance_to_angle_gain;   // 距离外环增益，单位 0.1 度/像素
+    float angle_direction;          // 角度内环修正方向
+    float distance_to_angle_direction; // 距离误差转换为目标角度的方向
     int16 angle_deadband_d10;       // 角度误差死区，单位 0.1 度
     int16 distance_deadband_px;     // 距离误差死区，单位像素
+    int16 target_angle_limit_d10;   // 距离外环生成的目标角度偏移限制，单位 0.1 度
     int16 yaw_offset_limit_d10;     // 航向角修正量限制，单位 0.1 度
     float control_gain_per_deg;     // 每 1 度航向修正转换成的底盘 angle 控制量
     float control_direction;        // 底盘控制方向
@@ -107,9 +108,10 @@ typedef struct
 // 单边桥控制换算结果
 typedef struct
 {
-    int16 angle_error_d10;          // 应用校准和死区后的角度误差，单位 0.1 度
     int16 distance_error_px;        // 应用校准和死区后的距离误差，单位像素
-    int16 yaw_offset_d10;           // 角度与距离合成后的航向角修正量，单位 0.1 度
+    int16 target_angle_d10;         // 距离外环生成的目标视觉角度，单位 0.1 度
+    int16 angle_error_d10;          // 目标角度与实际角度之间的内环误差，单位 0.1 度
+    int16 yaw_offset_d10;           // 角度内环生成的航向角修正量，单位 0.1 度
     int16 control_value;            // 最终底盘 angle 控制量
 } CameraBridgeControlResult_t;
 

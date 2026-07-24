@@ -55,6 +55,6 @@ void button_update(void)
     }
     if(button_flag[3] == 1)
     {
-      remote_right_01_now_flag = 1;
+      track_flag = true;
     }
 }

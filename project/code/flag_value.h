@@ -31,4 +31,5 @@ extern float target_yaw_remote; // 目标航向角 （遥控用）
 extern float target_roll;       // 目标横滚角 
 extern float YAW_TH;
 
+extern bool track_flag; // 跟踪flag true为开启跟踪
 #endif

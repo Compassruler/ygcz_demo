@@ -18,8 +18,8 @@
 #define ADAPTIVE_ROW_COEFF      (-5)                            // 自适应 Row 系数，数字为正，更晚切换到低 Row，更偏高 Row，跳跃时间更早；数字为负，更早切换到低 Row，更偏低 Row，跳跃时间越晚
 
 //=========================== 单边桥识别参数 ===========================
-#define BRIDGE_EDGE_TYPE          /*主要修改项*/   (CAMERA_BRIDGE_EDGE_LEFT)       // 边线选择：CAMERA_BRIDGE_EDGE_LEFT | CAMERA_BRIDGE_EDGE_RIGHT
-#define BRIDGE_BINARY_THRESHOLD   /*主要修改项*/   (85)                            // 单边桥识别二值化阈值
+#define BRIDGE_EDGE_TYPE          /*主要修改项*/   (CAMERA_BRIDGE_EDGE_RIGHT)       // 边线选择：CAMERA_BRIDGE_EDGE_LEFT | CAMERA_BRIDGE_EDGE_RIGHT
+#define BRIDGE_BINARY_THRESHOLD   /*主要修改项*/   (55)                            // 单边桥识别二值化阈值
 
 #define BRIDGE_SEARCH_LEFT          (0)                               // 搜索区间：左起点
 #define BRIDGE_SEARCH_RIGHT         (MT9V03X_W - 1)                   // 搜索区间：右终点
@@ -40,47 +40,55 @@
 
 #define BRIDGE_LEFT_ALIGNED_ANGLE_D10        (5)               // 正确对准时的视觉角度，单位 0.1 度
 #define BRIDGE_LEFT_ALIGNED_DISTANCE_PX      (-6)              // 正确对准时的视觉距离，单位像素
-#define BRIDGE_LEFT_ANGLE_GAIN               (1.0f)            // 角度误差增益
-#define BRIDGE_LEFT_DISTANCE_GAIN            (30.0f)           // 距离误差增益
-#define BRIDGE_LEFT_ANGLE_DIRECTION          (-1.0f)           // 角度修正方向
-#define BRIDGE_LEFT_DISTANCE_DIRECTION       (1.0f)            // 距离修正方向
+
+#define BRIDGE_LEFT_ANGLE_GAIN               (2.0f)            // 角度内环误差增益
+#define BRIDGE_LEFT_DISTANCE_TO_ANGLE_GAIN   (5.0f)            // 距离外环增益，单位 0.1 度/像素
+#define BRIDGE_LEFT_ANGLE_DIRECTION          (1.0f)            // 角度内环修正方向
+#define BRIDGE_LEFT_DISTANCE_TO_ANGLE_DIRECTION (-1.0f)         // 距离误差转换为目标角度的方向
 #define BRIDGE_LEFT_ANGLE_DEADBAND_D10       (10)              // 角度误差死区，单位 0.1 度
 #define BRIDGE_LEFT_DISTANCE_DEADBAND_PX     (3)               // 距离误差死区，单位像素
-#define BRIDGE_LEFT_YAW_OFFSET_LIMIT_D10     (60)              // 最大航向修正量，单位 0.1 度
+#define BRIDGE_LEFT_TARGET_ANGLE_LIMIT_D10   (60)              // 距离外环目标角度偏移限制，单位 0.1 度
+#define BRIDGE_LEFT_YAW_OFFSET_LIMIT_D10     (120)              // 最大航向修正量，单位 0.1 度
 #define BRIDGE_LEFT_CONTROL_GAIN_PER_DEG     (5.0f)            // 每 1 度对应的底盘 angle 控制量
 #define BRIDGE_LEFT_CONTROL_DIRECTION        (1.0f)            // 底盘控制方向
-#define BRIDGE_LEFT_CONTROL_LIMIT            (60)              // 底盘 angle 控制量限制
+#define BRIDGE_LEFT_CONTROL_LIMIT            (120)              // 底盘 angle 控制量限制
 
-#define BRIDGE_LEFT_ALIGN_DISTANCE_MIN_PX    (-10)             // 判断对齐的最小距离
-#define BRIDGE_LEFT_ALIGN_DISTANCE_MAX_PX    (25)               // 判断对齐的最大距离
-#define BRIDGE_LEFT_ALIGN_ANGLE_MIN_D10      (-100)            // 判断对齐的最小角度
+#define BRIDGE_LEFT_ALIGN_DISTANCE_MIN_PX    (0)             // 判断对齐的最小距离
+#define BRIDGE_LEFT_ALIGN_DISTANCE_MAX_PX    (30)               // 判断对齐的最大距离
+#define BRIDGE_LEFT_ALIGN_ANGLE_MIN_D10      (-50)            // 判断对齐的最小角度
 #define BRIDGE_LEFT_ALIGN_ANGLE_MAX_D10      (50)              // 判断对齐的最大角度
 
 //=========================== 右边线独立参数 ===========================
 #define BRIDGE_RIGHT_MIN_EDGE_LENGTH         (10)              // 拟合边线最小实际长度
 #define BRIDGE_RIGHT_MAX_EDGE_LENGTH         (100)             // 拟合边线最大实际长度
-#define BRIDGE_RIGHT_MIN_EDGE_X              (30)              // 拟合边线端点最小横坐标
+#define BRIDGE_RIGHT_MIN_EDGE_X              (40)              // 拟合边线端点最小横坐标
 #define BRIDGE_RIGHT_MAX_EDGE_X              (140)             // 拟合边线端点最大横坐标
 #define BRIDGE_RIGHT_TARGET_EDGE_X           (MT9V03X_W / 2)   // 右边线期望对齐横坐标
-#define BRIDGE_RIGHT_REFERENCE_ROW           (0)               // 固定测量行，0 使用内部默认值
+#define BRIDGE_RIGHT_REFERENCE_ROW           (30)               // 固定测量行，0 使用内部默认值
 
-#define BRIDGE_RIGHT_ALIGNED_ANGLE_D10       (5)               // 正确对准时的视觉角度，单位 0.1 度
-#define BRIDGE_RIGHT_ALIGNED_DISTANCE_PX     (-6)              // 正确对准时的视觉距离，单位像素
-#define BRIDGE_RIGHT_ANGLE_GAIN              (1.0f)            // 角度误差增益
-#define BRIDGE_RIGHT_DISTANCE_GAIN           (30.0f)           // 距离误差增益
-#define BRIDGE_RIGHT_ANGLE_DIRECTION         (-1.0f)           // 角度修正方向
-#define BRIDGE_RIGHT_DISTANCE_DIRECTION      (1.0f)            // 距离修正方向
+#define BRIDGE_RIGHT_ALIGNED_ANGLE_D10       (0)               // 正确对准时的视觉角度，单位 0.1 度
+#define BRIDGE_RIGHT_ALIGNED_DISTANCE_PX     (-15)              // 正确对准时的视觉距离，单位像素
+
+#define BRIDGE_RIGHT_ANGLE_GAIN              (2.0f)            // 角度内环误差增益
+#define BRIDGE_RIGHT_DISTANCE_TO_ANGLE_GAIN  (5.0f)            // 距离外环增益，单位 0.1 度/像素
+
+#define BRIDGE_RIGHT_ANGLE_DIRECTION         (-1.0f)           // 角度内环修正方向
+#define BRIDGE_RIGHT_DISTANCE_TO_ANGLE_DIRECTION (1.0f)         // 距离误差转换为目标角度的方向
+
 #define BRIDGE_RIGHT_ANGLE_DEADBAND_D10      (10)              // 角度误差死区，单位 0.1 度
-#define BRIDGE_RIGHT_DISTANCE_DEADBAND_PX    (3)               // 距离误差死区，单位像素
-#define BRIDGE_RIGHT_YAW_OFFSET_LIMIT_D10    (60)              // 最大航向修正量，单位 0.1 度
+#define BRIDGE_RIGHT_DISTANCE_DEADBAND_PX    (2)               // 距离误差死区，单位像素
+
+#define BRIDGE_RIGHT_TARGET_ANGLE_LIMIT_D10  (60)              // 距离外环目标角度偏移限制，单位 0.1 度
+#define BRIDGE_RIGHT_YAW_OFFSET_LIMIT_D10    (120)              // 最大航向修正量，单位 0.1 度
+
 #define BRIDGE_RIGHT_CONTROL_GAIN_PER_DEG    (5.0f)            // 每 1 度对应的底盘 angle 控制量
 #define BRIDGE_RIGHT_CONTROL_DIRECTION       (1.0f)            // 底盘控制方向
-#define BRIDGE_RIGHT_CONTROL_LIMIT           (60)              // 底盘 angle 控制量限制
+#define BRIDGE_RIGHT_CONTROL_LIMIT           (120)              // 底盘 angle 控制量限制
 
-#define BRIDGE_RIGHT_ALIGN_DISTANCE_MIN_PX   (-30)             // 判断对齐的最小距离
-#define BRIDGE_RIGHT_ALIGN_DISTANCE_MAX_PX   (8)               // 判断对齐的最大距离
-#define BRIDGE_RIGHT_ALIGN_ANGLE_MIN_D10     (-100)            // 判断对齐的最小角度
-#define BRIDGE_RIGHT_ALIGN_ANGLE_MAX_D10     (50)              // 判断对齐的最大角度
+#define BRIDGE_RIGHT_ALIGN_DISTANCE_MIN_PX   (-20)             // 判断对齐的最小距离
+#define BRIDGE_RIGHT_ALIGN_DISTANCE_MAX_PX   (-10)               // 判断对齐的最大距离
+#define BRIDGE_RIGHT_ALIGN_ANGLE_MIN_D10     (-25)            // 判断对齐的最小角度
+#define BRIDGE_RIGHT_ALIGN_ANGLE_MAX_D10     (25)              // 判断对齐的最大角度度
 
 // 根据 BRIDGE_EDGE_TYPE 选用左边线或右边线参数
 #define BRIDGE_SIDE_PARAM(left_param, right_param)    ((BRIDGE_EDGE_TYPE == CAMERA_BRIDGE_EDGE_LEFT) ? (left_param) : (right_param))
@@ -93,11 +101,12 @@
 #define BRIDGE_ALIGNED_ANGLE_D10     BRIDGE_SIDE_PARAM(BRIDGE_LEFT_ALIGNED_ANGLE_D10,     BRIDGE_RIGHT_ALIGNED_ANGLE_D10)
 #define BRIDGE_ALIGNED_DISTANCE_PX   BRIDGE_SIDE_PARAM(BRIDGE_LEFT_ALIGNED_DISTANCE_PX,   BRIDGE_RIGHT_ALIGNED_DISTANCE_PX)
 #define BRIDGE_ANGLE_GAIN            BRIDGE_SIDE_PARAM(BRIDGE_LEFT_ANGLE_GAIN,            BRIDGE_RIGHT_ANGLE_GAIN)
-#define BRIDGE_DISTANCE_GAIN         BRIDGE_SIDE_PARAM(BRIDGE_LEFT_DISTANCE_GAIN,         BRIDGE_RIGHT_DISTANCE_GAIN)
+#define BRIDGE_DISTANCE_TO_ANGLE_GAIN BRIDGE_SIDE_PARAM(BRIDGE_LEFT_DISTANCE_TO_ANGLE_GAIN, BRIDGE_RIGHT_DISTANCE_TO_ANGLE_GAIN)
 #define BRIDGE_ANGLE_DIRECTION       BRIDGE_SIDE_PARAM(BRIDGE_LEFT_ANGLE_DIRECTION,       BRIDGE_RIGHT_ANGLE_DIRECTION)
-#define BRIDGE_DISTANCE_DIRECTION    BRIDGE_SIDE_PARAM(BRIDGE_LEFT_DISTANCE_DIRECTION,    BRIDGE_RIGHT_DISTANCE_DIRECTION)
+#define BRIDGE_DISTANCE_TO_ANGLE_DIRECTION BRIDGE_SIDE_PARAM(BRIDGE_LEFT_DISTANCE_TO_ANGLE_DIRECTION, BRIDGE_RIGHT_DISTANCE_TO_ANGLE_DIRECTION)
 #define BRIDGE_ANGLE_DEADBAND_D10    BRIDGE_SIDE_PARAM(BRIDGE_LEFT_ANGLE_DEADBAND_D10,    BRIDGE_RIGHT_ANGLE_DEADBAND_D10)
 #define BRIDGE_DISTANCE_DEADBAND_PX  BRIDGE_SIDE_PARAM(BRIDGE_LEFT_DISTANCE_DEADBAND_PX,  BRIDGE_RIGHT_DISTANCE_DEADBAND_PX)
+#define BRIDGE_TARGET_ANGLE_LIMIT_D10 BRIDGE_SIDE_PARAM(BRIDGE_LEFT_TARGET_ANGLE_LIMIT_D10, BRIDGE_RIGHT_TARGET_ANGLE_LIMIT_D10)
 #define BRIDGE_YAW_OFFSET_LIMIT_D10  BRIDGE_SIDE_PARAM(BRIDGE_LEFT_YAW_OFFSET_LIMIT_D10,  BRIDGE_RIGHT_YAW_OFFSET_LIMIT_D10)
 #define BRIDGE_CONTROL_GAIN_PER_DEG  BRIDGE_SIDE_PARAM(BRIDGE_LEFT_CONTROL_GAIN_PER_DEG,  BRIDGE_RIGHT_CONTROL_GAIN_PER_DEG)
 #define BRIDGE_CONTROL_DIRECTION     BRIDGE_SIDE_PARAM(BRIDGE_LEFT_CONTROL_DIRECTION,     BRIDGE_RIGHT_CONTROL_DIRECTION)
@@ -252,11 +261,12 @@ int main(void)
         .aligned_angle_d10        = BRIDGE_ALIGNED_ANGLE_D10,
         .aligned_distance_px      = BRIDGE_ALIGNED_DISTANCE_PX,
         .angle_gain               = BRIDGE_ANGLE_GAIN,
-        .distance_gain            = BRIDGE_DISTANCE_GAIN,
+        .distance_to_angle_gain   = BRIDGE_DISTANCE_TO_ANGLE_GAIN,
         .angle_direction          = BRIDGE_ANGLE_DIRECTION,
-        .distance_direction       = BRIDGE_DISTANCE_DIRECTION,
+        .distance_to_angle_direction = BRIDGE_DISTANCE_TO_ANGLE_DIRECTION,
         .angle_deadband_d10       = BRIDGE_ANGLE_DEADBAND_D10,
         .distance_deadband_px     = BRIDGE_DISTANCE_DEADBAND_PX,
+        .target_angle_limit_d10   = BRIDGE_TARGET_ANGLE_LIMIT_D10,
         .yaw_offset_limit_d10     = BRIDGE_YAW_OFFSET_LIMIT_D10,
         .control_gain_per_deg     = BRIDGE_CONTROL_GAIN_PER_DEG,
         .control_direction        = BRIDGE_CONTROL_DIRECTION,

@@ -30,3 +30,4 @@ float DIST_TH = 0.05f;
 int MIN_SPEED = 0;
 float YAW_TH = 1.0f; 
 
+bool track_flag = false;

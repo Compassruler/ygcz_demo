@@ -820,22 +820,16 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
     return 1;
 }
 
-// 将视觉角度与距离误差合成为航向角修正量
+// 距离外环生成目标角度，角度内环生成航向角修正量
 static int16 camproc_bridge_calculate_yaw_offset_d10(const CameraBridgeResult_t *bridge_result, const CameraBridgeControlParams_t *control_params, CameraBridgeControlResult_t *control_result)
 {
+    float target_angle_offset;
     float yaw_offset;
+    int32 target_angle_offset_d10;
     int32 yaw_offset_d10;
 
-    // 以小车正确对准时的视觉输出为零点
-    control_result->angle_error_d10 = bridge_result->angle_d10 - control_params->aligned_angle_d10;
+    // 距离外环：将水平距离误差转换为小车需要保持的目标角度
     control_result->distance_error_px = bridge_result->distance_px - control_params->aligned_distance_px;
-
-    // 消除对准位置附近的小幅抖动
-    if((control_result->angle_error_d10 >= -control_params->angle_deadband_d10) &&
-       (control_result->angle_error_d10 <=  control_params->angle_deadband_d10))
-    {
-        control_result->angle_error_d10 = 0;
-    }
 
     if((control_result->distance_error_px >= -control_params->distance_deadband_px) &&
        (control_result->distance_error_px <=  control_params->distance_deadband_px))
@@ -843,8 +837,35 @@ static int16 camproc_bridge_calculate_yaw_offset_d10(const CameraBridgeResult_t 
         control_result->distance_error_px = 0;
     }
 
-    yaw_offset = control_params->angle_direction * control_params->angle_gain * (float)control_result->angle_error_d10
-               + control_params->distance_direction * control_params->distance_gain * (float)control_result->distance_error_px;
+    target_angle_offset = control_params->distance_to_angle_direction
+                        * control_params->distance_to_angle_gain
+                        * (float)control_result->distance_error_px;
+    target_angle_offset_d10 = (target_angle_offset >= 0.0f) ?
+        (int32)(target_angle_offset + 0.5f) : (int32)(target_angle_offset - 0.5f);
+
+    if(target_angle_offset_d10 > control_params->target_angle_limit_d10)
+    {
+        target_angle_offset_d10 = control_params->target_angle_limit_d10;
+    }
+    else if(target_angle_offset_d10 < -control_params->target_angle_limit_d10)
+    {
+        target_angle_offset_d10 = -control_params->target_angle_limit_d10;
+    }
+
+    control_result->target_angle_d10 = (int16)(control_params->aligned_angle_d10 + target_angle_offset_d10);
+
+    // 角度内环：控制小车跟随距离外环给出的目标角度
+    control_result->angle_error_d10 = bridge_result->angle_d10 - control_result->target_angle_d10;
+
+    if((control_result->angle_error_d10 >= -control_params->angle_deadband_d10) &&
+       (control_result->angle_error_d10 <=  control_params->angle_deadband_d10))
+    {
+        control_result->angle_error_d10 = 0;
+    }
+
+    yaw_offset = control_params->angle_direction
+               * control_params->angle_gain
+               * (float)control_result->angle_error_d10;
 
     // 四舍五入并限制最大航向修正量
     yaw_offset_d10 = (yaw_offset >= 0.0f) ? (int32)(yaw_offset + 0.5f) : (int32)(yaw_offset - 0.5f);

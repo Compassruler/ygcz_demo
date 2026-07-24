@@ -1,9 +1,11 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
-#define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
+#define LOOK_AHEAD_DISTANCE 0.20f   // 前视距离m
 #define NEAREST_SELECT_NUM 10       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 #define MAX_ELEMENT_NUM 10              // 打断点数量
+#define TURN_CHECK_POINT  10          // 提前检测的点数
+#define TURN_ANGLE_LIMIT 30           // 检测判断转弯的角度
 #define MAX_PATH_POINT          (FLASH_PAGE_LENGTH * Use_page)             //最大点数
 
 
@@ -53,7 +55,9 @@ float distance, target_v;
 float yaw_error;
 int target_speed;
 
-int pause_time = 0; // 恢复惯导时间
+float path_yaw_change = 0;  // 角度变化(yaw) 由 ins_update()计算
+
+float turn_angle;           // 检测角度
 
 float dt = 0.020;  // ins调用周期（s） 
 
@@ -180,6 +184,7 @@ void ins_update(void)
      dy_ins = y - y_last;
      distance_ins = sqrtf(dx_ins * dx_ins + dy_ins * dy_ins);
     if (distance_ins >= DISTANCE_STEP && pause_flag && !track_flag) //pause_flag为回放时的判断，remote_right_01_now_flag为遥控打断时的判断
+//     if ( pause_flag && !track_flag)  // 时间打点
     {
         // 超过打点间距，记录点
         path_record_add(x,y,yaw_angle);
@@ -280,16 +285,6 @@ void Track_update(void)
     if(!pause_flag) return; // 如果暂停标志为false，则不进行路径回放
     find_lookahead_point(find_nearest_point(path_index));
  
-    // 检测当前段跑完没
-//    // 判断是否该打断点了
-//    if(current_element < element_num)
-//    { 
-//        if(path_index >= element_index[current_element]-6)
-//        {
-//            pause_flag = false;
-//        }
-//    }
-
     //--------------------------------------------------
     // 计算距离
     //--------------------------------------------------
@@ -319,6 +314,13 @@ void Track_update(void)
     // 距离控制
     //--------------------------------------------------
     target_v = KP_DIS * distance;
+    
+    path_yaw_change = get_path_turn_angle(path_index);
+    
+    if(check_future_turn(path_index))
+{
+    target_v *= 0.0f;
+}
     //--------------------------------------------------
     // 后退逻辑（滞回区）
     //--------------------------------------------------
@@ -454,3 +456,71 @@ void segment_check(void)
 }
 
 
+// 获取路径未来转角
+float get_path_turn_angle(uint32_t index)
+{
+    if(index + TURN_CHECK_POINT >= record_header.total_point_num)
+        return 0;
+
+
+    // 当前路径方向
+    float dx1 =
+        replay_point[index+1].x -
+        replay_point[index].x;
+
+    float dy1 =
+        replay_point[index+1].y -
+        replay_point[index].y;
+
+
+    // 未来路径方向
+    float dx2 =
+        replay_point[index+TURN_CHECK_POINT+1].x -
+        replay_point[index+TURN_CHECK_POINT].x;
+
+    float dy2 =
+        replay_point[index+TURN_CHECK_POINT+1].y -
+        replay_point[index+TURN_CHECK_POINT].y;
+
+
+
+    float yaw1 =
+        atan2f(dy1,dx1)*180.0f/PI;
+
+
+    float yaw2 =
+        atan2f(dy2,dx2)*180.0f/PI;
+
+
+
+    float angle = yaw2-yaw1;
+
+
+    // 归一化
+    while(angle > 180)
+        angle -= 360;
+
+
+    while(angle < -180)
+        angle += 360;
+
+
+    return fabs(angle);
+}
+
+
+uint8_t check_future_turn(uint32_t index)
+{
+
+    float turn_angle =
+        get_path_turn_angle(index);
+
+
+    if(turn_angle > TURN_ANGLE_LIMIT)
+    {
+        return 1;
+    }
+
+
+    return 0;
+}

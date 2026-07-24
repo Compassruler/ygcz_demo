@@ -128,7 +128,7 @@ int main(void)
 
     screen_data_item_t remote_table[] =
 {
-    {"target_x",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
+    {"angle",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
     {"vx",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
     {"road_memery_flag",  SCREEN_DATA_INT, {.int_value = 0}, 0},
     {"pause_flag",  SCREEN_DATA_INT, {.int_value = 0}, 0},
@@ -157,7 +157,7 @@ int main(void)
         remote_right_01_switch_ctrl();
 //        remote_table[0].value.int_value = remote_left_01_last_flag;
 //        remote_table[1].value.int_value = remote_left_01_now_flag;
-        remote_table[0].value.float_value = target_x;
+        remote_table[0].value.float_value = path_yaw_change;
         remote_table[1].value.float_value = vx;
         remote_table[2].value.int_value = road_memery_flag;
         remote_table[3].value.int_value = pause_flag;
@@ -242,7 +242,8 @@ int main(void)
           i=0;
 //        sprintf(txt, "tar|now:(%.3f,%.3f),(%.3f,%.3f)\r\n",target_x,target_y,x,y); 
         
-        sprintf(txt, "x,y,yaw:%3f,%3f,%3f\r\n",replay_point[i].x,replay_point[i].y,replay_point[i].yaw); 
+//        sprintf(txt, "x,y,yaw:%3f,%3f,%3f\r\n",replay_point[i].x,replay_point[i].y,replay_point[i].yaw); 
+        sprintf(txt, "path_yaw_change:%3f\r\n",path_yaw_change); 
         
         i++;
         wireless_uart_send_string(txt);

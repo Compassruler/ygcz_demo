@@ -24,7 +24,7 @@ int vision_detect_mode = 0;
 int32 vision_target_speed = 0;
 int32 vision_target_yaw = 0;
 
-float KP_DIS = 4.5f;
+float KP_DIS = 10.0f;
 int MAX_SPEED = 3000;
 
 int MIN_SPEED = 0;

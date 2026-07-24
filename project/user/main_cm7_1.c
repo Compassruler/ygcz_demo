@@ -290,9 +290,9 @@ int main(void)
 
     clock_init(SYSTEM_CLOCK_250M);                    // 系统 初始化
     
-    #if IMAGE_DEBUG_TYPE == 1
-    screen_init();                                    // 屏幕 初始化
-    #endif
+//    #if IMAGE_DEBUG_TYPE == 1
+//    screen_init();                                    // 屏幕 初始化
+//    #endif
 
     camera_init();                                    // MT9V03X 摄像头初始化
     pit_ms_init(PIT_CH1, 1);                          // PIT_CH1 1ms周期中断，用于 sys_ms 计时
@@ -425,7 +425,7 @@ int main(void)
             }
         }
         // 统一视觉更新
-        debug_image_screen_display(jump_params, &bridge_result, bridge_exit_params, independent_fps, core0_car_speed);
+        //debug_image_screen_display(jump_params, &bridge_result, bridge_exit_params, independent_fps, core0_car_speed);
     }
 }
 

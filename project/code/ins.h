@@ -55,10 +55,15 @@ extern float target_x;
 extern float target_y;
 extern float target_v;
 extern float dt;  // ins调用周期（s）
-extern int pause_time;
+
 extern uint16_t element_index[];
 extern float distance_recover;
 extern bool pause_flag;
+
+
+
+extern float turn_angle;
+extern float path_yaw_change;
 // 初始化
 void ins_init(void);
 void ins_enable(bool on_off);
@@ -95,4 +100,9 @@ void flash_read_all_points(PathPoint *path,uint32_t point_num);
 // 当前段结束检测函数
 void segment_check(void);
 
+// 检测角度
+float get_path_turn_angle(uint32_t index);
+
+// 未来转弯检测
+uint8_t check_future_turn(uint32_t index);
 #endif

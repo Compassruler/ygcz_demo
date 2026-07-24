@@ -820,108 +820,343 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
     return 1;
 }
 
-// 距离外环生成目标角度，角度内环生成航向角修正量
-static int16 camproc_bridge_calculate_yaw_offset_d10(const CameraBridgeResult_t *bridge_result, const CameraBridgeControlParams_t *control_params, CameraBridgeControlResult_t *control_result)
+// 从下向上寻找第一个位于对准框外的拟合线采样点
+static uint8 camproc_bridge_select_guide_point(
+    const CameraBridgeResult_t *bridge_result,
+    const CameraBridgeAlignParams_t *align_params,
+    uint16 start_y,
+    uint16 end_y,
+    uint16 *active_x,
+    uint16 *active_y,
+    uint8 *all_inside)
 {
-    float target_angle_offset;
-    float yaw_offset;
-    int32 target_angle_offset_d10;
-    int32 yaw_offset_d10;
+    uint16 x = 0;
+    uint16 y = end_y;
 
-    // 距离外环：将水平距离误差转换为小车需要保持的目标角度
-    control_result->distance_error_px = bridge_result->distance_px - control_params->aligned_distance_px;
-
-    if((control_result->distance_error_px >= -control_params->distance_deadband_px) &&
-       (control_result->distance_error_px <=  control_params->distance_deadband_px))
+    if((start_y > end_y) || (NULL == active_x) || (NULL == active_y) || (NULL == all_inside))
     {
-        control_result->distance_error_px = 0;
+        return 0;
     }
 
-    target_angle_offset = control_params->distance_to_angle_direction
-                        * control_params->distance_to_angle_gain
-                        * (float)control_result->distance_error_px;
-    target_angle_offset_d10 = (target_angle_offset >= 0.0f) ?
-        (int32)(target_angle_offset + 0.5f) : (int32)(target_angle_offset - 0.5f);
+    *all_inside = 1;
 
-    if(target_angle_offset_d10 > control_params->target_angle_limit_d10)
+    while(1)
     {
-        target_angle_offset_d10 = control_params->target_angle_limit_d10;
-    }
-    else if(target_angle_offset_d10 < -control_params->target_angle_limit_d10)
-    {
-        target_angle_offset_d10 = -control_params->target_angle_limit_d10;
-    }
+        x = camera_bridge_round_and_limit_x(
+            bridge_result->edge_slope * (float)y + bridge_result->edge_intercept);
 
-    control_result->target_angle_d10 = (int16)(control_params->aligned_angle_d10 + target_angle_offset_d10);
+        *active_x = x;
+        *active_y = y;
 
-    // 角度内环：控制小车跟随距离外环给出的目标角度
-    control_result->angle_error_d10 = bridge_result->angle_d10 - control_result->target_angle_d10;
+        if((x < align_params->box_left) || (x > align_params->box_right))
+        {
+            *all_inside = 0;
+            return 1;
+        }
 
-    if((control_result->angle_error_d10 >= -control_params->angle_deadband_d10) &&
-       (control_result->angle_error_d10 <=  control_params->angle_deadband_d10))
-    {
-        control_result->angle_error_d10 = 0;
-    }
+        if(y == start_y)
+        {
+            break;
+        }
 
-    yaw_offset = control_params->angle_direction
-               * control_params->angle_gain
-               * (float)control_result->angle_error_d10;
-
-    // 四舍五入并限制最大航向修正量
-    yaw_offset_d10 = (yaw_offset >= 0.0f) ? (int32)(yaw_offset + 0.5f) : (int32)(yaw_offset - 0.5f);
-
-    if(yaw_offset_d10 > control_params->yaw_offset_limit_d10)
-    {
-        yaw_offset_d10 = control_params->yaw_offset_limit_d10;
-    }
-    else if(yaw_offset_d10 < -control_params->yaw_offset_limit_d10)
-    {
-        yaw_offset_d10 = -control_params->yaw_offset_limit_d10;
+        if((uint32)start_y + align_params->sample_step_y >= y)
+        {
+            y = start_y;
+        }
+        else
+        {
+            y = (uint16)(y - align_params->sample_step_y);
+        }
     }
 
-    return (int16)yaw_offset_d10;
+    return 1;
 }
 
-// 将航向角修正量转换为底盘 angle 控制量
-static int16 camproc_bridge_yaw_offset_to_control(int16 yaw_offset_d10, const CameraBridgeControlParams_t *control_params)
+// 将航向修正量转换为底盘 angle 控制量
+static int16 camproc_bridge_yaw_offset_to_control(int16 yaw_offset_d10, const CameraBridgeAlignParams_t *align_params)
 {
     float control_output;
     int32 control_value;
 
     control_output = (float)yaw_offset_d10 * 0.1f
-                   * control_params->control_gain_per_deg
-                   * control_params->control_direction;
+                   * align_params->control_gain_per_deg
+                   * align_params->control_direction;
 
-    control_value = (control_output >= 0.0f) ? (int32)(control_output + 0.5f) : (int32)(control_output - 0.5f);
+    control_value = (control_output >= 0.0f) ?
+        (int32)(control_output + 0.5f) : (int32)(control_output - 0.5f);
 
-    if(control_value > control_params->control_limit)
+    if(control_value > align_params->control_limit)
     {
-        control_value = control_params->control_limit;
+        control_value = align_params->control_limit;
     }
-    else if(control_value < -control_params->control_limit)
+    else if(control_value < -align_params->control_limit)
     {
-        control_value = -control_params->control_limit;
+        control_value = -align_params->control_limit;
     }
 
     return (int16)control_value;
 }
 
-uint8 camproc_bridge_calc_ctrl(const CameraBridgeResult_t *bridge_result, const CameraBridgeControlParams_t *control_params, CameraBridgeControlResult_t *control_result)
+void camproc_bridge_align_reset(CameraBridgeAlignState_t *align_state)
 {
-    if(NULL == control_result)
+    if(NULL == align_state)
+    {
+        return;
+    }
+
+    memset(align_state, 0, sizeof(*align_state));
+    align_state->phase = CAMERA_BRIDGE_ALIGN_CAPTURE;
+}
+
+uint8 camproc_bridge_align_update(
+    const CameraBridgeResult_t *bridge_result,
+    const CameraBridgeAlignParams_t *align_params,
+    CameraBridgeAlignState_t *align_state,
+    CameraBridgeAlignResult_t *align_result)
+{
+    uint16 overlap_top = 0;
+    uint16 overlap_bottom = 0;
+    uint16 active_x = 0;
+    uint16 active_y = 0;
+    uint8 all_inside = 0;
+    uint8 capture_inside = 0;
+    uint8 complete_inside = 0;
+    float point_error = 0.0f;
+    float yaw_offset = 0.0f;
+    int32 yaw_offset_d10 = 0;
+    int32 yaw_change_d10 = 0;
+
+    if(NULL == align_result)
     {
         return 0;
     }
 
-    memset(control_result, 0, sizeof(CameraBridgeControlResult_t));
+    memset(align_result, 0, sizeof(*align_result));
 
-    if((NULL == bridge_result) || (NULL == control_params) || !bridge_result->valid)
+    if((NULL == bridge_result) || (NULL == align_params) || (NULL == align_state))
     {
         return 0;
     }
 
-    control_result->yaw_offset_d10 = camproc_bridge_calculate_yaw_offset_d10(bridge_result, control_params, control_result);
-    control_result->control_value = camproc_bridge_yaw_offset_to_control(control_result->yaw_offset_d10, control_params);
+    if((align_params->box_left >= align_params->box_right) ||
+       (align_params->box_right >= MT9V03X_W) ||
+       (align_params->box_top >= align_params->box_bottom) ||
+       (align_params->box_bottom >= MT9V03X_H) ||
+       (0 == align_params->sample_step_y) ||
+       (0 == align_params->capture_confirm_frames) ||
+       (0 == align_params->complete_confirm_frames) ||
+       (0 == align_params->lost_reset_frames) ||
+       (align_params->point_filter_alpha < 0.0f) ||
+       (align_params->point_filter_alpha > 1.0f) ||
+       (align_params->point_gain_d10_per_px <= 0.0f) ||
+       (0.0f == align_params->point_direction) ||
+       (align_params->yaw_offset_limit_d10 <= 0) ||
+       (align_params->yaw_slew_limit_d10 <= 0) ||
+       (align_params->control_gain_per_deg <= 0.0f) ||
+       (0.0f == align_params->control_direction) ||
+       (align_params->control_limit <= 0))
+    {
+        return 0;
+    }
+
+    align_result->phase = align_state->phase;
+
+    // 对准完成后锁存状态，等待核心0切换到下一阶段
+    if(CAMERA_BRIDGE_ALIGN_COMPLETE == align_state->phase)
+    {
+        align_result->valid = 1;
+        align_result->point_inside = 1;
+        align_result->aligned = 1;
+        return 1;
+    }
+
+    if(!bridge_result->valid)
+    {
+        // 无效帧会打断连续确认，但短暂丢失时保留当前对准阶段
+        align_state->capture_frame_count = 0;
+        align_state->complete_frame_count = 0;
+
+        if(align_state->lost_frame_count < align_params->lost_reset_frames)
+        {
+            align_state->lost_frame_count++;
+        }
+
+        align_state->previous_yaw_offset_d10 = 0;
+        align_state->point_filter_initialized = 0;
+
+        if(align_state->lost_frame_count >= align_params->lost_reset_frames)
+        {
+            camproc_bridge_align_reset(align_state);
+        }
+
+        align_result->phase = align_state->phase;
+        return 0;
+    }
+
+    align_state->lost_frame_count = 0;
+    align_result->valid = 1;
+
+    if(CAMERA_BRIDGE_ALIGN_CAPTURE == align_state->phase)
+    {
+        active_x = bridge_result->edge_x2;
+        active_y = bridge_result->edge_y2;
+        capture_inside = (uint8)(
+            (active_x >= align_params->box_left) &&
+            (active_x <= align_params->box_right) &&
+            (active_y >= align_params->box_top) &&
+            (active_y <= align_params->box_bottom));
+
+        if(capture_inside)
+        {
+            if(align_state->capture_frame_count < align_params->capture_confirm_frames)
+            {
+                align_state->capture_frame_count++;
+            }
+
+            if(align_state->capture_frame_count >= align_params->capture_confirm_frames)
+            {
+                align_state->phase = CAMERA_BRIDGE_ALIGN_TRACK;
+                align_state->capture_frame_count = 0;
+                align_state->point_filter_initialized = 0;
+            }
+        }
+        else
+        {
+            align_state->capture_frame_count = 0;
+        }
+
+        all_inside = capture_inside;
+    }
+    else
+    {
+        overlap_top = (bridge_result->edge_y1 > align_params->box_top) ?
+            bridge_result->edge_y1 : align_params->box_top;
+        overlap_bottom = (bridge_result->edge_y2 < align_params->box_bottom) ?
+            bridge_result->edge_y2 : align_params->box_bottom;
+
+        // 拟合线与对准框有重叠时，逐步检查框内新进入的边线部分
+        if(overlap_top <= overlap_bottom)
+        {
+            camproc_bridge_select_guide_point(
+                bridge_result,
+                align_params,
+                overlap_top,
+                overlap_bottom,
+                &active_x,
+                &active_y,
+                &all_inside);
+        }
+        else
+        {
+            active_x = bridge_result->edge_x2;
+            active_y = bridge_result->edge_y2;
+            all_inside = 0;
+        }
+
+        // 上端点进入对准框后，检查整条拟合线通过对准框的位置
+        if((bridge_result->edge_y1 >= align_params->box_top) &&
+           (bridge_result->edge_y1 <= align_params->box_bottom))
+        {
+            camproc_bridge_select_guide_point(
+                bridge_result,
+                align_params,
+                align_params->box_top,
+                align_params->box_bottom,
+                &active_x,
+                &active_y,
+                &complete_inside);
+
+            if(complete_inside)
+            {
+                if(align_state->complete_frame_count < align_params->complete_confirm_frames)
+                {
+                    align_state->complete_frame_count++;
+                }
+            }
+            else
+            {
+                align_state->complete_frame_count = 0;
+                all_inside = 0;
+            }
+        }
+        else
+        {
+            align_state->complete_frame_count = 0;
+        }
+
+        if(align_state->complete_frame_count >= align_params->complete_confirm_frames)
+        {
+            align_state->phase = CAMERA_BRIDGE_ALIGN_COMPLETE;
+            align_state->previous_yaw_offset_d10 = 0;
+            align_result->valid = 1;
+            align_result->point_inside = 1;
+            align_result->aligned = 1;
+            align_result->phase = CAMERA_BRIDGE_ALIGN_COMPLETE;
+            align_result->active_x = active_x;
+            align_result->active_y = active_y;
+            return 1;
+        }
+    }
+
+    align_result->phase = align_state->phase;
+    align_result->active_x = active_x;
+    align_result->active_y = active_y;
+    align_result->point_inside = all_inside;
+
+    if(!align_state->point_filter_initialized)
+    {
+        align_state->filtered_point_x = (float)active_x;
+        align_state->point_filter_initialized = 1;
+    }
+    else
+    {
+        align_state->filtered_point_x =
+              align_params->point_filter_alpha * align_state->filtered_point_x
+            + (1.0f - align_params->point_filter_alpha) * (float)active_x;
+    }
+
+    if(align_state->filtered_point_x < (float)align_params->box_left)
+    {
+        point_error = align_state->filtered_point_x - (float)align_params->box_left;
+    }
+    else if(align_state->filtered_point_x > (float)align_params->box_right)
+    {
+        point_error = align_state->filtered_point_x - (float)align_params->box_right;
+    }
+
+    align_result->point_error_px = (point_error >= 0.0f) ?
+        (int16)(point_error + 0.5f) : (int16)(point_error - 0.5f);
+
+    yaw_offset = align_params->point_direction
+               * align_params->point_gain_d10_per_px
+               * point_error;
+    yaw_offset_d10 = (yaw_offset >= 0.0f) ?
+        (int32)(yaw_offset + 0.5f) : (int32)(yaw_offset - 0.5f);
+
+    if(yaw_offset_d10 > align_params->yaw_offset_limit_d10)
+    {
+        yaw_offset_d10 = align_params->yaw_offset_limit_d10;
+    }
+    else if(yaw_offset_d10 < -align_params->yaw_offset_limit_d10)
+    {
+        yaw_offset_d10 = -align_params->yaw_offset_limit_d10;
+    }
+
+    // 限制相邻两帧控制变化，避免切换检查点时突然大幅转向
+    yaw_change_d10 = yaw_offset_d10 - align_state->previous_yaw_offset_d10;
+    if(yaw_change_d10 > align_params->yaw_slew_limit_d10)
+    {
+        yaw_offset_d10 = align_state->previous_yaw_offset_d10 + align_params->yaw_slew_limit_d10;
+    }
+    else if(yaw_change_d10 < -align_params->yaw_slew_limit_d10)
+    {
+        yaw_offset_d10 = align_state->previous_yaw_offset_d10 - align_params->yaw_slew_limit_d10;
+    }
+
+    align_state->previous_yaw_offset_d10 = (int16)yaw_offset_d10;
+    align_result->yaw_offset_d10 = (int16)yaw_offset_d10;
+    align_result->control_value = camproc_bridge_yaw_offset_to_control(
+        align_result->yaw_offset_d10, align_params);
 
     return 1;
 }

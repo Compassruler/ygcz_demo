@@ -113,9 +113,14 @@ uint8 camera_bridge_processing(const CameraBridgeParams_t *bridge_params, Camera
     return 1;  // 返回的不是成功识别单边桥，这里最终的结果在 CameraBridgeResult_t 中
 }
 
-uint8 camera_bridge_calculate_control(const CameraBridgeResult_t *bridge_result, const CameraBridgeControlParams_t *control_params, CameraBridgeControlResult_t *control_result)
+void camera_bridge_align_reset(CameraBridgeAlignState_t *align_state)
 {
-    return camproc_bridge_calc_ctrl(bridge_result, control_params, control_result);
+    camproc_bridge_align_reset(align_state);
+}
+
+uint8 camera_bridge_align_update(const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result)
+{
+    return camproc_bridge_align_update(bridge_result, align_params, align_state, align_result);
 }
 
 uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params)

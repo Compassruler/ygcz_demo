@@ -44,6 +44,14 @@ typedef enum
     CAMERA_BRIDGE_EDGE_RIGHT       // 识别候选区域右侧边线
 } CameraBridgeEdgeType_t;
 
+// 单边桥对准控制阶段
+typedef enum
+{
+    CAMERA_BRIDGE_ALIGN_CAPTURE = 0, // 等待拟合线下端点进入对准框
+    CAMERA_BRIDGE_ALIGN_TRACK,       // 控制拟合线逐步通过对准框
+    CAMERA_BRIDGE_ALIGN_COMPLETE     // 整条拟合线已经完成对准
+} CameraBridgeAlignPhase_t;
+
 // 单边桥矩形识别参数
 typedef struct
 {
@@ -87,33 +95,52 @@ typedef struct
     float edge_intercept;           // 拟合模型 x = edge_slope*y + edge_intercept 的截距
 } CameraBridgeResult_t;
 
-// 单边桥控制换算参数
+// 单边桥对准控制参数
 typedef struct
 {
-    int16 aligned_angle_d10;        // 小车正确对准时的视觉角度，单位 0.1 度
-    int16 aligned_distance_px;      // 小车正确对准时的视觉距离，单位像素
-    float angle_gain;               // 角度内环误差增益
-    float distance_to_angle_gain;   // 距离外环增益，单位 0.1 度/像素
-    float angle_direction;          // 角度内环修正方向
-    float distance_to_angle_direction; // 距离误差转换为目标角度的方向
-    int16 angle_deadband_d10;       // 角度误差死区，单位 0.1 度
-    int16 distance_deadband_px;     // 距离误差死区，单位像素
-    int16 target_angle_limit_d10;   // 距离外环生成的目标角度偏移限制，单位 0.1 度
+    uint16 box_left;                // 对准框最左列
+    uint16 box_right;               // 对准框最右列
+    uint16 box_top;                 // 对准框最上行
+    uint16 box_bottom;              // 对准框最下行
+    uint16 sample_step_y;           // 对准框内沿纵向检查拟合线的间隔
+    uint8 capture_confirm_frames;   // 下端点进入对准框所需的连续帧数
+    uint8 complete_confirm_frames;  // 整条线对准所需的连续帧数
+    uint8 lost_reset_frames;        // 连续丢失目标后复位对准过程的帧数
+    float point_filter_alpha;       // 目标点横坐标低通滤波旧值权重，范围 0.0~1.0
+    float point_gain_d10_per_px;    // 每像素误差产生的航向修正量，单位 0.1 度/像素
+    float point_direction;          // 目标点横向误差修正方向
     int16 yaw_offset_limit_d10;     // 航向角修正量限制，单位 0.1 度
+    int16 yaw_slew_limit_d10;       // 每帧航向修正量允许的最大变化，单位 0.1 度
     float control_gain_per_deg;     // 每 1 度航向修正转换成的底盘 angle 控制量
     float control_direction;        // 底盘控制方向
     int16 control_limit;            // 底盘 angle 控制量的最大绝对值
-} CameraBridgeControlParams_t;
+} CameraBridgeAlignParams_t;
 
-// 单边桥控制换算结果
+// 单边桥对准控制运行状态
 typedef struct
 {
-    int16 distance_error_px;        // 应用校准和死区后的距离误差，单位像素
-    int16 target_angle_d10;         // 距离外环生成的目标视觉角度，单位 0.1 度
-    int16 angle_error_d10;          // 目标角度与实际角度之间的内环误差，单位 0.1 度
-    int16 yaw_offset_d10;           // 角度内环生成的航向角修正量，单位 0.1 度
+    CameraBridgeAlignPhase_t phase; // 当前对准控制阶段
+    uint8 capture_frame_count;      // 下端点已经连续进入对准框的帧数
+    uint8 complete_frame_count;     // 整条线已经连续满足要求的帧数
+    uint8 lost_frame_count;         // 连续丢失有效拟合线的帧数
+    uint8 point_filter_initialized; // 目标点滤波值是否已经初始化
+    float filtered_point_x;         // 滤波后的当前目标点横坐标
+    int16 previous_yaw_offset_d10;  // 上一帧输出的航向修正量
+} CameraBridgeAlignState_t;
+
+// 单边桥对准控制结果
+typedef struct
+{
+    uint8 valid;                    // 1 表示当前对准控制结果有效
+    uint8 point_inside;             // 1 表示当前进入框内的拟合线部分满足要求
+    uint8 aligned;                  // 1 表示已经完成整条边线对准
+    CameraBridgeAlignPhase_t phase; // 当前对准控制阶段
+    uint16 active_x;                // 当前用于控制的拟合线目标点横坐标
+    uint16 active_y;                // 当前用于控制的拟合线目标点纵坐标
+    int16 point_error_px;           // 当前目标点到对准框的有符号横向误差
+    int16 yaw_offset_d10;           // 目标点误差生成的航向修正量，单位 0.1 度
     int16 control_value;            // 最终底盘 angle 控制量
-} CameraBridgeControlResult_t;
+} CameraBridgeAlignResult_t;
 
 // 单边桥离开检测参数
 typedef struct
@@ -172,14 +199,21 @@ uint16 camera_jump_check_row_from_speed(uint16 car_speed, int8 aggressive_coeff)
 uint8 camera_bridge_processing(const CameraBridgeParams_t *bridge_params, CameraBridgeResult_t *bridge_result);
 
 /**
- * 单边桥控制换算接口
- * @param bridge_result  单边桥识别结果结构体
- * @param control_params 单边桥控制换算参数结构体
- * @param control_result 单边桥控制换算结果输出地址
- *
- * @return 1 换算完成 | 0 识别无效或参数非法
+ * 复位单边桥对准控制运行状态
+ * @param align_state 单边桥对准控制运行状态
  */
-uint8 camera_bridge_calculate_control(const CameraBridgeResult_t *bridge_result, const CameraBridgeControlParams_t *control_params, CameraBridgeControlResult_t *control_result);
+void camera_bridge_align_reset(CameraBridgeAlignState_t *align_state);
+
+/**
+ * 单边桥对准控制接口
+ * @param bridge_result  单边桥识别结果结构体
+ * @param align_params   单边桥对准控制参数结构体
+ * @param align_state    单边桥对准控制运行状态
+ * @param align_result   单边桥对准控制结果输出地址
+ *
+ * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
+ */
+uint8 camera_bridge_align_update(const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
 
 /**
  * 单边桥离开检测接口

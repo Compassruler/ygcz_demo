@@ -179,7 +179,7 @@ void ins_update(void)
      dx_ins = x - x_last;
      dy_ins = y - y_last;
      distance_ins = sqrtf(dx_ins * dx_ins + dy_ins * dy_ins);
-    if (distance_ins >= DISTANCE_STEP && pause_flag && remote_right_01_now_flag != 2) //pause_flag为回放时的判断，remote_right_01_now_flag为遥控打断时的判断
+    if (distance_ins >= DISTANCE_STEP && pause_flag && !track_flag) //pause_flag为回放时的判断，remote_right_01_now_flag为遥控打断时的判断
     {
         // 超过打点间距，记录点
         path_record_add(x,y,yaw_angle);
@@ -391,6 +391,7 @@ void Track_update(void)
         target_speed = 0;
         remote_right_01_now_flag = 2;
         road_memery_flag = 2;
+        track_flag = false; 
         target_yaw_remote = target_yaw;
         buzzer_beep(3,100);
     }

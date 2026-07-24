@@ -30,3 +30,4 @@ int MAX_SPEED = 3000;
 int MIN_SPEED = 0;
 float YAW_TH = 1.0f; 
 
+bool track_flag = false;

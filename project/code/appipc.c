@@ -15,7 +15,7 @@
 #define APPIPC_CHANNEL_MASK         (1ul << APPIPC_CHANNEL)
 #define APPIPC_RX_INTR_MASK         (1ul << APPIPC_RX_INTR_STRUCT)
 
-// 通道1：核心0发送车速、视觉工作模式和单边桥子状态，核心1接收。
+// 通道1：核心0发送车速、视觉工作模式和 BAB 子状态，核心1接收。
 #define APPIPC_SPEED_CHANNEL              (CY_IPC_CHAN_PIPE_EP1)
 #define APPIPC_SPEED_RX_INTR_STRUCT       (CY_IPC_INTR_PIPE_EP1)
 #define APPIPC_SPEED_RX_CPU_INT           (CPUIntIdx4_IRQn)
@@ -34,8 +34,8 @@
 #define APPIPC_CORE0_SPEED_MASK            (0x0000FFFFul)
 #define APPIPC_CORE0_MODE_MASK             (0x00FF0000ul)
 #define APPIPC_CORE0_MODE_SHIFT            (16u)
-#define APPIPC_CORE0_BRIDGE_PHASE_MASK     (0xFF000000ul)
-#define APPIPC_CORE0_BRIDGE_PHASE_SHIFT    (24u)
+#define APPIPC_CORE0_BAB_PHASE_MASK        (0xFF000000ul)
+#define APPIPC_CORE0_BAB_PHASE_SHIFT       (24u)
 
 static appipc_callback_t appipc_user_callback = (appipc_callback_t)0;
 static volatile stc_IPC_STRUCT_t      *appipc_channel_ptr = (volatile stc_IPC_STRUCT_t *)0;
@@ -223,11 +223,11 @@ uint8 appipc_send_speed_u32(uint32 data)
     return APPIPC_BUSY;
 }
 
-uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode, uint8 bridge_phase)
+uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode, uint8 vision_phase_bab)
 {
     uint32 data;
 
-    data = ((uint32)bridge_phase << APPIPC_CORE0_BRIDGE_PHASE_SHIFT) |
+    data = ((uint32)vision_phase_bab << APPIPC_CORE0_BAB_PHASE_SHIFT) |
            ((uint32)vision_detect_mode << APPIPC_CORE0_MODE_SHIFT) |
            (uint32)car_speed;
 
@@ -237,7 +237,7 @@ uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode, uint8 b
 uint8 appipc_decode_core0_data(uint32 data, appipc_core0_data_t *core0_data)
 {
     uint8 vision_detect_mode;
-    uint8 bridge_phase;
+    uint8 vision_phase_bab;
 
     if((appipc_core0_data_t *)0 == core0_data)
     {
@@ -245,20 +245,20 @@ uint8 appipc_decode_core0_data(uint32 data, appipc_core0_data_t *core0_data)
     }
 
     vision_detect_mode = (uint8)((data & APPIPC_CORE0_MODE_MASK) >> APPIPC_CORE0_MODE_SHIFT);
-    if(vision_detect_mode > APPIPC_VISION_MODE_JUMP)
+    if(vision_detect_mode > VISION_JUMP)
     {
         return 0;
     }
 
-    bridge_phase = (uint8)((data & APPIPC_CORE0_BRIDGE_PHASE_MASK) >> APPIPC_CORE0_BRIDGE_PHASE_SHIFT);
-    if(bridge_phase > APPIPC_BRIDGE_PHASE_COMPLETE)
+    vision_phase_bab = (uint8)((data & APPIPC_CORE0_BAB_PHASE_MASK) >> APPIPC_CORE0_BAB_PHASE_SHIFT);
+    if(vision_phase_bab > VISION_PHASE_BAB_COMPLETE)
     {
         return 0;
     }
 
     core0_data->car_speed = (uint16)(data & APPIPC_CORE0_SPEED_MASK);
     core0_data->vision_detect_mode = vision_detect_mode;
-    core0_data->bridge_phase = bridge_phase;
+    core0_data->vision_phase_bab = vision_phase_bab;
 
     return 1;
 }

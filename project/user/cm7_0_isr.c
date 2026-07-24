@@ -17,13 +17,13 @@ void pit0_ch0_isr()
     {
       small_driver_get_speed(&small_driver_value);
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
-      if (remote_right_01_now_flag == 1 && pause_flag)
+      if (track_flag && pause_flag)
       {
         Track_update();
         pid_pos_calc(&banlance.speed_pid, target_speed, car_speed);
         
       }
-      else if (vision_detect_mode == 1 || vision_detect_mode == 2)  // 单边桥 或 跳跃
+      else if (vision_detect_mode != VISION_IDLE)  // 视觉控制模式
       {
         pid_pos_calc(&banlance.speed_pid, vision_target_speed, car_speed);
       }
@@ -53,14 +53,14 @@ void pit0_ch0_isr()
       pid_pos_calc(&banlance.pitch_angle_pid, 0, pitch_filter.filtering_angle);
       pid_inc_calc(&banlance.roll_angle_pid, 0, roll_filter.filtering_angle);
 
-      if (remote_right_01_now_flag == 1 && pause_flag) pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle);
+      if (track_flag  && pause_flag) pid_pos_calc(&banlance.yaw_angle_pid, target_yaw, yaw_angle);
       
-      else if (vision_detect_mode == 1) // 单边桥
+      else if (vision_detect_mode == VISION_BRIDGE_BUMP) // 需要视觉转向控制的模式
       {
         target_yaw_remote += vision_target_yaw * 0.002f;
         pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
       }
-      else if (vision_detect_mode == 2) // 跳跃
+      else if (vision_detect_mode == VISION_JUMP) // 跳跃
       {
         // 跳跃暂时不用改变航向角
       }

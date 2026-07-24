@@ -6,8 +6,8 @@
 #define CAMERA_BRIDGE_RAD_TO_D10                (572.9577951f)
 #define CAMERA_BRIDGE_REFERENCE_ROW_DEFAULT     ((MT9V03X_H * 3u) / 4u)
 #define CAMERA_BRIDGE_MIN_FILL_PERCENT          (35u)                       // 候选区域的最低黑色填充率
-#define CAMERA_BRIDGE_MAX_EDGE_MSE              (9.0f)                      // 右边线允许的最大拟合误差
-#define CAMERA_BRIDGE_EDGE_POINT_DISTANCE       (3.0f)                      // 轮廓点到初始右边线的最大横向距离
+#define CAMERA_BRIDGE_MAX_EDGE_MSE              (9.0f)                      // 目标边线允许的最大拟合误差
+#define CAMERA_BRIDGE_EDGE_POINT_DISTANCE       (3.0f)                      // 轮廓点到初始目标边线的最大横向距离
 #define CAMERA_BRIDGE_BOTTOM_PRIORITY_MARGIN    (5)                         // 候选矩形下方优先的位置容差
 #define CAMERA_BRIDGE_VISITED_BUFFER_SIZE       ((MT9V03X_IMAGE_SIZE + 7u) / 8u) // 连通域访问标记所需空间
 #define CAMERA_BRIDGE_HULL_BUFFER_SIZE          ((MT9V03X_W + MT9V03X_H) * 2u + 2u) // 凸包最大点数
@@ -84,8 +84,8 @@ typedef struct
     uint16 edge_y2;
     uint16 edge_point_count;
     uint32 area;
-    float right_slope;
-    float right_intercept;
+    float edge_slope;
+    float edge_intercept;
     float edge_error;
 } CameraBridgeCandidate_t;
 
@@ -389,16 +389,18 @@ static uint32 camera_bridge_quad_area_twice(void)
     return (area_twice < 0) ? (uint32)(-area_twice) : (uint32)area_twice;
 }
 
-// 从四条边中选择横坐标最靠右、并具有足够纵向长度的一条边。
-static uint8 camera_bridge_find_right_side(uint16 min_height, CameraBridgePoint_t *upper_point, CameraBridgePoint_t *lower_point)
+// 从四条边中选择指定侧、并具有足够纵向长度的一条边。
+static uint8 camera_bridge_find_side(CameraBridgeEdgeType_t edge_type, uint16 min_height,
+                                     CameraBridgePoint_t *upper_point, CameraBridgePoint_t *lower_point)
 {
     uint8 index = 0;
     uint8 next_index = 0;
     uint8 best_index = 0;
+    uint8 found = 0;
     uint16 vertical_span = 0;
     uint16 best_vertical_span = 0;
     int16 side_score = 0;
-    int16 best_side_score = -1;
+    int16 best_side_score = 0;
     CameraBridgePoint_t point_a = {0};
     CameraBridgePoint_t point_b = {0};
 
@@ -421,16 +423,19 @@ static uint8 camera_bridge_find_right_side(uint16 min_height, CameraBridgePoint_
         }
 
         side_score = (int16)point_a.x + point_b.x;
-        if((side_score > best_side_score) ||
+        if(!found ||
+           ((CAMERA_BRIDGE_EDGE_RIGHT == edge_type) && (side_score > best_side_score)) ||
+           ((CAMERA_BRIDGE_EDGE_LEFT == edge_type) && (side_score < best_side_score)) ||
            ((side_score == best_side_score) && (vertical_span > best_vertical_span)))
         {
+            found = 1;
             best_index = index;
             best_side_score = side_score;
             best_vertical_span = vertical_span;
         }
     }
 
-    if(best_side_score < 0)
+    if(!found)
     {
         return 0;
     }
@@ -464,7 +469,7 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
     uint16 component_bottom = 0;
     uint16 component_width = 0;
     uint16 component_height = 0;
-    uint16 right_point_count = 0;
+    uint16 edge_point_count = 0;
     uint16 hull_count = 0;
     int16 neighbor_x = 0;
     int16 neighbor_y = 0;
@@ -478,13 +483,13 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
     uint32 component_box_area = 0;
     uint32 quadrilateral_area_twice = 0;
     uint32 search_area = 0;
-    uint16 right_edge[MT9V03X_H];
-    uint16 filtered_right_edge[MT9V03X_H];
-    float rough_right_slope = 0.0f;
-    float rough_right_intercept = 0.0f;
-    float right_slope = 0.0f;
-    float right_intercept = 0.0f;
-    float right_error = 0.0f;
+    uint16 edge_points[MT9V03X_H];
+    uint16 filtered_edge_points[MT9V03X_H];
+    float rough_edge_slope = 0.0f;
+    float rough_edge_intercept = 0.0f;
+    float edge_slope = 0.0f;
+    float edge_intercept = 0.0f;
+    float edge_error = 0.0f;
     float edge_delta_x = 0.0f;
     float edge_delta_y = 0.0f;
     float edge_length_squared = 0.0f;
@@ -496,8 +501,8 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
     float point_distance = 0.0f;
     float angle_d10 = 0.0f;
     CameraBridgePoint_t point = {0};
-    CameraBridgePoint_t right_upper_point = {0};
-    CameraBridgePoint_t right_lower_point = {0};
+    CameraBridgePoint_t edge_upper_point = {0};
+    CameraBridgePoint_t edge_lower_point = {0};
     CameraBridgeCandidate_t best_candidate = {0};
 
     if(NULL == result)
@@ -512,7 +517,9 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
         return 0;
     }
 
-    if((params->search_left >= MT9V03X_W) ||
+    if(((CAMERA_BRIDGE_EDGE_LEFT != params->edge_type) &&
+        (CAMERA_BRIDGE_EDGE_RIGHT != params->edge_type)) ||
+       (params->search_left >= MT9V03X_W) ||
        (params->search_right >= MT9V03X_W) ||
        (params->search_top >= MT9V03X_H) ||
        (params->search_bottom >= MT9V03X_H) ||
@@ -562,7 +569,7 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
                 continue;
             }
 
-            memset(right_edge, 0xFF, sizeof(right_edge));
+            memset(edge_points, 0xFF, sizeof(edge_points));
 
             component_left = x;
             component_right = x;
@@ -590,13 +597,16 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
                 if(point.y < component_top) component_top = point.y;
                 if(point.y > component_bottom) component_bottom = point.y;
 
-                if(right_edge[point.y] >= MT9V03X_W)
+                if(edge_points[point.y] >= MT9V03X_W)
                 {
-                    right_edge[point.y] = point.x;
+                    edge_points[point.y] = point.x;
                 }
-                else
+                else if(((CAMERA_BRIDGE_EDGE_RIGHT == params->edge_type) &&
+                         (point.x > edge_points[point.y])) ||
+                        ((CAMERA_BRIDGE_EDGE_LEFT == params->edge_type) &&
+                         (point.x < edge_points[point.y])))
                 {
-                    if(point.x > right_edge[point.y]) right_edge[point.y] = point.x;
+                    edge_points[point.y] = point.x;
                 }
 
                 for(neighbor_y = (int16)point.y - 1; neighbor_y <= (int16)point.y + 1; neighbor_y++)
@@ -674,28 +684,28 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
                 continue;
             }
 
-            if(!camera_bridge_find_right_side(params->min_height,
-                                              &right_upper_point, &right_lower_point))
+            if(!camera_bridge_find_side(params->edge_type, params->min_height,
+                                        &edge_upper_point, &edge_lower_point))
             {
                 continue;
             }
 
-            // 四边形角点先给出粗略右边线，再筛选真正位于该边附近的逐行轮廓点。
-            rough_right_slope = ((float)right_lower_point.x - right_upper_point.x) /
-                                ((float)right_lower_point.y - right_upper_point.y);
-            rough_right_intercept = (float)right_upper_point.x -
-                                    rough_right_slope * right_upper_point.y;
-            memset(filtered_right_edge, 0xFF, sizeof(filtered_right_edge));
+            // 四边形角点先给出粗略边线，再筛选真正位于该边附近的逐行轮廓点。
+            rough_edge_slope = ((float)edge_lower_point.x - edge_upper_point.x) /
+                               ((float)edge_lower_point.y - edge_upper_point.y);
+            rough_edge_intercept = (float)edge_upper_point.x -
+                                   rough_edge_slope * edge_upper_point.y;
+            memset(filtered_edge_points, 0xFF, sizeof(filtered_edge_points));
 
-            for(edge_y = right_upper_point.y; edge_y <= right_lower_point.y; edge_y++)
+            for(edge_y = edge_upper_point.y; edge_y <= edge_lower_point.y; edge_y++)
             {
-                if(right_edge[edge_y] >= MT9V03X_W)
+                if(edge_points[edge_y] >= MT9V03X_W)
                 {
                     continue;
                 }
 
-                expected_x = rough_right_slope * edge_y + rough_right_intercept;
-                point_distance = (float)right_edge[edge_y] - expected_x;
+                expected_x = rough_edge_slope * edge_y + rough_edge_intercept;
+                point_distance = (float)edge_points[edge_y] - expected_x;
                 if(point_distance < 0.0f)
                 {
                     point_distance = -point_distance;
@@ -703,23 +713,23 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
 
                 if(point_distance <= CAMERA_BRIDGE_EDGE_POINT_DISTANCE)
                 {
-                    filtered_right_edge[edge_y] = right_edge[edge_y];
+                    filtered_edge_points[edge_y] = edge_points[edge_y];
                 }
             }
 
-            if(!camera_bridge_fit_edge(filtered_right_edge,
-                                       right_upper_point.y, right_lower_point.y,
-                                       &right_slope, &right_intercept,
-                                       &right_point_count, &right_error) ||
-               (right_point_count < params->min_height) ||
-               (right_error > CAMERA_BRIDGE_MAX_EDGE_MSE))
+            if(!camera_bridge_fit_edge(filtered_edge_points,
+                                       edge_upper_point.y, edge_lower_point.y,
+                                       &edge_slope, &edge_intercept,
+                                       &edge_point_count, &edge_error) ||
+               (edge_point_count < params->min_height) ||
+               (edge_error > CAMERA_BRIDGE_MAX_EDGE_MSE))
             {
                 continue;
             }
 
             // 根据拟合线两个端点之间的实际长度过滤过短或过长的无关边线。
-            edge_delta_y = (float)right_lower_point.y - right_upper_point.y;
-            edge_delta_x = right_slope * edge_delta_y;
+            edge_delta_y = (float)edge_lower_point.y - edge_upper_point.y;
+            edge_delta_x = edge_slope * edge_delta_y;
             edge_length_squared = edge_delta_x * edge_delta_x + edge_delta_y * edge_delta_y;
 
             if((edge_length_squared < min_edge_length_squared) ||
@@ -729,8 +739,8 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
             }
 
             // 任意拟合线端点超出允许的横坐标范围时，排除当前候选。
-            fitted_upper_x = right_slope * (float)right_upper_point.y + right_intercept;
-            fitted_lower_x = right_slope * (float)right_lower_point.y + right_intercept;
+            fitted_upper_x = edge_slope * (float)edge_upper_point.y + edge_intercept;
+            fitted_lower_x = edge_slope * (float)edge_lower_point.y + edge_intercept;
 
             if((fitted_upper_x < (float)params->min_edge_x) ||
                (fitted_upper_x > (float)params->max_edge_x) ||
@@ -751,7 +761,7 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
                (((bottom_difference >= -CAMERA_BRIDGE_BOTTOM_PRIORITY_MARGIN) &&
                  (bottom_difference <=  CAMERA_BRIDGE_BOTTOM_PRIORITY_MARGIN)) &&
                 (component_area == best_candidate.area) &&
-                (right_error < best_candidate.edge_error)))
+                (edge_error < best_candidate.edge_error)))
             {
                 best_candidate.valid = 1;
                 best_candidate.left = component_left;
@@ -759,12 +769,12 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
                 best_candidate.top = component_top;
                 best_candidate.bottom = component_bottom;
                 best_candidate.area = component_area;
-                best_candidate.edge_y1 = right_upper_point.y;
-                best_candidate.edge_y2 = right_lower_point.y;
-                best_candidate.edge_point_count = right_point_count;
-                best_candidate.right_slope = right_slope;
-                best_candidate.right_intercept = right_intercept;
-                best_candidate.edge_error = right_error;
+                best_candidate.edge_y1 = edge_upper_point.y;
+                best_candidate.edge_y2 = edge_lower_point.y;
+                best_candidate.edge_point_count = edge_point_count;
+                best_candidate.edge_slope = edge_slope;
+                best_candidate.edge_intercept = edge_intercept;
+                best_candidate.edge_error = edge_error;
             }
         }
     }
@@ -788,21 +798,21 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
     result->top = best_candidate.top;
     result->bottom = best_candidate.bottom;
     result->area = best_candidate.area;
-    result->right_edge_x = camera_bridge_round_and_limit_x(
-        best_candidate.right_slope * (float)reference_row + best_candidate.right_intercept);
-    result->distance_px = (int16)((int32)result->right_edge_x - (int32)params->target_edge_x);
+    result->edge_x = camera_bridge_round_and_limit_x(
+        best_candidate.edge_slope * (float)reference_row + best_candidate.edge_intercept);
+    result->distance_px = (int16)((int32)result->edge_x - (int32)params->target_edge_x);
     result->edge_y1 = best_candidate.edge_y1;
     result->edge_x1 = camera_bridge_round_and_limit_x(
-        best_candidate.right_slope * (float)best_candidate.edge_y1 + best_candidate.right_intercept);
+        best_candidate.edge_slope * (float)best_candidate.edge_y1 + best_candidate.edge_intercept);
     result->edge_y2 = best_candidate.edge_y2;
     result->edge_x2 = camera_bridge_round_and_limit_x(
-        best_candidate.right_slope * (float)best_candidate.edge_y2 + best_candidate.right_intercept);
+        best_candidate.edge_slope * (float)best_candidate.edge_y2 + best_candidate.edge_intercept);
     result->reference_row = reference_row;
     result->edge_point_count = best_candidate.edge_point_count;
-    result->edge_slope = best_candidate.right_slope;
-    result->edge_intercept = best_candidate.right_intercept;
+    result->edge_slope = best_candidate.edge_slope;
+    result->edge_intercept = best_candidate.edge_intercept;
 
-    angle_d10 = atanf(best_candidate.right_slope) * CAMERA_BRIDGE_RAD_TO_D10;
+    angle_d10 = atanf(best_candidate.edge_slope) * CAMERA_BRIDGE_RAD_TO_D10;
     result->angle_d10 = (angle_d10 >= 0.0f) ?
         (int16)(angle_d10 + 0.5f) : (int16)(angle_d10 - 0.5f);
     result->valid = 1;
@@ -810,22 +820,16 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
     return 1;
 }
 
-// 将视觉角度与距离误差合成为航向角修正量
+// 距离外环生成目标角度，角度内环生成航向角修正量
 static int16 camproc_bridge_calculate_yaw_offset_d10(const CameraBridgeResult_t *bridge_result, const CameraBridgeControlParams_t *control_params, CameraBridgeControlResult_t *control_result)
 {
+    float target_angle_offset;
     float yaw_offset;
+    int32 target_angle_offset_d10;
     int32 yaw_offset_d10;
 
-    // 以小车正确对准时的视觉输出为零点
-    control_result->angle_error_d10 = bridge_result->angle_d10 - control_params->aligned_angle_d10;
+    // 距离外环：将水平距离误差转换为小车需要保持的目标角度
     control_result->distance_error_px = bridge_result->distance_px - control_params->aligned_distance_px;
-
-    // 消除对准位置附近的小幅抖动
-    if((control_result->angle_error_d10 >= -control_params->angle_deadband_d10) &&
-       (control_result->angle_error_d10 <=  control_params->angle_deadband_d10))
-    {
-        control_result->angle_error_d10 = 0;
-    }
 
     if((control_result->distance_error_px >= -control_params->distance_deadband_px) &&
        (control_result->distance_error_px <=  control_params->distance_deadband_px))
@@ -833,8 +837,35 @@ static int16 camproc_bridge_calculate_yaw_offset_d10(const CameraBridgeResult_t 
         control_result->distance_error_px = 0;
     }
 
-    yaw_offset = control_params->angle_direction * control_params->angle_gain * (float)control_result->angle_error_d10
-               + control_params->distance_direction * control_params->distance_gain * (float)control_result->distance_error_px;
+    target_angle_offset = control_params->distance_to_angle_direction
+                        * control_params->distance_to_angle_gain
+                        * (float)control_result->distance_error_px;
+    target_angle_offset_d10 = (target_angle_offset >= 0.0f) ?
+        (int32)(target_angle_offset + 0.5f) : (int32)(target_angle_offset - 0.5f);
+
+    if(target_angle_offset_d10 > control_params->target_angle_limit_d10)
+    {
+        target_angle_offset_d10 = control_params->target_angle_limit_d10;
+    }
+    else if(target_angle_offset_d10 < -control_params->target_angle_limit_d10)
+    {
+        target_angle_offset_d10 = -control_params->target_angle_limit_d10;
+    }
+
+    control_result->target_angle_d10 = (int16)(control_params->aligned_angle_d10 + target_angle_offset_d10);
+
+    // 角度内环：控制小车跟随距离外环给出的目标角度
+    control_result->angle_error_d10 = bridge_result->angle_d10 - control_result->target_angle_d10;
+
+    if((control_result->angle_error_d10 >= -control_params->angle_deadband_d10) &&
+       (control_result->angle_error_d10 <=  control_params->angle_deadband_d10))
+    {
+        control_result->angle_error_d10 = 0;
+    }
+
+    yaw_offset = control_params->angle_direction
+               * control_params->angle_gain
+               * (float)control_result->angle_error_d10;
 
     // 四舍五入并限制最大航向修正量
     yaw_offset_d10 = (yaw_offset >= 0.0f) ? (int32)(yaw_offset + 0.5f) : (int32)(yaw_offset - 0.5f);
@@ -953,6 +984,79 @@ uint8 camproc_pub_check_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row
     }
 
     return 0;
+}
+
+uint8 camproc_bump_exit_detect(uint8 image[MT9V03X_H][MT9V03X_W], BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled)
+{
+    uint8 black_detected = 0;
+    uint8 white_detected = 0;
+
+    // 必须先连续看到黑色凸起，防止入口处的白色地面被误判为出口
+    if(!bump_exit_params->bump_seen)
+    {
+        black_detected = camproc_pub_check_area(
+            image,
+            bump_exit_params->check_row,
+            bump_exit_params->check_row_count,
+            bump_exit_params->check_column,
+            bump_exit_params->check_column_count,
+            bump_exit_params->black_dot_count,
+            CAMERA_IMAGE_DOT_BLACK
+        );
+
+        if(!black_detected)
+        {
+            bump_exit_params->black_continuous_frame_count = 0;
+            return 0;
+        }
+
+        if(bump_exit_params->black_continuous_frame_count < bump_exit_params->black_confirm_frame_count)
+        {
+            bump_exit_params->black_continuous_frame_count++;
+        }
+
+        if(bump_exit_params->black_continuous_frame_count >= bump_exit_params->black_confirm_frame_count)
+        {
+            bump_exit_params->bump_seen = 1;
+        }
+
+        return 0;
+    }
+
+    // 最短行驶时间结束前不进行白色出口判断
+    if(!exit_check_enabled)
+    {
+        bump_exit_params->white_continuous_frame_count = 0;
+        return 0;
+    }
+
+    white_detected = camproc_pub_check_area(
+        image,
+        bump_exit_params->check_row,
+        bump_exit_params->check_row_count,
+        bump_exit_params->check_column,
+        bump_exit_params->check_column_count,
+        bump_exit_params->white_dot_count,
+        CAMERA_IMAGE_DOT_WHITE
+    );
+
+    if(!white_detected)
+    {
+        bump_exit_params->white_continuous_frame_count = 0;
+        return 0;
+    }
+
+    if(bump_exit_params->white_continuous_frame_count < bump_exit_params->white_confirm_frame_count)
+    {
+        bump_exit_params->white_continuous_frame_count++;
+    }
+
+    if(bump_exit_params->white_continuous_frame_count >= bump_exit_params->white_confirm_frame_count)
+    {
+        bump_exit_params->exited = 1;
+    }
+
+    return bump_exit_params->exited;
 }
 
 uint8 camproc_jump_cooldown_filter(uint32 time_ms, uint32 cooldown_time_ms)

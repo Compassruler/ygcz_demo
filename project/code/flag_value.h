@@ -24,7 +24,7 @@ extern int32 vision_target_speed;  // 视觉速度
 extern int32 vision_target_yaw;    // 视觉航向角
 
 extern float KP_DIS;
-extern float DIST_TH;
+
 extern int MAX_SPEED;
 extern int MIN_SPEED;
 extern float target_yaw_remote; // 目标航向角 （遥控用）

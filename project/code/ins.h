@@ -73,8 +73,6 @@ void Track_update(void);
 // 检测打断点
 void segment_check(void);
 
-// 检测是否该恢复了
-void element_recover_check(void);
 
 // 写入数据点到记录结构体数组
 void path_record_add(float x,float y,float yaw);

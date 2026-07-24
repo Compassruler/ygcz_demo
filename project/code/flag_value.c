@@ -26,7 +26,7 @@ int32 vision_target_yaw = 0;
 
 float KP_DIS = 4.5f;
 int MAX_SPEED = 3000;
-float DIST_TH = 0.05f;
+
 int MIN_SPEED = 0;
 float YAW_TH = 1.0f; 
 

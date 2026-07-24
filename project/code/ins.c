@@ -1,11 +1,9 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
 #define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
-#define NEAREST_SELECT_NUM 4       // 搜索最近点范围
+#define NEAREST_SELECT_NUM 10       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 #define MAX_ELEMENT_NUM 10              // 打断点数量
-#define INTERRUPT_DISTANCE 0.5         //打断惯导的判断距离
-#define RECOVER_DISTANCE 0.15           // 恢复惯导的判断距离
 #define MAX_PATH_POINT          (FLASH_PAGE_LENGTH * Use_page)             //最大点数
 
 
@@ -14,7 +12,6 @@ uint16_t element_index[MAX_ELEMENT_NUM];        // 打断点索引
 
 uint8 element_num = 0;     // 已经记录的打断点数量
 uint8 current_element = 0;  // 目前到哪个打断点了 
-//#define TURN_NUM        3    //
 float x_last = 0.0f;
 float y_last = 0.0f;
                                             
@@ -415,40 +412,6 @@ void segment_pause_check(void)
 
 }
 
-//  检测是否该恢复惯导了
-void element_recover_check(void)
-{
-    if(current_element >= element_num)
-        return;
-
-
-    uint16_t recover_index =
-        element_index[current_element] + 1;
-
-
-    float dx_recover =
-        replay_point[recover_index].x - x;
-
-    float dy_recover =
-        replay_point[recover_index].y - y;
-
-
-     distance_recover =
-        sqrtf(dx_recover*dx_recover +
-              dy_recover*dy_recover);
-
-
-    if(distance_recover < RECOVER_DISTANCE)
-    {
-        path_index = recover_index;
-
-
-        current_element++;
-
-
-        pause_flag = true;
-    }
-}
  
 // 当前段结束检测函数
 void segment_check(void)

@@ -11,10 +11,16 @@ extern int auto_protect_flag;       // 自动保护标志位
 extern int manual_protect_flag;     // 手动保护标志位
 extern int roll_control_flag;       // 横滚角运动模式标志位（0为运动模式，1为单边桥模式）
 
+
+// 遥控器标志位
 extern uint8 remote_left_01_last_flag;
 extern uint8 remote_right_01_last_flag;
 extern uint8 remote_left_01_now_flag;
 extern uint8 remote_right_01_now_flag;
+extern uint8 remote_right_02_last_flag;           // 右二档上次标志位
+extern uint8 remote_right_02_now_flag;            // 右二档现在标志位
+
+
 
 extern int flash_task_flag;
 extern bool pause_flag;            // 惯导中断flag
@@ -31,5 +37,7 @@ extern float target_yaw_remote; // 目标航向角 （遥控用）
 extern float target_roll;       // 目标横滚角 
 extern float YAW_TH;
 
+extern int course_record_flag;    // 记录标志位(由遥控器控制，最右边的拨钮，上为科目一（0），中为科目二（1），下为科目三（2）)
+extern int course_load_flag;   // 回放标志位(按钮控制)
 extern bool track_flag; // 跟踪flag true为开启跟踪
 #endif

@@ -1,5 +1,7 @@
 #include "button.h"
 #include "flag_value.h"
+#include "buzzer.h"
+
 // 按键释放时为高电平，按下时为低电平。
 #define BUTTON_RELEASE_LEVEL        (GPIO_HIGH)
 
@@ -30,7 +32,8 @@ void button_init(void)
         button_flag[i] = 0;
     }
 }
-
+// 目前按钮规划为：0为选择科目，1为开启回放，2为二值化阈值＋，3为二值化阈值-
+// 按钮状态更新
 void button_update(void)
 {
     uint8 i;
@@ -52,6 +55,29 @@ void button_update(void)
         }
 
         button_last_pressed[i] = now_pressed;
+    }
+    if(button_flag[0] == 1)
+    {
+      course_load_flag = 0;
+      buzzer_beep(1, 50);
+  
+    }
+    
+    if(button_flag[1] == 1)
+    {
+      course_load_flag = 1;
+      buzzer_beep(2, 50);
+      // 读取Flash
+            flash_path_load();
+            flash_yaw_flag = 2;     
+            track_init();
+            system_delay_ms(50);
+    }
+    
+    if(button_flag[2] == 1)
+    {
+      course_load_flag = 2;
+      buzzer_beep(3, 50);
     }
     if(button_flag[3] == 1)
     {

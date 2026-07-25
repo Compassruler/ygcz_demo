@@ -95,7 +95,7 @@ void pit0_ch0_isr()
       }
     else
     {
-      small_driver_set_duty(&small_driver_value,-(balance_out + yaw_gyro_out), (balance_out - yaw_gyro_out)); 
+      small_driver_set_duty(&small_driver_value,-(balance_out + yaw_gyro_out),(balance_out - yaw_gyro_out)); 
     }
 }
 

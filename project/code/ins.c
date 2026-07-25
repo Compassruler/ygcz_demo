@@ -20,8 +20,11 @@ float y_last = 0.0f;
                                             
 PathPoint record_path[FLASH_PAGE_LENGTH * Use_page];           //记录点结构体
 PathPoint replay_point[FLASH_PAGE_LENGTH * Use_page];          //回放点结构体
-PathHeader record_header;                                      //总头信息结构体
-SegmentHeader segment_header[MAX_SEGMENT_NUM];  // 段的头信息结构体
+uint32_t replay_point_num;                                     //回放点数量
+
+CourseSingleHeader single_header;                                 // 科目12头信息结构体
+Course3Header mul_header;                                      //科目三总头信息结构体
+SegmentHeader segment_header[MAX_SEGMENT_NUM];  // 科目三段头信息结构体
 
 uint32_t record_total_index;          //记录点总数/索引(总)
 uint32_t current_segment_points;      // 记录点总数/索引（段） 
@@ -123,7 +126,7 @@ void path_segment_finish(void)
 
 
     //生成这一段头信息
-    segment_header[segment_num].magic = PATH_SEGMENT_MAGIC;
+    segment_header[segment_num].check = PATH_SEGMENT_VALUE;
 
     segment_header[segment_num].point_num = current_segment_points; // 记录该段点数
 
@@ -136,21 +139,58 @@ void path_segment_finish(void)
 
 }
 
-//写入头信息（校验位＋点数）
+//写入头信息（校验位＋点数/段数）
 void path_record_finish(void)
 {
+    if(course_record_flag == 0)
+    {
+        //====================
+        // 科目1
+        //====================
 
-    if(current_segment_points > 0)
+        single_header.check =
+            COURSE1_CHECK_VALUE;
+
+
+        single_header.point_num =
+            record_total_index;
+
+    }
+    else if(course_record_flag == 1)
+    {
+        //====================
+        // 科目2
+        //====================
+        single_header.check =
+            COURSE2_CHECK_VALUE;
+
+
+        single_header.point_num =
+            record_total_index;
+
+    }
+    else if(course_record_flag == 2)
+    {
+        //====================
+        // 科目3
+        //====================
+        
+        if(current_segment_points > 0)
     {
         path_segment_finish();
     }
+        mul_header.check =
+            COURSE3_CHECK_VALUE;
 
 
-    record_header.magic = PATH_MAGIC;
+        mul_header.segment_num =
+            segment_num;
 
-    record_header.segment_num = segment_num;
 
-    record_header.total_point_num = record_total_index;
+        mul_header.total_point_num =
+            record_total_index;
+
+    }
 
 }
 
@@ -159,16 +199,17 @@ void ins_update(void)
 {
 //  yaw = round(yaw * 100.0f) / 100.0f; 
   
-    if(remote_right_01_now_flag != remote_right_01_last_flag) // 遥控打断时写入一段的头信息,检测跳变
-    {
+    if(remote_right_02_now_flag != remote_right_02_last_flag && course_record_flag == 2) // 遥控打断时写入一段的头信息,检测跳变（伪，需让遥控器的右二档开关初始化保持朝上） 
+  {
       path_segment_finish();
       pause_flag = false;
       return;
     }
     
     // 确保不会越界访问数组/
-    if (remote_left_01_now_flag !=2 && (record_total_index >= FLASH_PAGE_LENGTH * Use_page || remote_left_01_now_flag == 1))
-    {
+//    if (remote_left_01_now_flag !=2 && (record_total_index >= FLASH_PAGE_LENGTH * Use_page || remote_left_01_now_flag == 1))
+  if (record_total_index >= FLASH_PAGE_LENGTH * Use_page || remote_left_01_now_flag == 1)  
+  {
         path_record_finish();   //写入总头信息
         road_memery_flag = 2; // 路径记忆完成标志位
         return;                           // 直接返回，不再记录新的点
@@ -270,21 +311,7 @@ void Track_update(void)
     // 当前位置
     x_now = x;
     y_now = y;
-
-    //--------------------------------------------------
-    // 终点保护
-    //--------------------------------------------------
-    if(path_index >= record_header.total_point_num)
-    {
-        path_index = record_header.total_point_num - 1;
-
-        target_speed = 0;
-
-        remote_right_01_now_flag = 2;
-
-        return;
-    }
-    segment_check(); // 检测当前段是否结束
+    if(course_load_flag == 2) segment_check(); // 检测当前段是否结束（只有科目三有用）
     if(!pause_flag) return; // 如果暂停标志为false，则不进行路径回放
     find_lookahead_point(find_nearest_point(path_index));
  
@@ -399,7 +426,7 @@ if(future_turn_flag)
     //--------------------------------------------------
     // 到终点判断
     //--------------------------------------------------
-    if(path_index >= record_header.total_point_num - 2)
+    if(path_index >= replay_point_num - 2)
     { 
         target_speed = 0;
         remote_right_01_now_flag = 2;
@@ -410,28 +437,28 @@ if(future_turn_flag)
     }
 }
 
-// 检测当前段是否需要停止惯导
-void segment_pause_check(void)
-{
-
-    // 最后一段不需要停止
-    if(current_segment >= record_header.segment_num-1)
-        return;
-
-    //提前几个点停止
-    if(path_index >= segment_end_index-6)
-    {
-        pause_flag = false;
-    }
-
-}
+//// 检测当前段是否需要停止惯导
+//void segment_pause_check(void)
+//{
+//
+//    // 最后一段不需要停止
+//    if(current_segment >= mul_header.segment_num-1)
+//        return;
+//
+//    //提前几个点停止
+//    if(path_index >= segment_end_index-6)
+//    {
+//        pause_flag = false;
+//    }
+//
+//}
 
  
 // 当前段结束检测函数
 void segment_check(void)
 {
     //最后一段不用切换
-    if(current_segment >= record_header.segment_num-1)
+    if(current_segment >= mul_header.segment_num-1)
     {
         return;
     }
@@ -470,7 +497,7 @@ void segment_check(void)
 // 获取路径未来转角
 float get_path_turn_angle(uint32_t index)
 {
-    if(index + TURN_CHECK_POINT >= record_header.total_point_num)
+    if(index + TURN_CHECK_POINT >= mul_header.total_point_num)
         return 0;
 
 
@@ -535,7 +562,7 @@ void check_future_turn(uint32_t index)
         i++)
     {
 
-        if(i+TURN_CHECK_POINT+1 >= record_header.total_point_num)
+        if(i+TURN_CHECK_POINT+1 >= mul_header.total_point_num)
             break;
 
 

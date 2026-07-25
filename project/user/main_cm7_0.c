@@ -124,7 +124,7 @@ int main(void)
     //==========================
     int i = 0;
     static int j = 0;
-
+    int pause_time = 0; // 便于调试惯导打断恢复逻辑
 
     screen_data_item_t remote_table[] =
 {
@@ -132,7 +132,7 @@ int main(void)
     {"vx",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
     {"road_memery_flag",  SCREEN_DATA_INT, {.int_value = 0}, 0},
     {"pause_flag",  SCREEN_DATA_INT, {.int_value = 0}, 0},
-    {"right_now",  SCREEN_DATA_INT, {.int_value = 0}, 0},
+    {"course_load_flag",  SCREEN_DATA_INT, {.int_value = 0}, 0},
     {"vy",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
     {"segment_num ",  SCREEN_DATA_UINT, {.uint_value = 0}, 0},
     {"path_index",  SCREEN_DATA_FLOAT, {.float_value = 0}, 0},
@@ -161,12 +161,12 @@ int main(void)
         remote_table[1].value.float_value = vx;
         remote_table[2].value.int_value = road_memery_flag;
         remote_table[3].value.int_value = pause_flag;
-        remote_table[4].value.int_value = remote_right_01_now_flag;
+        remote_table[4].value.int_value = course_load_flag;
         remote_table[5].value.float_value = vy;
-        remote_table[6].value.uint_value = record_header.segment_num;
+        remote_table[6].value.uint_value = mul_header.segment_num;
         remote_table[7].value.float_value = path_index;
         remote_table[8].value.float_value = distance_recover;
-        remote_table[9].value.int_value = record_header.total_point_num;
+        remote_table[9].value.int_value = replay_point_num;
         remote_table[10].value.int_value = current_segment;//vision_detect_mode
         screen_show_data_table(remote_table, 11);
         //==================================================
@@ -185,29 +185,39 @@ int main(void)
             sprintf(txt, "FLASH STORE DONE\r\n");
             wireless_uart_send_string(txt);
         }
-
-        //==================================================
-        // 01left：0-> 2读取Flash
-        //==================================================
-//        if(remote_left_01_last_flag == 0 && remote_left_01_now_flag == 2)
-        if(button_flag[2]==1)
-        {
-//            sprintf(txt, "FLASH LOAD...\r\n");
-            wireless_uart_send_string(txt);
         
-            
-            // 读取Flash
+        if(button_flag[0]||button_flag[1]||button_flag[2])
+        {
+            sprintf(txt, "FLASH LOAD...\r\n");
+            wireless_uart_send_string(txt);      
+             // 读取Flash
             flash_path_load();
             flash_yaw_flag = 2;
             
             track_init();
-            buzzer_beep(2,100);
-            // 从头开始显示
-            i = 0;
-            
-            sprintf(txt, "FLASH LOAD DONE\r\n");
-            wireless_uart_send_string(txt);
         }
+        //==================================================
+        // 01left：0-> 2读取Flash
+        //==================================================
+//        if(remote_left_01_last_flag == 0 && remote_left_01_now_flag == 2)
+//        if(button_flag[2]==1)
+//        {
+////            sprintf(txt, "FLASH LOAD...\r\n");
+//            wireless_uart_send_string(txt);
+//        
+//            
+            // 读取Flash
+//            flash_path_load();
+//            flash_yaw_flag = 2;
+//            
+//            track_init();
+//            buzzer_beep(2,100);
+//            // 从头开始显示
+//            i = 0;
+//            
+//            sprintf(txt, "FLASH LOAD DONE\r\n");
+//            wireless_uart_send_string(txt);
+//        }
 
         //==========================
         // 更新按键历史状态
@@ -224,14 +234,16 @@ int main(void)
             y = 0;
             x_last = 0;
             y_last = 0;
-                    
-            if (vision_phase_bab == VISION_PHASE_BAB_COMPLETE)
+            pause_time ++;
+            
+            if (vision_phase_bab == VISION_PHASE_BAB_COMPLETE||pause_time >50)
             {
                 vision_target_speed = 0;
                 vision_target_yaw = 0;
                 //Y_left = 0.0f;
                 //Y_right = 0.0f;
                 pause_flag = true;
+                pause_time = 0;
                 
             }
             

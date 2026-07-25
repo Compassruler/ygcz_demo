@@ -52,14 +52,21 @@ uint8 camproc_bump_exit_detect(uint8 image[MT9V03X_H][MT9V03X_W], BumpExitParams
 uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const CameraBridgeParams_t *params, CameraBridgeResult_t *result);
 
 /**
- * 根据单边桥识别结果计算底盘 angle 控制量
- * @param bridge_result  单边桥识别结果结构体
- * @param control_params 单边桥控制换算参数结构体
- * @param control_result 单边桥控制换算结果输出地址
- *
- * @return 1 换算完成 | 0 识别无效或参数非法
+ * 复位单边桥对准控制运行状态
+ * @param align_state 单边桥对准控制运行状态
  */
-uint8 camproc_bridge_calc_ctrl(const CameraBridgeResult_t *bridge_result, const CameraBridgeControlParams_t *control_params, CameraBridgeControlResult_t *control_result);
+void camproc_bridge_align_reset(CameraBridgeAlignState_t *align_state);
+
+/**
+ * 根据拟合边线经过对准框的位置计算底盘 angle 控制量
+ * @param bridge_result  单边桥识别结果结构体
+ * @param align_params   单边桥对准控制参数结构体
+ * @param align_state    单边桥对准控制运行状态
+ * @param align_result   单边桥对准控制结果输出地址
+ *
+ * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
+ */
+uint8 camproc_bridge_align_update(const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
 
 // ==================================================== 跳跃检测、过滤、切换函数 ====================================================
 /**

@@ -184,6 +184,18 @@ void show_string_demo(void);
 void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params);
 
 /**
+ * @brief 在摄像头图像显示区域上绘制单边桥对准框。
+ *
+ * 函数将 `CameraBridgeAlignParams_t` 中的摄像头坐标加上
+ * `IMAGE_X`、`IMAGE_Y` 显示偏移后，以红色 2 像素粗矩形绘制到 IPS200。
+ *
+ * @param align_params 单边桥对准参数。指针为空、范围非法或坐标越界时不绘制。
+ *
+ * @note 应先显示摄像头图像，再调用本函数，否则矩形框可能被图像刷新覆盖。
+ */
+void screen_show_bridge_align_box(const CameraBridgeAlignParams_t *align_params);
+
+/**
  * @brief 在摄像头图像显示区域上绘制单边桥拟合边线。
  *
  * 函数使用 `CameraBridgeResult_t` 中的 `edge_x1/edge_y1` 和

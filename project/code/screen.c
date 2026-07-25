@@ -390,6 +390,44 @@ void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params)
     );
 }
 
+void screen_show_bridge_align_box(const CameraBridgeAlignParams_t *align_params)
+{
+    uint16 left = 0;
+    uint16 right = 0;
+    uint16 top = 0;
+    uint16 bottom = 0;
+    uint8 width = 0;
+
+    if((0 == align_params) ||
+       (align_params->box_left >= align_params->box_right) ||
+       (align_params->box_right >= MT9V03X_W) ||
+       (align_params->box_top >= align_params->box_bottom) ||
+       (align_params->box_bottom >= MT9V03X_H))
+    {
+        return;
+    }
+
+    left = IMAGE_X + align_params->box_left;
+    right = IMAGE_X + align_params->box_right;
+    top = IMAGE_Y + align_params->box_top;
+    bottom = IMAGE_Y + align_params->box_bottom;
+
+    // 向矩形内部加粗，避免边线超出图像显示区域
+    for(width = 0; width < 2; width++)
+    {
+        if(((uint16)(left + width) > (uint16)(right - width)) ||
+           ((uint16)(top + width) > (uint16)(bottom - width)))
+        {
+            break;
+        }
+
+        ips200_draw_line(left + width, top + width, right - width, top + width, RGB565_RED);
+        ips200_draw_line(left + width, bottom - width, right - width, bottom - width, RGB565_RED);
+        ips200_draw_line(left + width, top + width, left + width, bottom - width, RGB565_RED);
+        ips200_draw_line(right - width, top + width, right - width, bottom - width, RGB565_RED);
+    }
+}
+
 void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
 {
     int16 delta_x = 0;

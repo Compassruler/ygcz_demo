@@ -392,89 +392,108 @@ void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params)
 
 void screen_show_bridge_align_box(const CameraBridgeAlignParams_t *align_params)
 {
-    uint16 left = 0;
-    uint16 right = 0;
-    uint16 top = 0;
-    uint16 bottom = 0;
+    uint16 far_left = 0;
+    uint16 far_right = 0;
+    uint16 near_left = 0;
+    uint16 near_right = 0;
     uint8 width = 0;
 
     if((0 == align_params) ||
-       (align_params->box_left >= align_params->box_right) ||
-       (align_params->box_right >= MT9V03X_W) ||
-       (align_params->box_top >= align_params->box_bottom) ||
-       (align_params->box_bottom >= MT9V03X_H))
+       (align_params->target_center_x >= MT9V03X_W) ||
+       (align_params->far_check_row >= align_params->near_check_row) ||
+       (align_params->near_check_row >= MT9V03X_H) ||
+       (0u == align_params->far_tolerance_px) ||
+       (0u == align_params->near_tolerance_px))
     {
         return;
     }
 
-    left = IMAGE_X + align_params->box_left;
-    right = IMAGE_X + align_params->box_right;
-    top = IMAGE_Y + align_params->box_top;
-    bottom = IMAGE_Y + align_params->box_bottom;
+    far_left = (align_params->target_center_x > align_params->far_tolerance_px) ?
+        (uint16)(align_params->target_center_x - align_params->far_tolerance_px) : 0u;
+    far_right = (align_params->far_tolerance_px >=
+                 (MT9V03X_W - align_params->target_center_x)) ?
+        (MT9V03X_W - 1u) :
+        (uint16)(align_params->target_center_x + align_params->far_tolerance_px);
+    near_left = (align_params->target_center_x > align_params->near_tolerance_px) ?
+        (uint16)(align_params->target_center_x - align_params->near_tolerance_px) : 0u;
+    near_right = (align_params->near_tolerance_px >=
+                  (MT9V03X_W - align_params->target_center_x)) ?
+        (MT9V03X_W - 1u) :
+        (uint16)(align_params->target_center_x + align_params->near_tolerance_px);
 
-    // 向矩形内部加粗，避免边线超出图像显示区域
+    // 红色梯形表示远近两个中线检查点允许进入的范围
     for(width = 0; width < 2; width++)
     {
-        if(((uint16)(left + width) > (uint16)(right - width)) ||
-           ((uint16)(top + width) > (uint16)(bottom - width)))
-        {
-            break;
-        }
-
-        ips200_draw_line(left + width, top + width, right - width, top + width, RGB565_RED);
-        ips200_draw_line(left + width, bottom - width, right - width, bottom - width, RGB565_RED);
-        ips200_draw_line(left + width, top + width, left + width, bottom - width, RGB565_RED);
-        ips200_draw_line(right - width, top + width, right - width, bottom - width, RGB565_RED);
+        ips200_draw_line(
+            IMAGE_X + far_left,
+            IMAGE_Y + align_params->far_check_row + width,
+            IMAGE_X + far_right,
+            IMAGE_Y + align_params->far_check_row + width,
+            RGB565_RED);
+        ips200_draw_line(
+            IMAGE_X + near_left,
+            IMAGE_Y + align_params->near_check_row - width,
+            IMAGE_X + near_right,
+            IMAGE_Y + align_params->near_check_row - width,
+            RGB565_RED);
+        ips200_draw_line(
+            IMAGE_X + far_left + width,
+            IMAGE_Y + align_params->far_check_row,
+            IMAGE_X + near_left + width,
+            IMAGE_Y + align_params->near_check_row,
+            RGB565_RED);
+        ips200_draw_line(
+            IMAGE_X + far_right - width,
+            IMAGE_Y + align_params->far_check_row,
+            IMAGE_X + near_right - width,
+            IMAGE_Y + align_params->near_check_row,
+            RGB565_RED);
     }
 }
 
 void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
 {
-    int16 delta_x = 0;
-    int16 delta_y = 0;
-    int16 offset_x = 0;
-    int16 offset_y = 0;
-
     if((0 == bridge_result) || !bridge_result->valid)
     {
         return;
     }
 
-    if((bridge_result->edge_x1 >= MT9V03X_W) ||
-       (bridge_result->edge_x2 >= MT9V03X_W) ||
-       (bridge_result->edge_y1 >= MT9V03X_H) ||
-       (bridge_result->edge_y2 >= MT9V03X_H))
+    if((bridge_result->left_x1 >= MT9V03X_W) ||
+       (bridge_result->left_x2 >= MT9V03X_W) ||
+       (bridge_result->right_x1 >= MT9V03X_W) ||
+       (bridge_result->right_x2 >= MT9V03X_W) ||
+       (bridge_result->center_x1 >= MT9V03X_W) ||
+       (bridge_result->center_x2 >= MT9V03X_W) ||
+       (bridge_result->left_y1 >= MT9V03X_H) ||
+       (bridge_result->left_y2 >= MT9V03X_H) ||
+       (bridge_result->right_y1 >= MT9V03X_H) ||
+       (bridge_result->right_y2 >= MT9V03X_H) ||
+       (bridge_result->center_y1 >= MT9V03X_H) ||
+       (bridge_result->center_y2 >= MT9V03X_H))
     {
         return;
     }
 
+    // 红色显示左右赛道边线，绿色显示最终控制使用的中线
     ips200_draw_line(
-        IMAGE_X + bridge_result->edge_x1,
-        IMAGE_Y + bridge_result->edge_y1,
-        IMAGE_X + bridge_result->edge_x2,
-        IMAGE_Y + bridge_result->edge_y2,
-        RGB565_GREEN
+        IMAGE_X + bridge_result->left_x1,
+        IMAGE_Y + bridge_result->left_y1,
+        IMAGE_X + bridge_result->left_x2,
+        IMAGE_Y + bridge_result->left_y2,
+        RGB565_RED
     );
-
-    delta_x = (int16)bridge_result->edge_x2 - (int16)bridge_result->edge_x1;
-    delta_y = (int16)bridge_result->edge_y2 - (int16)bridge_result->edge_y1;
-
-    if((delta_y < 0 ? -delta_y : delta_y) >= (delta_x < 0 ? -delta_x : delta_x))
-    {
-        offset_x = ((bridge_result->edge_x1 < (MT9V03X_W - 1)) &&
-                    (bridge_result->edge_x2 < (MT9V03X_W - 1))) ? 1 : -1;
-    }
-    else
-    {
-        offset_y = ((bridge_result->edge_y1 < (MT9V03X_H - 1)) &&
-                    (bridge_result->edge_y2 < (MT9V03X_H - 1))) ? 1 : -1;
-    }
-
     ips200_draw_line(
-        IMAGE_X + bridge_result->edge_x1 + offset_x,
-        IMAGE_Y + bridge_result->edge_y1 + offset_y,
-        IMAGE_X + bridge_result->edge_x2 + offset_x,
-        IMAGE_Y + bridge_result->edge_y2 + offset_y,
+        IMAGE_X + bridge_result->right_x1,
+        IMAGE_Y + bridge_result->right_y1,
+        IMAGE_X + bridge_result->right_x2,
+        IMAGE_Y + bridge_result->right_y2,
+        RGB565_RED
+    );
+    ips200_draw_line(
+        IMAGE_X + bridge_result->center_x1,
+        IMAGE_Y + bridge_result->center_y1,
+        IMAGE_X + bridge_result->center_x2,
+        IMAGE_Y + bridge_result->center_y2,
         RGB565_GREEN
     );
 }

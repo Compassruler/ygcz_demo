@@ -11,8 +11,8 @@
 
 static uint8 image_copy[MT9V03X_H][MT9V03X_W];  // 复制的帧，所有后续图像处理均使用该帧
 
-// 摄像头新帧复制并进行最基本二值化处理
-static uint8 camera_frame_cpy_and_basic_processing(uint8 threshold)
+// 摄像头新帧复制
+static uint8 camera_frame_copy(void)
 {
     // 是否采集到一个新帧
     if(!mt9v03x_finish_flag)
@@ -23,6 +23,17 @@ static uint8 camera_frame_cpy_and_basic_processing(uint8 threshold)
 
     // 复制新帧到 image_copy
     memcpy(image_copy[0], mt9v03x_image[0], MT9V03X_IMAGE_SIZE);
+
+    return 1;
+}
+
+// 摄像头新帧复制并进行最基本二值化处理
+static uint8 camera_frame_cpy_and_basic_processing(uint8 threshold)
+{
+    if(!camera_frame_copy())
+    {
+        return 0;
+    }
 
     // 图像最基本二值化处理
     camproc_pub_thresh_bin(image_copy, threshold);
@@ -102,8 +113,8 @@ uint8 camera_bridge_processing(const CameraBridgeParams_t *bridge_params, Camera
         return 0;
     }
 
-    // 是否有效进行 摄像头新帧复制并进行最基本二值化处理
-    if(!camera_frame_cpy_and_basic_processing(bridge_params->binary_threshold))
+    // 双边线使用原始灰度变化检测边缘，不提前破坏灰度信息
+    if(!camera_frame_copy())
     {
         return 0;
     }

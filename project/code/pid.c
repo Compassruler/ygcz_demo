@@ -43,7 +43,7 @@ void banlance_init(void)
     
     // 偏航角速度环 PID 初始化
     // 原始参数: kp=10.0, ki=0.0, kd=0.0, maxIntegral=0, maxOutput=100, K=1.0
-    banlance.yaw_gyro_pid.kp = 20.0f;             // 比例系数
+    banlance.yaw_gyro_pid.kp = 25.0f;             // 比例系数
     banlance.yaw_gyro_pid.ki = 0.0f;             // 积分系数
     banlance.yaw_gyro_pid.kd = 0.0f;             // 微分系数
     banlance.yaw_gyro_pid.maxIntegral = 0;       // 积分限幅

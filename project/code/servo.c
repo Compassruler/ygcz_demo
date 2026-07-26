@@ -26,9 +26,9 @@ float speed_to_x_offset, balance_to_y_offset;
 // Y 坐标:10mm 舵机:80度
 // Y 坐标:0mm  舵机:70度
 float X_left = 0.0f;
-float Y_left = 0.0f;
+float Y_left = 10.0f;
 float X_right = 0.0f;
-float Y_right = 0.0f;
+float Y_right = 10.0f;
 
 // 当前实际坐标（0为初始值）
 float XLeft = 0.0f, YLeft = 0.0f;
@@ -202,9 +202,9 @@ void leg_control(void)
     float pid_scale = (jump_flag == 1) ? 0.2f : 1.0f;
     
     // X 方向：俯仰偏移计算
-    float target_offset = banlance.speed_pid.output * 0.1f * pid_scale;
+    float target_offset = banlance.speed_pid.output * 0.05f * pid_scale;
     speed_offset_filter = (speed_offset_filter * 19.0f + target_offset) / 20.0f;
-    speed_to_x_offset = func_limit_ab(speed_offset_filter, -30.0f, 30.0f);
+    speed_to_x_offset = func_limit_ab(speed_offset_filter, -40.0f, 30.0f);
     
     // X方向：目标坐标计算
     float target_X_left = X_left + X_OFFSET - speed_to_x_offset;

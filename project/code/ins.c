@@ -9,7 +9,7 @@
 #define MAX_PATH_POINT          (FLASH_PAGE_LENGTH * Use_page)             //最大点数
 
 
-#define TURN_SPEED_SCALE 0.35f // 降速比例
+#define TURN_SPEED_SCALE 0.10f // 降速比例
 
 uint16_t element_index[MAX_ELEMENT_NUM];        // 打断点索引
 
@@ -89,7 +89,7 @@ void track_init(void)
 
     segment_start_index = 0;
 
-    segment_end_index = segment_header[0].point_num - 1;
+//    segment_end_index = segment_header[0].point_num - 1;
 
     segment_finish_flag = 0;
 }
@@ -497,10 +497,11 @@ void segment_check(void)
 // 获取路径未来转角
 float get_path_turn_angle(uint32_t index)
 {
-    if(index + TURN_CHECK_POINT >= mul_header.total_point_num)
+ 
+ if(index + TURN_CHECK_POINT >= replay_point_num)
         return 0;
-
-
+  
+  
     // 当前路径方向
     float dx1 =
         replay_point[index+1].x -
@@ -557,14 +558,12 @@ void check_future_turn(uint32_t index)
     }
 
 
-    for(int i=index;
-        i<index+TURN_CHECK_POINT;
-        i++)
-    {
-
-        if(i+TURN_CHECK_POINT+1 >= mul_header.total_point_num)
-            break;
-
+    for(int i=index;i<index+TURN_CHECK_POINT;i++)
+    {        
+          if(i+TURN_CHECK_POINT+1 >= replay_point_num)
+          break;
+        
+       
 
         float turn_angle =
             get_path_turn_angle(i);

@@ -507,6 +507,7 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
+    KP_DIS = 10.0;
     }
 
 
@@ -527,6 +528,7 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
+    KP_DIS = 5.0;
     }
 
 
@@ -549,6 +551,8 @@ void flash_path_load(void)
             mul_header.total_point_num
         );
     replay_point_num = mul_header.total_point_num;
+    segment_end_index = segment_header[0].point_num - 1;
+    KP_DIS = 4.5;
     }
 }
 

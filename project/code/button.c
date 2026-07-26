@@ -67,11 +67,6 @@ void button_update(void)
     {
       course_load_flag = 1;
       buzzer_beep(2, 50);
-      // ∂¡»°Flash
-            flash_path_load();
-            flash_yaw_flag = 2;     
-            track_init();
-            system_delay_ms(50);
     }
     
     if(button_flag[2] == 1)

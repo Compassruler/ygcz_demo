@@ -194,7 +194,7 @@ int main(void)
             flash_path_load();
             flash_yaw_flag = 2;
             
-            track_init();
+//            track_init();
         }
         //==================================================
         // 01left£∫0-> 2∂¡»°Flash

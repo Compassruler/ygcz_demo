@@ -5,8 +5,8 @@
 uint8_t flash_yaw_flag = 0;      // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
 uint8_t flash_xy_flag = 0; // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志；
 uint8_t flash_turn_flag = 0; // 0为初始状态，1为开始存，2为开始取，3为存完标志，4为取完标志
-int path_write_page = PATH_START_PAGE; //写路径点的页数
-
+uint32_t path_write_page; //写路径点的起始页/对应页
+uint32_t path_read_page; // 读取flash的起始页/对应页
 /**
  * @brief 清除路径存储Flash区域
  * @note 上电初始化时调用
@@ -16,36 +16,108 @@ void flash_path_memory_clear(void)
 {
 
     //清除总header
-    flash_erase_page(FLASH_SECTION_INDEX, PATH_HEADER_PAGE);
+    flash_erase_page(FLASH_SECTION_INDEX, COURSE3_HEADER_PAGE);
 
 
     //清除segment header
-    flash_erase_page(FLASH_SECTION_INDEX, PATH_SEGMENT_HEADER_PAGE);
+    flash_erase_page(FLASH_SECTION_INDEX, COURSE3_SEGMENT_HEADER_PAGE);
 
 
 
     //清除路径点区域(改清除的页数)
 
-    for(uint32 page = PATH_START_PAGE; page < FLASH_PAGE_NUM; page++)
+    for(uint32 page = COURSE3_POINT_START_PAGE; page < FLASH_PAGE_NUM; page++)
     {
         flash_erase_page(FLASH_SECTION_INDEX,page);
     }
 }
 
-//flash写入总头信息
+
+// flash写入科目1/2单段头信息
+void flash_write_single_header(void)
+{
+    uint32_t header_page;
+
+
+    //清空buffer
+    flash_buffer_clear();
+
+
+
+    //根据科目选择magic和页地址
+
+    if(course_record_flag == 0)
+    {
+        //科目1
+
+        single_header.check = COURSE1_CHECK_VALUE;
+
+        header_page = COURSE1_HEADER_PAGE;
+
+    }
+
+
+    else if(course_record_flag == 1)
+    {
+        //科目2
+
+        single_header.check = COURSE2_CHECK_VALUE;
+
+        header_page = COURSE2_HEADER_PAGE;
+
+    }
+
+
+    else
+    {
+      // 无效
+        return;
+    }
+
+
+
+    //记录点数量
+
+    single_header.point_num = record_total_index;
+
+
+
+    //写入buffer
+
+    flash_union_buffer[0].uint32_type =
+        single_header.check;
+
+
+    flash_union_buffer[1].uint32_type =
+        single_header.point_num;
+
+
+
+    //写Flash
+
+    flash_write_page_from_buffer(
+        0,
+        header_page,
+        2
+    );
+
+}
+
+
+//flash写入科三总头信息
 void flash_write_path_header(void)
 {       
   flash_buffer_clear();
-  flash_union_buffer[0].uint32_type = record_header.magic;
+  flash_union_buffer[0].uint32_type = mul_header.check;
 
 
-flash_union_buffer[1].uint32_type = record_header.segment_num;
+flash_union_buffer[1].uint32_type = mul_header.segment_num;
 
 
-flash_union_buffer[2].uint32_type = record_header.total_point_num;
+flash_union_buffer[2].uint32_type = mul_header.total_point_num;
 
 
-flash_write_page_from_buffer(0, PATH_HEADER_PAGE, 3);
+flash_write_page_from_buffer(0, COURSE3_HEADER_PAGE, 3);
   
 }
 
@@ -53,21 +125,21 @@ flash_write_page_from_buffer(0, PATH_HEADER_PAGE, 3);
 void flash_write_segment_headers(void)
 {
 
-    if(record_header.segment_num > MAX_SEGMENT_NUM)
+    if(mul_header.segment_num > MAX_SEGMENT_NUM)
         return;
 
 
     flash_buffer_clear();
 
 
-    for(uint32_t i=0;i<record_header.segment_num;i++)
+    for(uint32_t i=0;i<mul_header.segment_num;i++)
     {
-        flash_union_buffer[i*2].uint32_type = segment_header[i].magic;
+        flash_union_buffer[i*2].uint32_type = segment_header[i].check;
         flash_union_buffer[i*2+1].uint32_type = segment_header[i].point_num;
     }
 
 
-    flash_write_page_from_buffer(0, PATH_SEGMENT_HEADER_PAGE, record_header.segment_num*2);
+    flash_write_page_from_buffer(0, COURSE3_SEGMENT_HEADER_PAGE, mul_header.segment_num*2);
 
 }
 
@@ -137,56 +209,172 @@ void flash_write_all_points(PathPoint *path,uint32_t point_num)
 void flash_path_store(void)
 {
 
-    //路径点起始页
-    path_write_page = PATH_START_PAGE;
+    if(course_record_flag == 0)
+    {
+        //科目1
+
+        path_write_page = COURSE1_POINT_START_PAGE;
+
+        flash_write_single_header();
+
+        flash_write_all_points(
+            record_path,
+            record_total_index
+        );
+
+    }
 
 
+    else if(course_record_flag == 1)
+    {
+        //科目2
 
-    //1 总头
-    flash_write_path_header();
+        path_write_page = COURSE2_POINT_START_PAGE;
+
+        flash_write_single_header();
+
+        flash_write_all_points(
+            record_path,
+            record_total_index
+        );
+
+    }
 
 
+    else if(course_record_flag == 2)
+    {
+        //科目3
 
-    //2 段头
-    flash_write_segment_headers();
+
+        path_write_page = COURSE3_POINT_START_PAGE;
 
 
+        flash_write_path_header();
 
-    //3 点
-    flash_write_all_points(
-        record_path,
-        record_header.total_point_num
-    );
+
+        flash_write_segment_headers();
+
+
+        flash_write_all_points(
+            record_path,
+            mul_header.total_point_num
+        );
+
+    }
 
 }
 
-// flash读取总头
+// flash读取科目三总头
 void flash_read_path_header(void)
 {
     flash_read_page_to_buffer(
         0,
-        PATH_HEADER_PAGE,
+        COURSE3_HEADER_PAGE,
         3
     );
 
-    record_header.magic = flash_union_buffer[0].uint32_type;
+    mul_header.check = flash_union_buffer[0].uint32_type;
 
-    record_header.segment_num = flash_union_buffer[1].uint32_type;
+    mul_header.segment_num = flash_union_buffer[1].uint32_type;
 
-    record_header.total_point_num = flash_union_buffer[2].uint32_type;
+    mul_header.total_point_num = flash_union_buffer[2].uint32_type;
 
-    if(record_header.magic != PATH_MAGIC)
+    if(mul_header.check != COURSE3_CHECK_VALUE)
     {
-        record_header.total_point_num = 0;
+        mul_header.total_point_num = 0;
         return;
     }
+}
+
+// flash读取单段科目头（科一科二用）
+void flash_read_single_header(void)
+{
+
+    uint32_t page;
+
+
+    if(course_load_flag == 0)
+    {
+        //科目1
+
+        page = COURSE1_HEADER_PAGE;
+
+    }
+
+
+    else if(course_load_flag == 1)
+    {
+        //科目2
+
+        page = COURSE2_HEADER_PAGE;
+
+    }
+
+
+    else
+    {
+        return;
+    }
+
+
+
+    flash_read_page_to_buffer(0,page,2);
+
+
+
+    single_header.check =
+        flash_union_buffer[0].uint32_type;
+
+
+
+    single_header.point_num =
+        flash_union_buffer[1].uint32_type;
+
+
+
+    //校验
+
+    if(course_load_flag == 0)
+    {
+
+        if(single_header.check != COURSE1_CHECK_VALUE)
+        {
+            single_header.point_num = 0;
+            return;
+        }
+
+    }
+
+
+
+    else if(course_load_flag == 1)
+    {
+
+        if(single_header.check != COURSE2_CHECK_VALUE)
+        {
+            single_header.point_num = 0;
+            return;
+        }
+
+    }
+
+
+
+    //点数量保护（过于宽泛目前）
+
+    if(single_header.point_num >
+       FLASH_PAGE_LENGTH * Use_page)
+    {
+        single_header.point_num = 0;
+    }
+
 }
 
 // flash读取段头
 void flash_read_segment_headers(void)
 {
 
-    if(record_header.segment_num > MAX_SEGMENT_NUM)
+    if(mul_header.segment_num > MAX_SEGMENT_NUM)
     {
         return;
     }
@@ -194,15 +382,15 @@ void flash_read_segment_headers(void)
 
     flash_read_page_to_buffer(
         0,
-        PATH_SEGMENT_HEADER_PAGE,
-        record_header.segment_num * 2
+        COURSE3_SEGMENT_HEADER_PAGE,
+        mul_header.segment_num * 2
     );
 
 
-    for(uint32_t i=0;i<record_header.segment_num;i++)
+    for(uint32_t i=0;i<mul_header.segment_num;i++)
     {
 
-        segment_header[i].magic =
+        segment_header[i].check =
             flash_union_buffer[i*2].uint32_type;
 
 
@@ -211,7 +399,7 @@ void flash_read_segment_headers(void)
 
 
         // 校验段头
-        if(segment_header[i].magic != PATH_SEGMENT_MAGIC)
+        if(segment_header[i].check != PATH_SEGMENT_VALUE)
         {
             segment_header[i].point_num = 0;
         }
@@ -234,7 +422,9 @@ void flash_read_all_points(PathPoint *path,uint32_t point_num)
     uint32_t point_index = 0;
 
 
-    uint32_t page = PATH_START_PAGE;
+    //读取起始页由外部设置
+    uint32_t page = path_read_page;
+
 
 
     while(point_index < point_num)
@@ -250,11 +440,22 @@ void flash_read_all_points(PathPoint *path,uint32_t point_num)
         }
 
 
+
+        //页越界保护
+
+        if(page >= FLASH_PAGE_NUM)
+        {
+            return;
+        }
+
+
+
         flash_read_page_to_buffer(
             0,
             page,
             read_num*3
         );
+
 
 
         for(uint32_t i=0;i<read_num;i++)
@@ -274,36 +475,85 @@ void flash_read_all_points(PathPoint *path,uint32_t point_num)
             path[point_index+i].yaw =
                 flash_union_buffer[index+2].float_type;
 
-
         }
 
 
-        point_index += read_num;
 
+        point_index += read_num;
 
         page++;
 
     }
 
 }
-
 // flash读取总
 void flash_path_load(void)
 {
 
-    //1.读取总头
-    flash_read_path_header();
-
-    if(record_header.magic != PATH_MAGIC)
+    if(course_load_flag == 0)
     {
-        return;
+        //科目1
+
+        path_read_page =
+        COURSE1_POINT_START_PAGE;
+
+
+        flash_read_single_header();
+
+
+        flash_read_all_points(
+            replay_point,
+            single_header.point_num
+        );
+    replay_point_num = single_header.point_num;
+    segment_end_index = replay_point_num - 1;
+    KP_DIS = 10.0;
     }
 
-    //2.读取段头
-    flash_read_segment_headers();
 
-    //3.读取所有路径点
-    flash_read_all_points(replay_point,record_header.total_point_num);
+    else if(course_load_flag == 1)
+    { 
+        //科目2
+
+        path_read_page =
+        COURSE2_POINT_START_PAGE;
+
+
+        flash_read_single_header();
+
+
+        flash_read_all_points(
+            replay_point,
+            single_header.point_num
+        );
+    replay_point_num = single_header.point_num;
+    segment_end_index = replay_point_num - 1;
+    KP_DIS = 5.0;
+    }
+
+
+    else if(course_load_flag == 2)
+    {
+        //科目3
+
+        path_read_page =
+        COURSE3_POINT_START_PAGE;
+
+
+        flash_read_path_header();
+
+
+        flash_read_segment_headers();
+
+
+        flash_read_all_points(
+            replay_point,
+            mul_header.total_point_num
+        );
+    replay_point_num = mul_header.total_point_num;
+    segment_end_index = segment_header[0].point_num - 1;
+    KP_DIS = 4.5;
+    }
 }
 
 void flash_turn_memery_store()

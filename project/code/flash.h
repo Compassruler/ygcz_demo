@@ -5,7 +5,7 @@
 
 typedef struct
 {
-    uint32_t magic;        //校验位
+    uint32_t check;        //校验位
 
     uint32_t point_num;    //这一段点数量
 
@@ -48,17 +48,64 @@ void flash_read_all_points(PathPoint *path,uint32_t point_num);
 //flash读取总
 void flash_path_load(void);
 
-#define PATH_MAGIC 0x12345678                                   // 头信息校验位
-#define PATH_SEGMENT_MAGIC 0x1234                               // 段头信息
 
+//======================
+// 头信息校验位
+//======================
+
+#define COURSE1_CHECK_VALUE    0x1111
+
+#define COURSE2_CHECK_VALUE    0x2222
+
+#define COURSE3_CHECK_VALUE    0x3333
+
+#define PATH_SEGMENT_VALUE     0xAAAA                               // 段头信息
 
 
 
 #define FLASH_SECTION_INDEX (0)     // 存储数据用的扇区
+//======================
+// 科目1 Flash区域
+//======================
 
-#define PATH_HEADER_PAGE     (1)    // 总头信息页
-#define PATH_SEGMENT_HEADER_PAGE      (2)    // 段头信息页
-#define PATH_START_PAGE           (3)           // 路径点起始页
+#define COURSE1_HEADER_PAGE       1                     // 写入flash头信息
+
+#define COURSE1_POINT_START_PAGE  2                     // 写入flash路径点起始页
+#define COURSE1_POINT_END_PAGE    5                     // 写入flash路径点结束页
+
+//======================
+// 科目2 Flash区域
+//======================
+
+#define COURSE2_HEADER_PAGE       11                    // 写入flash头信息
+
+#define COURSE2_POINT_START_PAGE  12                    // 写入flash路径点起始页
+#define COURSE2_POINT_END_PAGE    20                    // 写入flash路径点结束页
+
+//======================
+// 科目3 Flash区域
+//======================
+
+#define COURSE3_HEADER_PAGE          26                    // 写入flash总头信息
+
+#define COURSE3_SEGMENT_HEADER_PAGE  27                    // 写入flash段头信息
+
+#define COURSE3_POINT_START_PAGE     28                    // 写入flash路径点起始页
+
+#define COURSE3_POINT_END_PAGE       80                    // 写入flash路径点结束页
+
+
+//======================
+// 擦除信息区
+//======================
+#define COURSE1_ERASE_START_PAGE  COURSE1_HEADER_PAGE
+#define COURSE1_ERASE_END_PAGE    COURSE1_POINT_END_PAGE
+
+#define COURSE2_ERASE_START_PAGE  COURSE2_HEADER_PAGE
+#define COURSE2_ERASE_END_PAGE    COURSE2_POINT_END_PAGE
+
+#define COURSE3_ERASE_START_PAGE  COURSE3_HEADER_PAGE
+#define COURSE3_ERASE_END_PAGE    COURSE3_POINT_END_PAGE
 
 
 

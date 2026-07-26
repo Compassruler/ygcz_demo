@@ -7,7 +7,7 @@
 
 static uint16 remote_channel[REMOTE_CONTROL_CHANNEL_NUM];
 static uint8 remote_online = 0;
-
+bool beep_flag = false;
 void remote_control_init(void)
 {
     uart_receiver_init();
@@ -116,6 +116,7 @@ void remote_left_02_switch_ctrl(void)
 
 void remote_right_01_switch_ctrl(void)
 {
+     
      if(!remote_is_online())
     {
         return;
@@ -123,23 +124,48 @@ void remote_right_01_switch_ctrl(void)
     remote_right_01_last_flag = remote_right_01_now_flag;
   if(remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH)<REMOTE_CONTROL_CENTER_RAW)
   {
-    remote_right_01_now_flag = 1;
-//  road_memery_flag = 1;
+    course_record_flag = 0;
   }
-       else if (remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH)>=200 && remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH) < 1500)
-       {
-        remote_right_01_now_flag = 0;        
-       }
-       else 
-       {
-        remote_right_01_now_flag = 2;
-       }
+   else if (remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH)>=200 && remote_get_channel(REMOTE_CONTROL_RIGHT_01_SWITCH_CH) < 1500)
+   {
+    course_record_flag = 1;   
+   }
+   else 
+   {
+    course_record_flag = 2;
+   }
+  if(beep_flag)
+  {
+    return;
+  }
+  switch(course_record_flag)
+  {case 0:
+      buzzer_beep(1, 50);
+      break;
+  case 1:
+    buzzer_beep(2, 50);
+      break;
+  case 2:
+    buzzer_beep(3, 50);
+      break;
+  }
+  beep_flag = true;
          
 }
 
 void remote_right_02_switch_ctrl(void)
 {
-    static uint16 last_raw = 0;
+  if(!remote_is_online())
+    {
+        return;
+    }  
+  remote_right_02_last_flag = remote_right_02_now_flag;
+  if(remote_get_channel(REMOTE_CONTROL_RIGHT_02_SWITCH_CH)<REMOTE_CONTROL_CENTER_RAW)  // об0ио1
+  {
+    remote_right_02_now_flag = 0;
+  }
+  else remote_right_02_now_flag = 1;
+    /*static uint16 last_raw = 0;
     static uint8 has_last_raw = 0; 
     uint16 raw_data = remote_get_channel(REMOTE_CONTROL_RIGHT_02_SWITCH_CH);
 
@@ -152,7 +178,8 @@ void remote_right_02_switch_ctrl(void)
     if(has_last_raw && raw_data != last_raw)
     { 
         jump_flag = 1; 
+
     } 
     last_raw = raw_data; 
-    has_last_raw = 1;
+    has_last_raw = 1;*/
 }

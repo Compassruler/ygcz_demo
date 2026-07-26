@@ -57,7 +57,7 @@ void pit0_ch0_isr()
       
       else if (vision_detect_mode == VISION_BRIDGE_BUMP) // 需要视觉转向控制的模式
       {
-        target_yaw_remote += vision_target_yaw * 0.002f;
+        target_yaw_remote += vision_target_yaw * 0.003f;
         pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
       }
       else if (vision_detect_mode == VISION_JUMP) // 跳跃
@@ -84,7 +84,7 @@ void pit0_ch0_isr()
     int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
 
 //    if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
-      if(fabs(pitch_filter.filtering_angle) > 70.0f) // 自动保护
+      if(fabs(pitch_filter.filtering_angle) > 75.0f) // 自动保护
       {
         auto_protect_flag = 1;
       }
@@ -95,7 +95,7 @@ void pit0_ch0_isr()
       }
     else
     {
-      small_driver_set_duty(&small_driver_value,-(balance_out + yaw_gyro_out), (balance_out - yaw_gyro_out)); 
+      small_driver_set_duty(&small_driver_value,-(balance_out + yaw_gyro_out),(balance_out - yaw_gyro_out)); 
     }
 }
 

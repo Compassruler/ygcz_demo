@@ -42,23 +42,23 @@ uint8 camproc_bump_exit_detect(uint8 image[MT9V03X_H][MT9V03X_W], BumpExitParams
 
 // ==================================================== 单边桥函数 ====================================================
 /**
- * 从二值图中搜索多个黑色连通区域，将候选轮廓简化为四边形，并按参数拟合左侧或右侧边线
- * @param image  待检测的二值图像数组
+ * 在灰度图的稀疏行上搜索左右方向边缘，通过连续路径拟合左右边线和赛道中线
+ * @param image  待检测的灰度图像数组
  * @param params 单边桥识别参数结构体
  * @param result 识别结果输出结构体，函数会在每次调用开始时清空该结构体
  *
- * @return 1 成功找到并拟合 | 0 未找到或者参数非法
+ * @return 1 成功拟合赛道中线 | 0 未找到或者参数非法
  */
 uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const CameraBridgeParams_t *params, CameraBridgeResult_t *result);
 
 /**
- * 复位单边桥对准控制运行状态
+ * 复位单边桥边线跟踪和对准控制运行状态
  * @param align_state 单边桥对准控制运行状态
  */
 void camproc_bridge_align_reset(CameraBridgeAlignState_t *align_state);
 
 /**
- * 根据拟合边线经过对准框的位置计算底盘 angle 控制量
+ * 根据拟合中线前视点计算底盘 angle 控制量，并使用远近检查点判断是否对齐
  * @param bridge_result  单边桥识别结果结构体
  * @param align_params   单边桥对准控制参数结构体
  * @param align_state    单边桥对准控制运行状态

@@ -37,74 +37,74 @@ typedef struct
     uint32 steps;                   // 已执行的识别步骤
 } JumpDetectParams_t;
 
-// 单边桥识别边线类型
-typedef enum
-{
-    CAMERA_BRIDGE_EDGE_LEFT = 0,   // 识别候选区域左侧边线
-    CAMERA_BRIDGE_EDGE_RIGHT       // 识别候选区域右侧边线
-} CameraBridgeEdgeType_t;
-
 // 单边桥对准控制阶段
 typedef enum
 {
-    CAMERA_BRIDGE_ALIGN_CAPTURE = 0, // 等待拟合线下端点进入对准框
-    CAMERA_BRIDGE_ALIGN_TRACK,       // 控制拟合线逐步通过对准框
-    CAMERA_BRIDGE_ALIGN_COMPLETE     // 整条拟合线已经完成对准
+    CAMERA_BRIDGE_ALIGN_TRACK = 0,   // 根据拟合中线持续进行对准
+    CAMERA_BRIDGE_ALIGN_COMPLETE     // 远近中线点均已完成对准
 } CameraBridgeAlignPhase_t;
 
-// 单边桥矩形识别参数
+// 单边桥赛道边线识别参数
 typedef struct
 {
-    uint8 binary_threshold;         // 固定二值化阈值
-    CameraBridgeEdgeType_t edge_type; // 当前需要识别的边线类型
-    uint16 search_left;             // 搜索区域最左列
-    uint16 search_right;            // 搜索区域最右列
     uint16 search_top;              // 搜索区域最上行
     uint16 search_bottom;           // 搜索区域最下行
-    uint16 min_width;               // 候选连通区域的最小横向宽度
-    uint16 min_height;              // 候选连通区域及其目标边线的最小纵向高度
-    uint16 min_edge_length;         // 拟合边线允许的最小实际长度，单位像素
-    uint16 max_edge_length;         // 拟合边线允许的最大实际长度，单位像素
-    uint16 min_edge_x;              // 拟合边线端点允许的最小横坐标
-    uint16 max_edge_x;              // 拟合边线端点允许的最大横坐标
-    uint32 min_area;                // 候选连通区域内黑色像素总数下限
-    uint16 connect_gap;             // 相邻两行黑色像素允许的横向连接间隔
-    uint16 target_edge_x;           // 当前目标边线期望对齐的横坐标
-    uint16 reference_row;           // 固定位置测量行，0 表示使用内部默认行
+    uint16 left_edge_min_x;         // 左边线允许搜索的最小横坐标
+    uint16 left_edge_max_x;         // 左边线允许搜索的最大横坐标
+    uint16 right_edge_min_x;        // 右边线允许搜索的最小横坐标
+    uint16 right_edge_max_x;        // 右边线允许搜索的最大横坐标
+    uint16 min_lane_width;          // 左右边线之间允许的最小宽度
+    uint16 max_lane_width;          // 左右边线之间允许的最大宽度
+    uint16 max_edge_jump;           // 相邻行锚点边线允许的最大横向变化
+    uint16 min_point_count;         // 拟合所需的最少有效行锚点数量
+    uint16 min_y_span;              // 有效边线点需要覆盖的最小纵向范围
+    uint16 center_residual_limit;   // 中线拟合允许的最大横向残差
+    uint16 width_residual_limit;    // 半宽拟合允许的最大横向残差
+    uint8 row_step;                 // 相邻行锚点之间的行间隔
+    uint8 edge_window;              // 单侧灰度均值使用的像素窗口宽度
+    uint8 min_edge_contrast;        // 黑白边缘两侧所需的最小平均灰度差
+    uint8 local_search_radius;      // 上一帧模型附近的局部搜索半径
+    uint8 max_missing_rows;         // 路径允许连续缺失的行锚点数量
 } CameraBridgeParams_t;
 
-// 单边桥矩形识别结果
+// 单边桥赛道边线识别结果
 typedef struct
 {
     uint8 valid;                    // 1 表示识别成功，0 表示当前帧没有有效目标
-    uint16 left;                    // 最佳候选连通区域最左坐标
-    uint16 right;                   // 最佳候选连通区域最右坐标
-    uint16 top;                     // 最佳候选连通区域最上坐标
-    uint16 bottom;                  // 最佳候选连通区域最下坐标
-    uint32 area;                    // 最佳候选连通区域的黑色像素总数
-    uint16 edge_x;                  // 拟合边线在 reference_row 处的横坐标
-    int16 distance_px;              // 拟合边线相对 target_edge_x 的有符号像素距离
-    int16 angle_d10;                // 拟合边线相对垂直方向的角度，单位 0.1 度
-    uint16 edge_x1;                 // 实际边线拟合后的上端点横坐标
-    uint16 edge_y1;                 // 实际边线上端点的纵坐标
-    uint16 edge_x2;                 // 实际边线拟合后的下端点横坐标
-    uint16 edge_y2;                 // 实际边线下端点的纵坐标
-    uint16 reference_row;           // 本次计算 edge_x 时使用的参考行
-    uint16 edge_point_count;        // 参与边线拟合的轮廓点数量
-    float edge_slope;               // 拟合模型 x = edge_slope*y + edge_intercept 的斜率
-    float edge_intercept;           // 拟合模型 x = edge_slope*y + edge_intercept 的截距
+    uint16 top;                     // 当前有效路径最上方的纵坐标
+    uint16 bottom;                  // 当前有效路径最下方的纵坐标
+    uint16 point_count;             // 参与最终拟合的有效行锚点数量
+    uint16 left_x1;                 // 左拟合边线上端点横坐标
+    uint16 left_y1;                 // 左拟合边线上端点纵坐标
+    uint16 left_x2;                 // 左拟合边线下端点横坐标
+    uint16 left_y2;                 // 左拟合边线下端点纵坐标
+    uint16 right_x1;                // 右拟合边线上端点横坐标
+    uint16 right_y1;                // 右拟合边线上端点纵坐标
+    uint16 right_x2;                // 右拟合边线下端点横坐标
+    uint16 right_y2;                // 右拟合边线下端点纵坐标
+    uint16 center_x1;               // 中线拟合后的上端点横坐标
+    uint16 center_y1;               // 中线拟合后的上端点纵坐标
+    uint16 center_x2;               // 中线拟合后的下端点横坐标
+    uint16 center_y2;               // 中线拟合后的下端点纵坐标
+    float center_slope;             // 中线模型 x = center_slope*y + center_intercept
+    float center_intercept;         // 中线模型截距
+    float half_width_slope;         // 赛道半宽模型 half_width = slope*y + intercept
+    float half_width_intercept;     // 赛道半宽模型截距
+    float center_error;             // 中线最终拟合均方误差
+    float width_error;              // 半宽最终拟合均方误差
 } CameraBridgeResult_t;
 
 // 单边桥对准控制参数
 typedef struct
 {
-    uint16 box_left;                // 对准框最左列
-    uint16 box_right;               // 对准框最右列
-    uint16 box_top;                 // 对准框最上行
-    uint16 box_bottom;              // 对准框最下行
-    uint16 sample_step_y;           // 对准框内沿纵向检查拟合线的间隔
-    uint8 capture_confirm_frames;   // 下端点进入对准框所需的连续帧数
-    uint8 complete_confirm_frames;  // 整条线对准所需的连续帧数
+    uint16 target_center_x;         // 赛道中线期望对齐的横坐标
+    uint16 lookahead_row;           // 计算转向控制误差的前视行
+    uint16 far_check_row;           // 判断远处中线是否对齐的纵坐标
+    uint16 near_check_row;          // 判断近处中线是否对齐的纵坐标
+    uint16 far_tolerance_px;        // 远处中线允许的横向误差
+    uint16 near_tolerance_px;       // 近处中线允许的横向误差
+    uint16 control_deadband_px;     // 前视点控制误差死区
+    uint8 complete_confirm_frames;  // 远近中线点完成对准的连续确认帧数
     uint8 lost_reset_frames;        // 连续丢失目标后复位对准过程的帧数
     float point_filter_alpha;       // 目标点横坐标低通滤波旧值权重，范围 0.0~1.0
     float point_gain_d10_per_px;    // 每像素误差产生的航向修正量，单位 0.1 度/像素
@@ -120,7 +120,6 @@ typedef struct
 typedef struct
 {
     CameraBridgeAlignPhase_t phase; // 当前对准控制阶段
-    uint8 capture_frame_count;      // 下端点已经连续进入对准框的帧数
     uint8 complete_frame_count;     // 整条线已经连续满足要求的帧数
     uint8 lost_frame_count;         // 连续丢失有效拟合线的帧数
     uint8 point_filter_initialized; // 目标点滤波值是否已经初始化
@@ -132,12 +131,12 @@ typedef struct
 typedef struct
 {
     uint8 valid;                    // 1 表示当前对准控制结果有效
-    uint8 point_inside;             // 1 表示当前进入框内的拟合线部分满足要求
-    uint8 aligned;                  // 1 表示已经完成整条边线对准
+    uint8 point_inside;             // 1 表示远近两个中线检查点均位于容差内
+    uint8 aligned;                  // 1 表示已经完成赛道中线对准
     CameraBridgeAlignPhase_t phase; // 当前对准控制阶段
-    uint16 active_x;                // 当前用于控制的拟合线目标点横坐标
-    uint16 active_y;                // 当前用于控制的拟合线目标点纵坐标
-    int16 point_error_px;           // 当前目标点到对准框的有符号横向误差
+    uint16 active_x;                // 当前前视中线点横坐标
+    uint16 active_y;                // 当前前视中线点纵坐标
+    int16 point_error_px;           // 前视中线点相对目标中心的有符号横向误差
     int16 yaw_offset_d10;           // 目标点误差生成的航向修正量，单位 0.1 度
     int16 control_value;            // 最终底盘 angle 控制量
 } CameraBridgeAlignResult_t;
@@ -194,18 +193,20 @@ uint16 camera_jump_check_row_from_speed(uint16 car_speed, int8 aggressive_coeff)
 /**
  * 单边桥检测接口
  * @param bridge_params 单边桥识别参数结构体
- * @param bridge_result 当前帧的单边桥识别结果输出地址，不进行跨帧滤波
+ * @param bridge_result 当前帧左右边线及中线拟合结果输出地址
+ *
+ * @return 1 已处理一个新帧 | 0 当前没有新帧或参数无效
  */
 uint8 camera_bridge_processing(const CameraBridgeParams_t *bridge_params, CameraBridgeResult_t *bridge_result);
 
 /**
- * 复位单边桥对准控制运行状态
+ * 复位单边桥边线跟踪和对准控制运行状态
  * @param align_state 单边桥对准控制运行状态
  */
 void camera_bridge_align_reset(CameraBridgeAlignState_t *align_state);
 
 /**
- * 单边桥对准控制接口
+ * 根据拟合中线前视点计算单边桥对准控制量
  * @param bridge_result  单边桥识别结果结构体
  * @param align_params   单边桥对准控制参数结构体
  * @param align_state    单边桥对准控制运行状态

@@ -49,10 +49,10 @@ float servoRightFront, servoRightRear;  // 前后舵机角度
 // jump部分
 const jump_control_struct jump_control_config[] = 
 {
-    {  0, 75, jump_step_a, "起跳"     },
-    {75, 150, jump_step_a, "收脚"     },
-    {150, 200, jump_step_a, "准备缓冲" },
-    {200, 250, jump_step_a, "执行缓冲" },
+    {  0, 80, jump_step_a, "起跳"     },
+    {80, 110, jump_step_a, "收脚"     },
+    {110, 270, jump_step_a, "准备缓冲" },
+    {270, 360, jump_step_a, "执行缓冲" },
 };
 
 const uint8 jump_step = sizeof(jump_control_config) / sizeof(jump_control_struct);
@@ -282,12 +282,12 @@ void jump_step_a(int step_num)
   {
     case 0: // 起跳
     {
-      Set_angle(125, 125, 125, 125);
+      Set_angle(140, 140, 140, 140);
     }break;
 
     case 1: // 收腿
     {
-      Set_angle(95, 95, 95, 95);
+      Set_angle(90, 90, 90, 90);
     }break;
 
     case 2:  // 准备缓冲

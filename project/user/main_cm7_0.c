@@ -29,6 +29,8 @@ volatile uint8 bridge_aligned_count = 0;            // Á¬ÐøÊÕµ½Ê¶±ðÓÐÐ§ÇÒÒÑ¾­¶ÔÆ
 volatile uint8 phase_exited_from_core1 = 0;          // ºË1È·ÈÏÒÑ¾­Àë¿ªµ±Ç°½×¶ÎÂ·¶ÎµÄ±êÖ¾Î»
 volatile uint8 vision_phase_bab = VISION_PHASE_BAB_BRIDGE_ALIGN; // µ¥±ßÇÅÓëµßô¤Â·¶Î×Ó×´Ì¬£¬ÓÉºË0Í³Ò»¿ØÖÆ
 uint32 jump_count = 0;                              // ÌøÔ¾¼ÆÊý
+volatile uint8 vision_steps = 0;                             // ÊÓ¾õ²½Öè | 0 µ¥±ßÇÅ | 1 ÌøÔ¾ | 2 ÌøÔ¾·µ»Ø
+volatile uint8 vision_phase_done_flag = 0;                   // ÊÓ¾õµ¥²½ÖèÍê³É±êÖ¾Î»
 
 // ½ÓÊÕºËÐÄ1·¢ËÍµÄÊý¾Ý
 static void appipc_callback(uint32 data)
@@ -88,6 +90,7 @@ static void appipc_callback(uint32 data)
         {
             phase_exited_from_core1 = 0;
             vision_phase_bab = VISION_PHASE_BAB_COMPLETE;
+            vision_phase_done_flag = 1;
         }
 
         bridge_control_updated = 1;
@@ -123,6 +126,7 @@ int main(void)
     int i = 0;
     static int j = 0;
     int pause_time = 0; // ±ãÓÚµ÷ÊÔ¹ßµ¼´ò¶Ï»Ö¸´Âß¼­
+    uint8 remote_ch9_value = 100;  // Í¨µÀ9Ó³ÉäÖµ£¬Ò£¿ØÆ÷µôÏßÊ±±£³ÖÉÏÒ»´ÎÓÐÐ§Öµ
 
     screen_data_item_t remote_table[] =
 {
@@ -145,6 +149,10 @@ int main(void)
     {
         button_update();                // °´¼ü×´Ì¬¸üÐÂ
         remote_update();                // Ò£¿ØÆ÷×´Ì¬¸üÐÂ
+        if(remote_is_online())
+        {
+            remote_ch9_value = remote_left_knob_ctrl();
+        }
         remote_left_02_switch_ctrl();   // ×ó²à2±£»¤¿ª¹Ø³õÊ¼»¯
         remote_right_02_switch_ctrl();  // ÓÒ²à2ÌøÔ¾¿ª¹Ø³õÊ¼»¯
 //                ins_update();  // insÊý¾Ý¸üÐÂ       
@@ -234,12 +242,17 @@ int main(void)
             y_last = 0;
             pause_time ++;
             
-            if (vision_phase_bab == VISION_PHASE_BAB_COMPLETE||pause_time >50)
+            if (vision_phase_done_flag)
             {
+                vision_phase_done_flag = 0;  // ÌøÔ¾Íê³É±êÖ¾Î»ÖÃ 0
+                vision_steps++;  // ½øÈëÏÂÒ»ÊÓ¾õ½×¶Î£¬µÈ´ý pause_flag ÔÙ´ÎÎª false
+
                 vision_target_speed = 0;
                 vision_target_yaw = 0;
+
                 //Y_left = 0.0f;
                 //Y_right = 0.0f;
+                
                 pause_flag = true;
                 pause_time = 0;
                 
@@ -263,14 +276,29 @@ int main(void)
 
      if (pause_flag == false)
     {
-        vision_detect_mode = VISION_BRIDGE_BUMP;
+        // ÊÓ¾õ²½ÖèÇÐ»»
+        switch (vision_steps)
+        {
+        case 0:
+            vision_detect_mode = VISION_BRIDGE_BUMP;  // µ¥±ßÇÅºÍµßô¤Â·¶Î
+            break;
+
+        case 1:
+            vision_detect_mode = VISION_JUMP;  // ÌøÔ¾
+            break;
+        
+        case 2:
+            vision_detect_mode = VISION_BACK;  // Èý¼¶Ì¨½×·µ»Ø
+            break;
+
+        }
     }
     else
     {
-        vision_detect_mode = VISION_IDLE;
+        vision_detect_mode = VISION_IDLE;  // ¿ÕÏÐ
     }
 
-    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, vision_phase_bab);  // ·¢ËÍ³µËÙ¡¢ÊÓ¾õÄ£Ê½ºÍ BAB ×Ó×´Ì¬µ½ºË1
+    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, vision_phase_bab, remote_ch9_value);  // ·¢ËÍ³µËÙ¡¢ÊÓ¾õ×´Ì¬ºÍÍ¨µÀ9Êý¾Ýµ½ºË1
     
     //=========================== ÌøÔ¾Ä£Ê½ ===========================
         if(vision_detect_mode == VISION_JUMP)
@@ -295,13 +323,19 @@ int main(void)
             if(is_jump_updated)
             {
                 is_jump_updated = 0;
-                if(jump_count >= 2) continue;  // ÏÞ¶¨ÌøÔ¾´ÎÊý
+                if(jump_count >= 3) continue;  // ÏÞ¶¨ÌøÔ¾´ÎÊý
                 
                 // Ö´ÐÐÌøÔ¾
                 if(is_jump_from_core1)
                 {
                     jump_flag = 1;
                     jump_count++;
+
+                    if (jump_count == 3)
+                    {
+                        vision_phase_done_flag = 1;
+                    }
+                    
                 }
             } 
         }

@@ -15,7 +15,7 @@
 #define APPIPC_CHANNEL_MASK         (1ul << APPIPC_CHANNEL)
 #define APPIPC_RX_INTR_MASK         (1ul << APPIPC_RX_INTR_STRUCT)
 
-// 通道1：核心0发送车速、视觉工作模式和 BAB 子状态，核心1接收。
+// 通道1：核心0发送车速、遥控器通道 9、视觉工作模式和 BAB 子状态，核心1接收。
 #define APPIPC_SPEED_CHANNEL              (CY_IPC_CHAN_PIPE_EP1)
 #define APPIPC_SPEED_RX_INTR_STRUCT       (CY_IPC_INTR_PIPE_EP1)
 #define APPIPC_SPEED_RX_CPU_INT           (CPUIntIdx4_IRQn)
@@ -32,10 +32,12 @@
 #define APPIPC_BRIDGE_CONTROL_MASK        (0x0000FFFFul)
 
 #define APPIPC_CORE0_SPEED_MASK            (0x0000FFFFul)
-#define APPIPC_CORE0_MODE_MASK             (0x00FF0000ul)
-#define APPIPC_CORE0_MODE_SHIFT            (16u)
-#define APPIPC_CORE0_BAB_PHASE_MASK        (0xFF000000ul)
-#define APPIPC_CORE0_BAB_PHASE_SHIFT       (24u)
+#define APPIPC_CORE0_REMOTE_CH9_MASK       (0x00FF0000ul)
+#define APPIPC_CORE0_REMOTE_CH9_SHIFT      (16u)
+#define APPIPC_CORE0_MODE_MASK             (0x0F000000ul)
+#define APPIPC_CORE0_MODE_SHIFT            (24u)
+#define APPIPC_CORE0_BAB_PHASE_MASK        (0xF0000000ul)
+#define APPIPC_CORE0_BAB_PHASE_SHIFT       (28u)
 
 static appipc_callback_t appipc_user_callback = (appipc_callback_t)0;
 static volatile stc_IPC_STRUCT_t      *appipc_channel_ptr = (volatile stc_IPC_STRUCT_t *)0;
@@ -223,12 +225,13 @@ uint8 appipc_send_speed_u32(uint32 data)
     return APPIPC_BUSY;
 }
 
-uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode, uint8 vision_phase_bab)
+uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode, uint8 vision_phase_bab, uint8 remote_ch9_value)
 {
     uint32 data;
 
-    data = ((uint32)vision_phase_bab << APPIPC_CORE0_BAB_PHASE_SHIFT) |
-           ((uint32)vision_detect_mode << APPIPC_CORE0_MODE_SHIFT) |
+    data = (((uint32)vision_phase_bab << APPIPC_CORE0_BAB_PHASE_SHIFT) & APPIPC_CORE0_BAB_PHASE_MASK) |
+           (((uint32)vision_detect_mode << APPIPC_CORE0_MODE_SHIFT) & APPIPC_CORE0_MODE_MASK) |
+           ((uint32)remote_ch9_value << APPIPC_CORE0_REMOTE_CH9_SHIFT) |
            (uint32)car_speed;
 
     return appipc_send_speed_u32(data);
@@ -245,7 +248,7 @@ uint8 appipc_decode_core0_data(uint32 data, appipc_core0_data_t *core0_data)
     }
 
     vision_detect_mode = (uint8)((data & APPIPC_CORE0_MODE_MASK) >> APPIPC_CORE0_MODE_SHIFT);
-    if(vision_detect_mode > VISION_JUMP)
+    if(vision_detect_mode > VISION_BACK)
     {
         return 0;
     }
@@ -259,6 +262,7 @@ uint8 appipc_decode_core0_data(uint32 data, appipc_core0_data_t *core0_data)
     core0_data->car_speed = (uint16)(data & APPIPC_CORE0_SPEED_MASK);
     core0_data->vision_detect_mode = vision_detect_mode;
     core0_data->vision_phase_bab = vision_phase_bab;
+    core0_data->remote_ch9_value = (uint8)((data & APPIPC_CORE0_REMOTE_CH9_MASK) >> APPIPC_CORE0_REMOTE_CH9_SHIFT);
 
     return 1;
 }

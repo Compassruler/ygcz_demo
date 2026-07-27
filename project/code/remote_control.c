@@ -4,6 +4,8 @@
 #define REMOTE_CONTROL_OUTPUT_MAX         (1792)
 #define REMOTE_CONTROL_OUTPUT_MIN         (192)
 #define REMOTE_CONTROL_DEAD_ZONE          (30)
+#define REMOTE_CONTROL_KNOB_OUTPUT_MIN     (1)
+#define REMOTE_CONTROL_KNOB_OUTPUT_MAX     (255)
 
 static uint16 remote_channel[REMOTE_CONTROL_CHANNEL_NUM];
 static uint8 remote_online = 0;
@@ -36,6 +38,36 @@ uint16 remote_get_channel(uint8 ch)
     }
 
     return remote_channel[ch];
+}
+
+uint8 remote_left_knob_ctrl(void)
+{
+    uint16 raw_data;
+    uint32 mapped_data;
+    uint32 raw_range = REMOTE_CONTROL_OUTPUT_MAX - REMOTE_CONTROL_OUTPUT_MIN;
+    uint32 output_range = REMOTE_CONTROL_KNOB_OUTPUT_MAX - REMOTE_CONTROL_KNOB_OUTPUT_MIN;
+
+    if(!remote_is_online())
+    {
+        return REMOTE_CONTROL_KNOB_OUTPUT_MIN;
+    }
+
+    raw_data = remote_get_channel(REMOTE_CONTROL_LEFT_KNOB_CH);
+
+    if(raw_data <= REMOTE_CONTROL_OUTPUT_MIN)
+    {
+        return REMOTE_CONTROL_KNOB_OUTPUT_MIN;
+    }
+
+    if(raw_data >= REMOTE_CONTROL_OUTPUT_MAX)
+    {
+        return REMOTE_CONTROL_KNOB_OUTPUT_MAX;
+    }
+
+    mapped_data = (uint32)(raw_data - REMOTE_CONTROL_OUTPUT_MIN) * output_range;
+    mapped_data = (mapped_data + raw_range / 2u) / raw_range;
+
+    return (uint8)(mapped_data + REMOTE_CONTROL_KNOB_OUTPUT_MIN);
 }
 
 uint8 remote_is_online(void)

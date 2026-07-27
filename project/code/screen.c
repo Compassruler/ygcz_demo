@@ -390,22 +390,34 @@ void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params)
     );
 }
 
-void screen_show_bridge_align_box(const CameraBridgeAlignParams_t *align_params)
+void screen_show_bridge_align_box(
+    const CameraBridgeResult_t *bridge_result,
+    const CameraBridgeAlignParams_t *align_params)
 {
     uint16 far_left = 0;
     uint16 far_right = 0;
     uint16 near_left = 0;
     uint16 near_right = 0;
+    uint16 far_y = 0;
+    uint16 near_y = MT9V03X_H - 1u;
     uint8 width = 0;
 
     if((0 == align_params) ||
        (align_params->target_center_x >= MT9V03X_W) ||
-       (align_params->far_check_row >= align_params->near_check_row) ||
-       (align_params->near_check_row >= MT9V03X_H) ||
        (0u == align_params->far_tolerance_px) ||
        (0u == align_params->near_tolerance_px))
     {
         return;
+    }
+
+    // 识别有效时跟随实际边线段，无结果时覆盖整幅图像便于观察目标范围
+    if((0 != bridge_result) &&
+       bridge_result->valid &&
+       (bridge_result->center_y1 < bridge_result->center_y2) &&
+       (bridge_result->center_y2 < MT9V03X_H))
+    {
+        far_y = bridge_result->center_y1;
+        near_y = bridge_result->center_y2;
     }
 
     far_left = (align_params->target_center_x > align_params->far_tolerance_px) ?
@@ -426,29 +438,71 @@ void screen_show_bridge_align_box(const CameraBridgeAlignParams_t *align_params)
     {
         ips200_draw_line(
             IMAGE_X + far_left,
-            IMAGE_Y + align_params->far_check_row + width,
+            IMAGE_Y + far_y + width,
             IMAGE_X + far_right,
-            IMAGE_Y + align_params->far_check_row + width,
+            IMAGE_Y + far_y + width,
             RGB565_RED);
         ips200_draw_line(
             IMAGE_X + near_left,
-            IMAGE_Y + align_params->near_check_row - width,
+            IMAGE_Y + near_y - width,
             IMAGE_X + near_right,
-            IMAGE_Y + align_params->near_check_row - width,
+            IMAGE_Y + near_y - width,
             RGB565_RED);
         ips200_draw_line(
             IMAGE_X + far_left + width,
-            IMAGE_Y + align_params->far_check_row,
+            IMAGE_Y + far_y,
             IMAGE_X + near_left + width,
-            IMAGE_Y + align_params->near_check_row,
+            IMAGE_Y + near_y,
             RGB565_RED);
         ips200_draw_line(
             IMAGE_X + far_right - width,
-            IMAGE_Y + align_params->far_check_row,
+            IMAGE_Y + far_y,
             IMAGE_X + near_right - width,
-            IMAGE_Y + align_params->near_check_row,
+            IMAGE_Y + near_y,
             RGB565_RED);
     }
+}
+
+void screen_show_bridge_roi(const CameraBridgeParams_t *bridge_params)
+{
+    if((0 == bridge_params) ||
+       (bridge_params->roi_top >= bridge_params->roi_bottom) ||
+       (bridge_params->roi_bottom >= MT9V03X_H) ||
+       (bridge_params->roi_left >= bridge_params->roi_right) ||
+       (bridge_params->roi_right >= MT9V03X_W))
+    {
+        return;
+    }
+
+    // 绿色矩形表示当前双边线扫描的有效区域
+    ips200_draw_line(
+        IMAGE_X + bridge_params->roi_left,
+        IMAGE_Y + bridge_params->roi_top,
+        IMAGE_X + bridge_params->roi_right,
+        IMAGE_Y + bridge_params->roi_top,
+        RGB565_GREEN
+    );
+    ips200_draw_line(
+        IMAGE_X + bridge_params->roi_left,
+        IMAGE_Y + bridge_params->roi_bottom,
+        IMAGE_X + bridge_params->roi_right,
+        IMAGE_Y + bridge_params->roi_bottom,
+        RGB565_GREEN
+    );
+    ips200_draw_line(
+        IMAGE_X + bridge_params->roi_left,
+        IMAGE_Y + bridge_params->roi_top,
+        IMAGE_X + bridge_params->roi_left,
+        IMAGE_Y + bridge_params->roi_bottom,
+        RGB565_GREEN
+    );
+    ips200_draw_line(
+        IMAGE_X + bridge_params->roi_right,
+        IMAGE_Y + bridge_params->roi_top,
+        IMAGE_X + bridge_params->roi_right,
+        IMAGE_Y + bridge_params->roi_bottom,
+        RGB565_GREEN
+    );
 }
 
 void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
@@ -474,7 +528,7 @@ void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
         return;
     }
 
-    // 红色显示左右赛道边线，绿色显示最终控制使用的中线
+    // 红色左右边线各绘制 2 像素宽，向赛道内部加粗
     ips200_draw_line(
         IMAGE_X + bridge_result->left_x1,
         IMAGE_Y + bridge_result->left_y1,
@@ -482,6 +536,19 @@ void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
         IMAGE_Y + bridge_result->left_y2,
         RGB565_RED
     );
+
+    if((bridge_result->left_x1 + 1u < MT9V03X_W) &&
+       (bridge_result->left_x2 + 1u < MT9V03X_W))
+    {
+        ips200_draw_line(
+            IMAGE_X + bridge_result->left_x1 + 1u,
+            IMAGE_Y + bridge_result->left_y1,
+            IMAGE_X + bridge_result->left_x2 + 1u,
+            IMAGE_Y + bridge_result->left_y2,
+            RGB565_RED
+        );
+    }
+
     ips200_draw_line(
         IMAGE_X + bridge_result->right_x1,
         IMAGE_Y + bridge_result->right_y1,
@@ -489,6 +556,20 @@ void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
         IMAGE_Y + bridge_result->right_y2,
         RGB565_RED
     );
+
+    if((bridge_result->right_x1 > 0u) &&
+       (bridge_result->right_x2 > 0u))
+    {
+        ips200_draw_line(
+            IMAGE_X + bridge_result->right_x1 - 1u,
+            IMAGE_Y + bridge_result->right_y1,
+            IMAGE_X + bridge_result->right_x2 - 1u,
+            IMAGE_Y + bridge_result->right_y2,
+            RGB565_RED
+        );
+    }
+
+    // 绿色控制中线绘制 3 像素宽
     ips200_draw_line(
         IMAGE_X + bridge_result->center_x1,
         IMAGE_Y + bridge_result->center_y1,
@@ -496,6 +577,30 @@ void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
         IMAGE_Y + bridge_result->center_y2,
         RGB565_GREEN
     );
+
+    if((bridge_result->center_x1 > 0u) &&
+       (bridge_result->center_x2 > 0u))
+    {
+        ips200_draw_line(
+            IMAGE_X + bridge_result->center_x1 - 1u,
+            IMAGE_Y + bridge_result->center_y1,
+            IMAGE_X + bridge_result->center_x2 - 1u,
+            IMAGE_Y + bridge_result->center_y2,
+            RGB565_GREEN
+        );
+    }
+
+    if((bridge_result->center_x1 + 1u < MT9V03X_W) &&
+       (bridge_result->center_x2 + 1u < MT9V03X_W))
+    {
+        ips200_draw_line(
+            IMAGE_X + bridge_result->center_x1 + 1u,
+            IMAGE_Y + bridge_result->center_y1,
+            IMAGE_X + bridge_result->center_x2 + 1u,
+            IMAGE_Y + bridge_result->center_y2,
+            RGB565_GREEN
+        );
+    }
 }
 
 

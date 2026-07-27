@@ -9,7 +9,7 @@
 #define LED1                                 (P19_0)                     // 摄像头初始化失败蓝色 LED
 #define CAMERA_BINARY_THRESHOLD_DEFAULT      (100u)                      // 默认 固定二值化 阈值
 
-static uint8 image_copy[MT9V03X_H][MT9V03X_W];  // 复制的帧，所有后续图像处理均使用该帧
+static uint8 image_copy[MT9V03X_H][MT9V03X_W];  // 复制的帧，所有后续图像处理和屏幕显示均使用该帧
 
 // 摄像头新帧复制
 static uint8 camera_frame_copy(void)
@@ -113,12 +113,13 @@ uint8 camera_bridge_processing(const CameraBridgeParams_t *bridge_params, Camera
         return 0;
     }
 
-    // 双边线使用原始灰度变化检测边缘，不提前破坏灰度信息
-    if(!camera_frame_copy())
+    // 复制新帧并对整幅图像二值化，屏幕显示该完整二值图
+    if(!camera_frame_cpy_and_basic_processing(bridge_params->binary_threshold))
     {
         return 0;
     }
 
+    // 边线算法只扫描 bridge_params 指定的 ROI
     camproc_bridge_detect(image_copy, bridge_params, bridge_result);
 
     return 1;  // 返回的不是成功识别单边桥，这里最终的结果在 CameraBridgeResult_t 中

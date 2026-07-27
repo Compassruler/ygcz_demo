@@ -1,14 +1,8 @@
 #include "camera_proc.h"
-#include <math.h>
 #include <string.h>
 
 // ==================================================== 参数调节 ====================================================
-#define CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT      (3u)    // 每行每侧最多保留的边缘候选数量
-#define CAMERA_BRIDGE_PAIR_STATE_COUNT          (9u)    // 每行左右候选最多产生的组合数量
-#define CAMERA_BRIDGE_INVALID_STATE_INDEX       (0xFFu)
-#define CAMERA_BRIDGE_POSITION_COST_WEIGHT      (8)     // 相邻行边线位置变化代价
-#define CAMERA_BRIDGE_WIDTH_COST_WEIGHT         (4)     // 相邻行赛道宽度变化代价
-#define CAMERA_BRIDGE_MODEL_COST_WEIGHT         (3)     // 与上一帧预测模型偏差代价
+#define CAMERA_BRIDGE_ENDPOINT_AVERAGE_COUNT    (3u)    // 上下端点分别使用的平均采样点数量
 #define CAMERA_ROW_SPEED_RULE_COUNT              (5u)
 
 // 跳跃次序列表
@@ -34,7 +28,7 @@ static const CamprocRowSpeedRule_t camproc_row_speed_rules[CAMERA_ROW_SPEED_RULE
     {141, 95},
     {162, 85},
     {200, 75},
-    
+
     // 新版自适应算法
     /*
     {116, 105},
@@ -43,7 +37,6 @@ static const CamprocRowSpeedRule_t camproc_row_speed_rules[CAMERA_ROW_SPEED_RULE
     {162, 65},
     {200, 65},
     */
-
 };
 
 
@@ -63,62 +56,13 @@ void camproc_pub_thresh_bin(uint8 image[MT9V03X_H][MT9V03X_W], uint8 threshold)
     }
 }
 
-
-// ==================================================== 单边桥函数 ====================================================
-typedef struct
-{
-    uint8 valid;
-    uint8 x;
-    uint16 strength;
-} CameraBridgeEdgeCandidate_t;
-
-typedef struct
-{
-    uint8 valid;
-    uint8 left_x;
-    uint8 right_x;
-    uint8 previous_index;
-    uint8 path_count;
-    uint16 strength;
-    int32 cost;
-} CameraBridgePairState_t;
-
+// ==================================================== 单边桥和颠簸路段函数 ====================================================
 typedef struct
 {
     uint8 y;
     uint8 left_x;
     uint8 right_x;
-    uint8 weight;
 } CameraBridgeSample_t;
-
-static CameraBridgePairState_t camera_bridge_pair_states[MT9V03X_H][CAMERA_BRIDGE_PAIR_STATE_COUNT];
-static uint8 camera_bridge_state_count[MT9V03X_H];
-static uint8 camera_bridge_anchor_y[MT9V03X_H];
-
-static uint8 camera_bridge_previous_model_valid = 0;
-static float camera_bridge_previous_center_slope = 0.0f;
-static float camera_bridge_previous_center_intercept = 0.0f;
-static float camera_bridge_previous_half_width_slope = 0.0f;
-static float camera_bridge_previous_half_width_intercept = 0.0f;
-
-static uint16 camera_bridge_round_and_limit_x(float value)
-{
-    int32 rounded_value = 0;
-
-    rounded_value = (value >= 0.0f) ?
-        (int32)(value + 0.5f) : (int32)(value - 0.5f);
-
-    if(rounded_value < 0)
-    {
-        rounded_value = 0;
-    }
-    else if(rounded_value >= MT9V03X_W)
-    {
-        rounded_value = MT9V03X_W - 1;
-    }
-
-    return (uint16)rounded_value;
-}
 
 static uint16 camera_bridge_abs_diff_u16(uint16 value_a, uint16 value_b)
 {
@@ -126,674 +70,150 @@ static uint16 camera_bridge_abs_diff_u16(uint16 value_a, uint16 value_b)
         (uint16)(value_a - value_b) : (uint16)(value_b - value_a);
 }
 
-static float camera_bridge_abs_float(float value)
-{
-    return (value >= 0.0f) ? value : -value;
-}
-
-static void camera_bridge_track_reset(void)
-{
-    camera_bridge_previous_model_valid = 0;
-    camera_bridge_previous_center_slope = 0.0f;
-    camera_bridge_previous_center_intercept = 0.0f;
-    camera_bridge_previous_half_width_slope = 0.0f;
-    camera_bridge_previous_half_width_intercept = 0.0f;
-}
-
-static void camera_bridge_sort_candidates(CameraBridgeEdgeCandidate_t candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT])
-{
-    uint8 i = 0;
-    uint8 j = 0;
-    CameraBridgeEdgeCandidate_t temporary = {0};
-
-    for(i = 0; i < CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT; i++)
-    {
-        for(j = (uint8)(i + 1u); j < CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT; j++)
-        {
-            if((!candidates[i].valid && candidates[j].valid) ||
-               (candidates[i].valid && candidates[j].valid &&
-                (candidates[j].strength > candidates[i].strength)))
-            {
-                temporary = candidates[i];
-                candidates[i] = candidates[j];
-                candidates[j] = temporary;
-            }
-        }
-    }
-}
-
-static void camera_bridge_add_candidate(
-    CameraBridgeEdgeCandidate_t candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT],
-    uint16 x,
-    uint16 strength,
-    uint8 min_spacing)
-{
-    uint8 index = 0;
-
-    // 同一条边缘附近只保留最强响应，避免三个候选集中在相邻像素。
-    for(index = 0; index < CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT; index++)
-    {
-        if(candidates[index].valid &&
-           (camera_bridge_abs_diff_u16(candidates[index].x, x) <= min_spacing))
-        {
-            if(strength > candidates[index].strength)
-            {
-                candidates[index].x = (uint8)x;
-                candidates[index].strength = strength;
-                camera_bridge_sort_candidates(candidates);
-            }
-
-            return;
-        }
-    }
-
-    for(index = 0; index < CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT; index++)
-    {
-        if(!candidates[index].valid)
-        {
-            candidates[index].valid = 1;
-            candidates[index].x = (uint8)x;
-            candidates[index].strength = strength;
-            camera_bridge_sort_candidates(candidates);
-            return;
-        }
-    }
-
-    if(strength > candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT - 1u].strength)
-    {
-        candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT - 1u].x = (uint8)x;
-        candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT - 1u].strength = strength;
-        camera_bridge_sort_candidates(candidates);
-    }
-}
-
-static uint8 camera_bridge_find_edge_candidates(
+// 从画面左侧向内寻找连续黑色到连续白色的稳定跳变
+static uint8 camera_bridge_find_left_edge(
     const uint8 image[MT9V03X_H][MT9V03X_W],
     uint16 y,
-    uint16 search_start,
-    uint16 search_end,
-    uint8 left_edge,
     const CameraBridgeParams_t *params,
-    CameraBridgeEdgeCandidate_t candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT])
+    uint8 *left_x)
 {
-    uint8 index = 0;
-    uint8 offset = 0;
-    uint8 candidate_count = 0;
     uint16 x = 0;
-    uint16 left_sum = 0;
-    uint16 right_sum = 0;
-    uint16 strength = 0;
-    int32 signed_strength = 0;
+    uint8 offset = 0;
+    uint8 stable = 0;
 
-    memset(candidates, 0, sizeof(CameraBridgeEdgeCandidate_t) * CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT);
-
-    if(search_start < params->edge_window)
+    for(x = params->roi_left + params->stable_pixel_count;
+        x <= (params->roi_right - params->stable_pixel_count + 1u);
+        x++)
     {
-        search_start = params->edge_window;
-    }
+        stable = 1;
 
-    if(search_end >= (MT9V03X_W - params->edge_window))
-    {
-        search_end = MT9V03X_W - params->edge_window - 1u;
-    }
-
-    if(search_start > search_end)
-    {
-        return 0;
-    }
-
-    for(offset = 1; offset <= params->edge_window; offset++)
-    {
-        left_sum += image[y][search_start - offset];
-        right_sum += image[y][search_start + offset];
-    }
-
-    for(x = search_start; x <= search_end; x++)
-    {
-        // 左边线为黑到白，右边线为白到黑，分别保留对应方向的灰度突变。
-        signed_strength = left_edge ?
-            (int32)right_sum - left_sum : (int32)left_sum - right_sum;
-
-        if(signed_strength >= (int32)params->min_edge_contrast * params->edge_window)
+        for(offset = 0; offset < params->stable_pixel_count; offset++)
         {
-            strength = (uint16)signed_strength;
-            camera_bridge_add_candidate(candidates, x, strength, params->edge_window);
+            if((0u != image[y][x - offset - 1u]) ||
+               (255u != image[y][x + offset]))
+            {
+                stable = 0;
+                break;
+            }
         }
 
-        if(x < search_end)
+        if(stable)
         {
-            left_sum = (uint16)(
-                left_sum + image[y][x] - image[y][x - params->edge_window]);
-            right_sum = (uint16)(
-                right_sum + image[y][x + params->edge_window + 1u] - image[y][x + 1u]);
-        }
-    }
-
-    for(index = 0; index < CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT; index++)
-    {
-        if(candidates[index].valid)
-        {
-            candidate_count++;
-        }
-    }
-
-    return candidate_count;
-}
-
-static uint8 camera_bridge_collect_side_candidates(
-    const uint8 image[MT9V03X_H][MT9V03X_W],
-    uint16 y,
-    uint8 left_edge,
-    uint8 use_previous_model,
-    const CameraBridgeParams_t *params,
-    CameraBridgeEdgeCandidate_t candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT])
-{
-    uint16 search_start = left_edge ? params->left_edge_min_x : params->right_edge_min_x;
-    uint16 search_end = left_edge ? params->left_edge_max_x : params->right_edge_max_x;
-    uint16 predicted_x = 0;
-    uint16 local_start = 0;
-    uint16 local_end = 0;
-    float center_x = 0.0f;
-    float half_width = 0.0f;
-
-    if(use_previous_model && camera_bridge_previous_model_valid)
-    {
-        center_x = camera_bridge_previous_center_slope * (float)y +
-                   camera_bridge_previous_center_intercept;
-        half_width = camera_bridge_previous_half_width_slope * (float)y +
-                     camera_bridge_previous_half_width_intercept;
-        predicted_x = camera_bridge_round_and_limit_x(
-            left_edge ? center_x - half_width : center_x + half_width);
-
-        local_start = (predicted_x > params->local_search_radius) ?
-            (uint16)(predicted_x - params->local_search_radius) : 0u;
-        local_end = (uint16)(predicted_x + params->local_search_radius);
-
-        if(local_start < search_start) local_start = search_start;
-        if(local_end > search_end) local_end = search_end;
-
-        if(camera_bridge_find_edge_candidates(
-            image, y, local_start, local_end, left_edge, params, candidates))
-        {
+            *left_x = (uint8)x;
             return 1;
         }
     }
 
-    return camera_bridge_find_edge_candidates(
-        image, y, search_start, search_end, left_edge, params, candidates);
+    return 0;
 }
 
-static uint8 camera_bridge_build_path(
+// 从画面右侧向内寻找连续黑色到连续白色的稳定跳变
+static uint8 camera_bridge_find_right_edge(
     const uint8 image[MT9V03X_H][MT9V03X_W],
+    uint16 y,
     const CameraBridgeParams_t *params,
-    uint8 use_previous_model,
-    CameraBridgeSample_t samples[MT9V03X_H],
-    uint16 *sample_count)
+    uint8 *right_x)
 {
-    int16 y = 0;
-    int16 best_anchor_index = -1;
-    uint8 left_index = 0;
-    uint8 right_index = 0;
-    uint8 pair_index = 0;
-    uint8 previous_index = 0;
-    uint8 best_state_index = CAMERA_BRIDGE_INVALID_STATE_INDEX;
-    uint8 anchor_count = 0;
-    uint8 pair_count = 0;
-    uint8 best_path_count = 0;
+    int16 x = 0;
+    uint8 offset = 0;
+    uint8 stable = 0;
+
+    for(x = (int16)(params->roi_right - params->stable_pixel_count);
+        x >= (int16)(params->roi_left + params->stable_pixel_count - 1u);
+        x--)
+    {
+        stable = 1;
+
+        for(offset = 0; offset < params->stable_pixel_count; offset++)
+        {
+            if((255u != image[y][(uint16)x - offset]) ||
+               (0u != image[y][(uint16)x + offset + 1u]))
+            {
+                stable = 0;
+                break;
+            }
+        }
+
+        if(stable)
+        {
+            *right_x = (uint8)x;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+// 在当前行同时取得左右边线，并检查赛道宽度
+static uint8 camera_bridge_find_edge_pair(
+    const uint8 image[MT9V03X_H][MT9V03X_W],
+    uint16 y,
+    const CameraBridgeParams_t *params,
+    CameraBridgeSample_t *sample)
+{
+    uint8 left_x = 0;
+    uint8 right_x = 0;
     uint16 lane_width = 0;
-    uint16 previous_width = 0;
-    uint16 left_jump = 0;
-    uint16 right_jump = 0;
-    uint16 width_jump = 0;
-    uint16 row_gap = 0;
-    uint16 gap_step_count = 0;
-    uint16 allowed_jump = 0;
-    uint16 max_pair_strength = (uint16)(2u * params->edge_window * 255u);
-    uint16 path_sample_count = 0;
-    int32 base_cost = 0;
-    int32 transition_cost = 0;
-    int32 total_cost = 0;
-    int32 best_cost = 0x7FFFFFFF;
-    uint16 predicted_left = 0;
-    uint16 predicted_right = 0;
-    float predicted_center = 0.0f;
-    float predicted_half_width = 0.0f;
-    CameraBridgeEdgeCandidate_t left_candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT];
-    CameraBridgeEdgeCandidate_t right_candidates[CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT];
-    CameraBridgePairState_t *state = NULL;
-    CameraBridgePairState_t *previous_state = NULL;
 
-    if(NULL == sample_count)
+    if(!camera_bridge_find_left_edge(
+           image, y, params, &left_x) ||
+       !camera_bridge_find_right_edge(
+           image, y, params, &right_x) ||
+       (left_x >= right_x))
     {
         return 0;
     }
 
-    *sample_count = 0;
-
-    for(y = (int16)params->search_bottom; y >= (int16)params->search_top;
-        y = (int16)(y - params->row_step))
-    {
-        if(!camera_bridge_collect_side_candidates(
-               image, (uint16)y, 1, use_previous_model, params, left_candidates) ||
-           !camera_bridge_collect_side_candidates(
-               image, (uint16)y, 0, use_previous_model, params, right_candidates))
-        {
-            continue;
-        }
-
-        memset(camera_bridge_pair_states[anchor_count], 0,
-               sizeof(camera_bridge_pair_states[anchor_count]));
-        pair_count = 0;
-
-        for(left_index = 0;
-            left_index < CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT;
-            left_index++)
-        {
-            if(!left_candidates[left_index].valid)
-            {
-                continue;
-            }
-
-            for(right_index = 0;
-                right_index < CAMERA_BRIDGE_EDGE_CANDIDATE_COUNT;
-                right_index++)
-            {
-                if(!right_candidates[right_index].valid ||
-                   (left_candidates[left_index].x >= right_candidates[right_index].x))
-                {
-                    continue;
-                }
-
-                lane_width = (uint16)(
-                    right_candidates[right_index].x - left_candidates[left_index].x);
-                if((lane_width < params->min_lane_width) ||
-                   (lane_width > params->max_lane_width))
-                {
-                    continue;
-                }
-
-                state = &camera_bridge_pair_states[anchor_count][pair_count];
-                state->valid = 1;
-                state->left_x = left_candidates[left_index].x;
-                state->right_x = right_candidates[right_index].x;
-                state->strength = (uint16)(
-                    left_candidates[left_index].strength +
-                    right_candidates[right_index].strength);
-                state->previous_index = CAMERA_BRIDGE_INVALID_STATE_INDEX;
-                state->path_count = 1;
-                base_cost = (int32)max_pair_strength - state->strength;
-
-                if(use_previous_model && camera_bridge_previous_model_valid)
-                {
-                    predicted_center =
-                        camera_bridge_previous_center_slope * (float)y +
-                        camera_bridge_previous_center_intercept;
-                    predicted_half_width =
-                        camera_bridge_previous_half_width_slope * (float)y +
-                        camera_bridge_previous_half_width_intercept;
-                    predicted_left = camera_bridge_round_and_limit_x(
-                        predicted_center - predicted_half_width);
-                    predicted_right = camera_bridge_round_and_limit_x(
-                        predicted_center + predicted_half_width);
-
-                    base_cost +=
-                        (camera_bridge_abs_diff_u16(state->left_x, predicted_left) +
-                         camera_bridge_abs_diff_u16(state->right_x, predicted_right)) *
-                        CAMERA_BRIDGE_MODEL_COST_WEIGHT;
-                }
-
-                state->cost = base_cost;
-
-                if(anchor_count > 0u)
-                {
-                    row_gap = (uint16)(
-                        camera_bridge_anchor_y[anchor_count - 1u] - (uint16)y);
-                    gap_step_count = (uint16)(
-                        (row_gap + params->row_step - 1u) / params->row_step);
-
-                    if(gap_step_count <= (uint16)params->max_missing_rows + 1u)
-                    {
-                        allowed_jump = (uint16)(params->max_edge_jump * gap_step_count);
-
-                        for(previous_index = 0;
-                            previous_index < camera_bridge_state_count[anchor_count - 1u];
-                            previous_index++)
-                        {
-                            previous_state =
-                                &camera_bridge_pair_states[anchor_count - 1u][previous_index];
-                            left_jump = camera_bridge_abs_diff_u16(
-                                state->left_x, previous_state->left_x);
-                            right_jump = camera_bridge_abs_diff_u16(
-                                state->right_x, previous_state->right_x);
-
-                            if((left_jump > allowed_jump) || (right_jump > allowed_jump))
-                            {
-                                continue;
-                            }
-
-                            previous_width = (uint16)(
-                                previous_state->right_x - previous_state->left_x);
-                            width_jump = camera_bridge_abs_diff_u16(lane_width, previous_width);
-                            transition_cost =
-                                (int32)(left_jump + right_jump) *
-                                    CAMERA_BRIDGE_POSITION_COST_WEIGHT +
-                                (int32)width_jump * CAMERA_BRIDGE_WIDTH_COST_WEIGHT;
-                            total_cost = previous_state->cost + base_cost + transition_cost;
-
-                            if(((uint16)previous_state->path_count + 1u > state->path_count) ||
-                               (((uint16)previous_state->path_count + 1u == state->path_count) &&
-                                (total_cost < state->cost)))
-                            {
-                                state->path_count = (uint8)(previous_state->path_count + 1u);
-                                state->previous_index = previous_index;
-                                state->cost = total_cost;
-                            }
-                        }
-                    }
-                }
-
-                pair_count++;
-            }
-        }
-
-        if(0u == pair_count)
-        {
-            continue;
-        }
-
-        camera_bridge_anchor_y[anchor_count] = (uint8)y;
-        camera_bridge_state_count[anchor_count] = pair_count;
-        anchor_count++;
-    }
-
-    for(pair_index = 0; pair_index < anchor_count; pair_index++)
-    {
-        for(previous_index = 0;
-            previous_index < camera_bridge_state_count[pair_index];
-            previous_index++)
-        {
-            state = &camera_bridge_pair_states[pair_index][previous_index];
-
-            if((state->path_count > best_path_count) ||
-               ((state->path_count == best_path_count) && (state->cost < best_cost)))
-            {
-                best_path_count = state->path_count;
-                best_cost = state->cost;
-                best_anchor_index = pair_index;
-                best_state_index = previous_index;
-            }
-        }
-    }
-
-    if((best_anchor_index < 0) ||
-       (best_state_index == CAMERA_BRIDGE_INVALID_STATE_INDEX) ||
-       (best_path_count < params->min_point_count))
+    lane_width = (uint16)right_x - left_x;
+    if((lane_width < params->min_lane_width) ||
+       (lane_width > params->max_lane_width))
     {
         return 0;
     }
 
-    while((best_anchor_index >= 0) &&
-          (best_state_index != CAMERA_BRIDGE_INVALID_STATE_INDEX) &&
-          (path_sample_count < MT9V03X_H))
-    {
-        state = &camera_bridge_pair_states[best_anchor_index][best_state_index];
-        samples[path_sample_count].y = camera_bridge_anchor_y[best_anchor_index];
-        samples[path_sample_count].left_x = state->left_x;
-        samples[path_sample_count].right_x = state->right_x;
-        samples[path_sample_count].weight = (uint8)(
-            1u + state->strength / (2u * params->edge_window * 64u));
-        if(samples[path_sample_count].weight > 4u)
-        {
-            samples[path_sample_count].weight = 4u;
-        }
-
-        path_sample_count++;
-        best_state_index = state->previous_index;
-        best_anchor_index--;
-    }
-
-    *sample_count = path_sample_count;
-    return path_sample_count >= params->min_point_count;
-}
-
-static uint8 camera_bridge_fit_model(
-    const CameraBridgeSample_t samples[MT9V03X_H],
-    const uint8 inlier_mask[MT9V03X_H],
-    uint16 sample_count,
-    uint8 fit_center,
-    float *slope,
-    float *intercept,
-    float *mean_square_error,
-    uint16 *inlier_count)
-{
-    uint16 index = 0;
-    uint16 count = 0;
-    float y = 0.0f;
-    float value = 0.0f;
-    float weight = 0.0f;
-    float weight_sum = 0.0f;
-    float sum_y = 0.0f;
-    float sum_value = 0.0f;
-    float sum_yy = 0.0f;
-    float sum_y_value = 0.0f;
-    float denominator = 0.0f;
-    float error = 0.0f;
-    float error_sum = 0.0f;
-
-    if((NULL == slope) || (NULL == intercept) ||
-       (NULL == mean_square_error) || (NULL == inlier_count))
-    {
-        return 0;
-    }
-
-    for(index = 0; index < sample_count; index++)
-    {
-        if(!inlier_mask[index])
-        {
-            continue;
-        }
-
-        y = (float)samples[index].y;
-        value = fit_center ?
-            ((float)samples[index].left_x + samples[index].right_x) * 0.5f :
-            ((float)samples[index].right_x - samples[index].left_x) * 0.5f;
-        weight = (float)samples[index].weight;
-        weight_sum += weight;
-        sum_y += weight * y;
-        sum_value += weight * value;
-        sum_yy += weight * y * y;
-        sum_y_value += weight * y * value;
-        count++;
-    }
-
-    if((count < 2u) || (weight_sum <= 0.0f))
-    {
-        return 0;
-    }
-
-    denominator = weight_sum * sum_yy - sum_y * sum_y;
-    if(camera_bridge_abs_float(denominator) < 0.0001f)
-    {
-        return 0;
-    }
-
-    *slope = (weight_sum * sum_y_value - sum_y * sum_value) / denominator;
-    *intercept = (sum_value - *slope * sum_y) / weight_sum;
-
-    for(index = 0; index < sample_count; index++)
-    {
-        if(!inlier_mask[index])
-        {
-            continue;
-        }
-
-        value = fit_center ?
-            ((float)samples[index].left_x + samples[index].right_x) * 0.5f :
-            ((float)samples[index].right_x - samples[index].left_x) * 0.5f;
-        error = value - (*slope * (float)samples[index].y + *intercept);
-        error_sum += error * error;
-    }
-
-    *mean_square_error = error_sum / (float)count;
-    *inlier_count = count;
+    sample->y = (uint8)y;
+    sample->left_x = left_x;
+    sample->right_x = right_x;
     return 1;
 }
 
-static uint8 camera_bridge_fit_path(
-    const CameraBridgeSample_t samples[MT9V03X_H],
-    uint16 sample_count,
-    const CameraBridgeParams_t *params,
-    CameraBridgeResult_t *result)
+// 保存当前最长的连续双边线段
+static void camera_bridge_update_best_segment(
+    const CameraBridgeSample_t current_samples[MT9V03X_H],
+    uint16 current_count,
+    CameraBridgeSample_t best_samples[MT9V03X_H],
+    uint16 *best_count)
 {
     uint16 index = 0;
-    uint16 inlier_count = 0;
-    uint16 top = MT9V03X_H;
-    uint16 bottom = 0;
-    uint8 inlier_mask[MT9V03X_H];
-    float center_slope = 0.0f;
-    float center_intercept = 0.0f;
-    float half_width_slope = 0.0f;
-    float half_width_intercept = 0.0f;
-    float center_error = 0.0f;
-    float width_error = 0.0f;
-    float center_residual = 0.0f;
-    float width_residual = 0.0f;
-    float center_top = 0.0f;
-    float center_bottom = 0.0f;
-    float half_width_top = 0.0f;
-    float half_width_bottom = 0.0f;
-    float left_top = 0.0f;
-    float left_bottom = 0.0f;
-    float right_top = 0.0f;
-    float right_bottom = 0.0f;
+    uint16 current_span = 0;
+    uint16 best_span = 0;
 
-    memset(inlier_mask, 1, sizeof(inlier_mask));
-
-    if(!camera_bridge_fit_model(
-           samples, inlier_mask, sample_count, 1,
-           &center_slope, &center_intercept, &center_error, &inlier_count) ||
-       !camera_bridge_fit_model(
-           samples, inlier_mask, sample_count, 0,
-           &half_width_slope, &half_width_intercept, &width_error, &inlier_count))
+    if(0u == current_count)
     {
-        return 0;
+        return;
     }
 
-    // 第一次拟合后删除偏离中线或赛道宽度模型的点，再进行最终拟合。
-    for(index = 0; index < sample_count; index++)
-    {
-        center_residual =
-            ((float)samples[index].left_x + samples[index].right_x) * 0.5f -
-            (center_slope * samples[index].y + center_intercept);
-        width_residual =
-            ((float)samples[index].right_x - samples[index].left_x) * 0.5f -
-            (half_width_slope * samples[index].y + half_width_intercept);
+    current_span = (uint16)(
+        current_samples[0].y - current_samples[current_count - 1u].y);
 
-        if((camera_bridge_abs_float(center_residual) > params->center_residual_limit) ||
-           (camera_bridge_abs_float(width_residual) > params->width_residual_limit))
-        {
-            inlier_mask[index] = 0;
-        }
+    if(0u != *best_count)
+    {
+        best_span = (uint16)(
+            best_samples[0].y - best_samples[*best_count - 1u].y);
     }
 
-    if(!camera_bridge_fit_model(
-           samples, inlier_mask, sample_count, 1,
-           &center_slope, &center_intercept, &center_error, &inlier_count) ||
-       (inlier_count < params->min_point_count) ||
-       !camera_bridge_fit_model(
-           samples, inlier_mask, sample_count, 0,
-           &half_width_slope, &half_width_intercept, &width_error, &inlier_count) ||
-       (inlier_count < params->min_point_count))
+    if((current_count < *best_count) ||
+       ((current_count == *best_count) && (current_span <= best_span)))
     {
-        return 0;
+        return;
     }
 
-    for(index = 0; index < sample_count; index++)
+    for(index = 0; index < current_count; index++)
     {
-        if(!inlier_mask[index])
-        {
-            continue;
-        }
-
-        if(samples[index].y < top) top = samples[index].y;
-        if(samples[index].y > bottom) bottom = samples[index].y;
+        best_samples[index] = current_samples[index];
     }
 
-    if((top >= MT9V03X_H) || (bottom <= top) ||
-       ((bottom - top) < params->min_y_span))
-    {
-        return 0;
-    }
-
-    center_top = center_slope * (float)top + center_intercept;
-    center_bottom = center_slope * (float)bottom + center_intercept;
-    half_width_top = half_width_slope * (float)top + half_width_intercept;
-    half_width_bottom = half_width_slope * (float)bottom + half_width_intercept;
-
-    if((half_width_top <= 0.0f) || (half_width_bottom <= 0.0f) ||
-       ((half_width_top * 2.0f) < params->min_lane_width) ||
-       ((half_width_top * 2.0f) > params->max_lane_width) ||
-       ((half_width_bottom * 2.0f) < params->min_lane_width) ||
-       ((half_width_bottom * 2.0f) > params->max_lane_width) ||
-       ((half_width_bottom + params->width_residual_limit) < half_width_top))
-    {
-        return 0;
-    }
-
-    left_top = center_top - half_width_top;
-    left_bottom = center_bottom - half_width_bottom;
-    right_top = center_top + half_width_top;
-    right_bottom = center_bottom + half_width_bottom;
-
-    if((left_top < 0.0f) || (left_bottom < 0.0f) ||
-       (right_top >= MT9V03X_W) || (right_bottom >= MT9V03X_W) ||
-       (left_top >= right_top) || (left_bottom >= right_bottom))
-    {
-        return 0;
-    }
-
-    result->top = top;
-    result->bottom = bottom;
-    result->point_count = inlier_count;
-    result->left_x1 = camera_bridge_round_and_limit_x(left_top);
-    result->left_y1 = top;
-    result->left_x2 = camera_bridge_round_and_limit_x(left_bottom);
-    result->left_y2 = bottom;
-    result->right_x1 = camera_bridge_round_and_limit_x(right_top);
-    result->right_y1 = top;
-    result->right_x2 = camera_bridge_round_and_limit_x(right_bottom);
-    result->right_y2 = bottom;
-    result->center_x1 = camera_bridge_round_and_limit_x(center_top);
-    result->center_y1 = top;
-    result->center_x2 = camera_bridge_round_and_limit_x(center_bottom);
-    result->center_y2 = bottom;
-    result->center_slope = center_slope;
-    result->center_intercept = center_intercept;
-    result->half_width_slope = half_width_slope;
-    result->half_width_intercept = half_width_intercept;
-    result->center_error = center_error;
-    result->width_error = width_error;
-    result->valid = 1;
-
-    return 1;
-}
-
-static uint8 camera_bridge_detect_once(
-    const uint8 image[MT9V03X_H][MT9V03X_W],
-    const CameraBridgeParams_t *params,
-    uint8 use_previous_model,
-    CameraBridgeResult_t *result)
-{
-    uint16 sample_count = 0;
-    CameraBridgeSample_t samples[MT9V03X_H];
-
-    if(!camera_bridge_build_path(
-           image, params, use_previous_model, samples, &sample_count))
-    {
-        return 0;
-    }
-
-    return camera_bridge_fit_path(samples, sample_count, params, result);
+    *best_count = current_count;
 }
 
 uint8 camproc_bridge_detect(
@@ -801,7 +221,24 @@ uint8 camproc_bridge_detect(
     const CameraBridgeParams_t *params,
     CameraBridgeResult_t *result)
 {
+    int16 y = 0;
+    uint8 pair_valid = 0;
+    uint8 missing_rows = 0;
+    uint16 current_count = 0;
+    uint16 best_count = 0;
     uint16 maximum_point_count = 0;
+    uint16 allowed_jump = 0;
+    uint16 average_count = 0;
+    uint16 index = 0;
+    uint32 far_left_sum = 0;
+    uint32 far_right_sum = 0;
+    uint32 far_y_sum = 0;
+    uint32 near_left_sum = 0;
+    uint32 near_right_sum = 0;
+    uint32 near_y_sum = 0;
+    CameraBridgeSample_t sample = {0};
+    CameraBridgeSample_t current_samples[MT9V03X_H];
+    CameraBridgeSample_t best_samples[MT9V03X_H];
 
     if(NULL == result)
     {
@@ -810,66 +247,121 @@ uint8 camproc_bridge_detect(
 
     memset(result, 0, sizeof(*result));
 
-    if((NULL == image) || (NULL == params))
-    {
-        return 0;
-    }
-
-    if((params->search_top >= params->search_bottom) ||
-       (params->search_bottom >= MT9V03X_H) ||
-       (params->left_edge_min_x >= params->left_edge_max_x) ||
-       (params->left_edge_max_x >= MT9V03X_W) ||
-       (params->right_edge_min_x >= params->right_edge_max_x) ||
-       (params->right_edge_max_x >= MT9V03X_W) ||
+    if((NULL == image) || (NULL == params) ||
+       (params->roi_top >= params->roi_bottom) ||
+       (params->roi_bottom >= MT9V03X_H) ||
+       (params->roi_left >= params->roi_right) ||
+       (params->roi_right >= MT9V03X_W) ||
        (params->min_lane_width >= params->max_lane_width) ||
-       (params->max_lane_width >= MT9V03X_W) ||
        (0u == params->max_edge_jump) ||
        (params->min_point_count < 2u) ||
        (0u == params->min_y_span) ||
-       (0u == params->center_residual_limit) ||
-       (0u == params->width_residual_limit) ||
        (0u == params->row_step) ||
-       (0u == params->edge_window) ||
-       (params->edge_window > 8u) ||
-       (0u == params->min_edge_contrast) ||
-       (params->local_search_radius < params->edge_window))
+       (0u == params->stable_pixel_count) ||
+       ((uint16)params->stable_pixel_count * 2u >=
+        (params->roi_right - params->roi_left + 1u)))
     {
         return 0;
     }
 
     maximum_point_count = (uint16)(
-        (params->search_bottom - params->search_top) / params->row_step + 1u);
-    if((params->min_point_count > maximum_point_count) ||
-       (params->min_lane_width >
-        (params->right_edge_max_x - params->left_edge_min_x)))
+        ((uint16)(params->roi_bottom - params->roi_top) /
+         (uint16)params->row_step) + 1u);
+    if(params->min_point_count > maximum_point_count)
     {
         return 0;
     }
 
-    // 上一帧模型附近优先局部搜索；失败后同一帧立即执行完整搜索。
-    if(camera_bridge_previous_model_valid &&
-       camera_bridge_detect_once(image, params, 1, result))
+    // 从画面下方向上逐行扫描，低视角下超出画面的近处边线会自然被跳过
+    for(y = (int16)params->roi_bottom;
+        y >= (int16)params->roi_top;
+        y -= params->row_step)
     {
-        camera_bridge_previous_center_slope = result->center_slope;
-        camera_bridge_previous_center_intercept = result->center_intercept;
-        camera_bridge_previous_half_width_slope = result->half_width_slope;
-        camera_bridge_previous_half_width_intercept = result->half_width_intercept;
-        return 1;
+        pair_valid = camera_bridge_find_edge_pair(
+            image, (uint16)y, params, &sample);
+
+        if(pair_valid && (0u != current_count))
+        {
+            allowed_jump = (uint16)(
+                params->max_edge_jump * (uint16)(missing_rows + 1u));
+
+            if((camera_bridge_abs_diff_u16(
+                    sample.left_x,
+                    current_samples[current_count - 1u].left_x) > allowed_jump) ||
+               (camera_bridge_abs_diff_u16(
+                    sample.right_x,
+                    current_samples[current_count - 1u].right_x) > allowed_jump))
+            {
+                camera_bridge_update_best_segment(
+                    current_samples, current_count, best_samples, &best_count);
+                current_count = 0;
+                missing_rows = 0;
+            }
+        }
+
+        if(pair_valid)
+        {
+            current_samples[current_count] = sample;
+            current_count++;
+            missing_rows = 0;
+        }
+        else if(0u != current_count)
+        {
+            missing_rows++;
+
+            if(missing_rows > params->max_missing_rows)
+            {
+                camera_bridge_update_best_segment(
+                    current_samples, current_count, best_samples, &best_count);
+                current_count = 0;
+                missing_rows = 0;
+            }
+        }
     }
 
-    memset(result, 0, sizeof(*result));
-    if(camera_bridge_detect_once(image, params, 0, result))
+    camera_bridge_update_best_segment(
+        current_samples, current_count, best_samples, &best_count);
+
+    if((best_count < params->min_point_count) ||
+       ((uint16)(best_samples[0].y - best_samples[best_count - 1u].y) <
+        params->min_y_span))
     {
-        camera_bridge_previous_model_valid = 1;
-        camera_bridge_previous_center_slope = result->center_slope;
-        camera_bridge_previous_center_intercept = result->center_intercept;
-        camera_bridge_previous_half_width_slope = result->half_width_slope;
-        camera_bridge_previous_half_width_intercept = result->half_width_intercept;
-        return 1;
+        return 0;
     }
 
-    camera_bridge_track_reset();
-    return 0;
+    average_count = (best_count < CAMERA_BRIDGE_ENDPOINT_AVERAGE_COUNT) ?
+        best_count : CAMERA_BRIDGE_ENDPOINT_AVERAGE_COUNT;
+
+    // 分别平均连续边线段的上端和下端，减少单行抖动对控制的影响
+    for(index = 0; index < average_count; index++)
+    {
+        near_left_sum += best_samples[index].left_x;
+        near_right_sum += best_samples[index].right_x;
+        near_y_sum += best_samples[index].y;
+
+        far_left_sum += best_samples[best_count - 1u - index].left_x;
+        far_right_sum += best_samples[best_count - 1u - index].right_x;
+        far_y_sum += best_samples[best_count - 1u - index].y;
+    }
+
+    result->top = best_samples[best_count - 1u].y;
+    result->bottom = best_samples[0].y;
+    result->point_count = best_count;
+    result->left_x1 = (uint16)(far_left_sum / average_count);
+    result->left_y1 = (uint16)(far_y_sum / average_count);
+    result->left_x2 = (uint16)(near_left_sum / average_count);
+    result->left_y2 = (uint16)(near_y_sum / average_count);
+    result->right_x1 = (uint16)(far_right_sum / average_count);
+    result->right_y1 = result->left_y1;
+    result->right_x2 = (uint16)(near_right_sum / average_count);
+    result->right_y2 = result->left_y2;
+    result->center_x1 = (uint16)((result->left_x1 + result->right_x1) / 2u);
+    result->center_y1 = result->left_y1;
+    result->center_x2 = (uint16)((result->left_x2 + result->right_x2) / 2u);
+    result->center_y2 = result->left_y2;
+    result->valid = 1;
+
+    return 1;
 }
 
 static int16 camproc_bridge_yaw_offset_to_control(
@@ -906,7 +398,6 @@ void camproc_bridge_align_reset(CameraBridgeAlignState_t *align_state)
 
     memset(align_state, 0, sizeof(*align_state));
     align_state->phase = CAMERA_BRIDGE_ALIGN_TRACK;
-    camera_bridge_track_reset();
 }
 
 uint8 camproc_bridge_align_update(
@@ -916,15 +407,21 @@ uint8 camproc_bridge_align_update(
     CameraBridgeAlignResult_t *align_result)
 {
     uint16 active_x = 0;
-    uint16 far_x = 0;
-    uint16 near_x = 0;
+    uint16 active_y = 0;
+    uint16 vertical_span = 0;
+    uint16 tilt_error_abs = 0;
     uint8 center_line_inside = 0;
     float point_error = 0.0f;
+    float error_gain = 0.0f;
     float yaw_offset = 0.0f;
+    int32 tilt_error_numerator = 0;
+    int32 normalized_tilt_error = 0;
     int32 yaw_offset_d10 = 0;
     int32 yaw_change_d10 = 0;
     int32 far_error = 0;
     int32 near_error = 0;
+    int32 far_residual = 0;
+    int32 near_residual = 0;
 
     if(NULL == align_result)
     {
@@ -939,17 +436,18 @@ uint8 camproc_bridge_align_update(
     }
 
     if((align_params->target_center_x >= MT9V03X_W) ||
-       (align_params->lookahead_row >= MT9V03X_H) ||
-       (align_params->far_check_row >= MT9V03X_H) ||
-       (align_params->near_check_row >= MT9V03X_H) ||
-       (align_params->far_check_row >= align_params->near_check_row) ||
        (0u == align_params->far_tolerance_px) ||
        (0u == align_params->near_tolerance_px) ||
+       (0u == align_params->tilt_reference_span) ||
+       (align_params->tilt_reference_span > MT9V03X_H) ||
+       (0u == align_params->tilt_enter_threshold_px) ||
+       (align_params->tilt_exit_threshold_px >= align_params->tilt_enter_threshold_px) ||
        (0u == align_params->complete_confirm_frames) ||
        (0u == align_params->lost_reset_frames) ||
        (align_params->point_filter_alpha < 0.0f) ||
        (align_params->point_filter_alpha > 1.0f) ||
        (align_params->point_gain_d10_per_px <= 0.0f) ||
+       (align_params->tilt_gain_d10_per_px <= 0.0f) ||
        (0.0f == align_params->point_direction) ||
        (align_params->yaw_offset_limit_d10 <= 0) ||
        (align_params->yaw_slew_limit_d10 <= 0) ||
@@ -962,18 +460,8 @@ uint8 camproc_bridge_align_update(
 
     align_result->phase = align_state->phase;
 
-    // 对准完成后锁存状态，等待核心0切换到下一阶段。
-    if(CAMERA_BRIDGE_ALIGN_COMPLETE == align_state->phase)
-    {
-        align_result->valid = 1;
-        align_result->point_inside = 1;
-        align_result->aligned = 1;
-        return 1;
-    }
-
     if(!bridge_result->valid ||
-       (align_params->lookahead_row < bridge_result->top) ||
-       (align_params->lookahead_row > bridge_result->bottom))
+       (bridge_result->center_y1 >= bridge_result->center_y2))
     {
         align_state->complete_frame_count = 0;
 
@@ -996,24 +484,29 @@ uint8 camproc_bridge_align_update(
 
     align_state->lost_frame_count = 0;
     align_result->valid = 1;
-    active_x = camera_bridge_round_and_limit_x(
-        bridge_result->center_slope * align_params->lookahead_row +
-        bridge_result->center_intercept);
-    far_x = camera_bridge_round_and_limit_x(
-        bridge_result->center_slope * align_params->far_check_row +
-        bridge_result->center_intercept);
-    near_x = camera_bridge_round_and_limit_x(
-        bridge_result->center_slope * align_params->near_check_row +
-        bridge_result->center_intercept);
 
+    // 中线中点用于横向位置控制，上下端点差值用于倾角控制
+    active_x = (uint16)(
+        (bridge_result->center_x1 + bridge_result->center_x2 + 1u) / 2u);
+    active_y = (uint16)(
+        (bridge_result->center_y1 + bridge_result->center_y2 + 1u) / 2u);
     align_result->active_x = active_x;
-    align_result->active_y = align_params->lookahead_row;
+    align_result->active_y = active_y;
 
-    far_error = (int32)far_x - align_params->target_center_x;
-    near_error = (int32)near_x - align_params->target_center_x;
+    far_error = (int32)bridge_result->center_x1 - align_params->target_center_x;
+    near_error = (int32)bridge_result->center_x2 - align_params->target_center_x;
+    vertical_span = bridge_result->center_y2 - bridge_result->center_y1;
+    tilt_error_numerator =
+        ((int32)bridge_result->center_x1 - bridge_result->center_x2)
+        * align_params->tilt_reference_span;
+
+    // 将不同长度中线的倾斜量统一换算到固定纵向跨度
+    normalized_tilt_error = (tilt_error_numerator >= 0) ?
+        (tilt_error_numerator + (int32)(vertical_span / 2u)) / (int32)vertical_span :
+        (tilt_error_numerator - (int32)(vertical_span / 2u)) / (int32)vertical_span;
+    align_result->tilt_error_px = (int16)normalized_tilt_error;
+
     center_line_inside = (uint8)(
-        (align_params->far_check_row >= bridge_result->top) &&
-        (align_params->near_check_row <= bridge_result->bottom) &&
         (far_error >= -(int32)align_params->far_tolerance_px) &&
         (far_error <=  (int32)align_params->far_tolerance_px) &&
         (near_error >= -(int32)align_params->near_tolerance_px) &&
@@ -1034,7 +527,7 @@ uint8 camproc_bridge_align_update(
 
     if(align_state->complete_frame_count >= align_params->complete_confirm_frames)
     {
-        align_state->phase = CAMERA_BRIDGE_ALIGN_COMPLETE;
+        align_state->tilt_control_active = 0;
         align_state->previous_yaw_offset_d10 = 0;
         align_result->valid = 1;
         align_result->point_inside = 1;
@@ -1055,7 +548,36 @@ uint8 camproc_bridge_align_update(
             + (1.0f - align_params->point_filter_alpha) * (float)active_x;
     }
 
-    point_error = align_state->filtered_point_x - align_params->target_center_x;
+    tilt_error_abs = (uint16)((normalized_tilt_error >= 0) ?
+        normalized_tilt_error : -normalized_tilt_error);
+
+    // 使用迟滞阈值切换控制模式，避免在倾角阈值附近反复跳变
+    if(align_state->tilt_control_active)
+    {
+        if(tilt_error_abs <= align_params->tilt_exit_threshold_px)
+        {
+            align_state->tilt_control_active = 0;
+        }
+    }
+    else if(tilt_error_abs >= align_params->tilt_enter_threshold_px)
+    {
+        align_state->tilt_control_active = 1;
+    }
+
+    align_result->tilt_control_active = align_state->tilt_control_active;
+
+    // 中线明显倾斜时优先修正方向，基本竖直后再修正中点位置
+    if(align_state->tilt_control_active)
+    {
+        point_error = (float)normalized_tilt_error;
+        error_gain = align_params->tilt_gain_d10_per_px;
+    }
+    else
+    {
+        point_error = align_state->filtered_point_x - align_params->target_center_x;
+        error_gain = align_params->point_gain_d10_per_px;
+    }
+
     if(point_error > align_params->control_deadband_px)
     {
         point_error -= align_params->control_deadband_px;
@@ -1069,10 +591,37 @@ uint8 camproc_bridge_align_update(
         point_error = 0.0f;
     }
 
+    // 尚未对齐但控制误差落入死区时，使用超出容差最多的端点继续修正
+    if((0.0f == point_error) && !center_line_inside)
+    {
+        if(far_error > (int32)align_params->far_tolerance_px)
+        {
+            far_residual = far_error - align_params->far_tolerance_px;
+        }
+        else if(far_error < -(int32)align_params->far_tolerance_px)
+        {
+            far_residual = far_error + align_params->far_tolerance_px;
+        }
+
+        if(near_error > (int32)align_params->near_tolerance_px)
+        {
+            near_residual = near_error - align_params->near_tolerance_px;
+        }
+        else if(near_error < -(int32)align_params->near_tolerance_px)
+        {
+            near_residual = near_error + align_params->near_tolerance_px;
+        }
+
+        point_error = ((far_residual >= 0 ? far_residual : -far_residual) >=
+                       (near_residual >= 0 ? near_residual : -near_residual)) ?
+            (float)far_residual : (float)near_residual;
+        error_gain = align_params->point_gain_d10_per_px;
+    }
+
     align_result->point_error_px = (point_error >= 0.0f) ?
         (int16)(point_error + 0.5f) : (int16)(point_error - 0.5f);
     yaw_offset = align_params->point_direction
-               * align_params->point_gain_d10_per_px
+               * error_gain
                * point_error;
     yaw_offset_d10 = (yaw_offset >= 0.0f) ?
         (int32)(yaw_offset + 0.5f) : (int32)(yaw_offset - 0.5f);
@@ -1137,8 +686,6 @@ uint8 camproc_pub_check_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row
     uint32 current_dot_count = 0;   // 矩形中已经计数的符合条件的点的数量
 
     uint8 target_dot_value = (dot_type == CAMERA_IMAGE_DOT_BLACK) ? 0 : 255;        // 检测点具体值类型
-    uint32 check_area_size = (uint32)check_row_count * (uint32)check_column_count;  // 检测区域面积
-
     /* 已移除所有安全限制 */
 
     // 遍历矩形

@@ -18,43 +18,43 @@
 #define ADAPTIVE_ROW_COEFF      (-5)                            // 自适应 Row 系数，数字为正，更晚切换到低 Row，更偏高 Row，跳跃时间更早；数字为负，更早切换到低 Row，更偏低 Row，跳跃时间越晚
 
 //=========================== 单边桥识别参数 ===========================
-#define BRIDGE_SEARCH_TOP                 (5)                    // 双边线搜索区域最上行
-#define BRIDGE_SEARCH_BOTTOM              (MT9V03X_H - 5)        // 双边线搜索区域最下行
-#define BRIDGE_LEFT_EDGE_MIN_X            (3)                    // 左边线搜索最小横坐标
-#define BRIDGE_LEFT_EDGE_MAX_X            (145)                  // 左边线搜索最大横坐标
-#define BRIDGE_RIGHT_EDGE_MIN_X           (42)                   // 右边线搜索最小横坐标
-#define BRIDGE_RIGHT_EDGE_MAX_X           (MT9V03X_W - 4)        // 右边线搜索最大横坐标
+#define BRIDGE_BINARY_THRESHOLD           (115)                  // 单边桥固定二值化阈值
 
-#define BRIDGE_MIN_LANE_WIDTH             (100)                   // 左右边线最小间距
-#define BRIDGE_MAX_LANE_WIDTH             (185)                  // 左右边线最大间距
-#define BRIDGE_MAX_EDGE_JUMP              (25)                   // 相邻行锚点边线最大横向变化
-#define BRIDGE_MIN_POINT_COUNT            (8)                   // 最少有效行锚点数量
-#define BRIDGE_MIN_Y_SPAN                 (5)                   // 有效边线点最小纵向跨度
-#define BRIDGE_CENTER_RESIDUAL_LIMIT      (8)                    // 中线拟合最大横向残差
-#define BRIDGE_WIDTH_RESIDUAL_LIMIT       (7)                    // 赛道半宽拟合最大横向残差
-#define BRIDGE_ROW_STEP                   (2)                    // 行锚点采样间隔
-#define BRIDGE_EDGE_WINDOW                (3)                    // 边缘两侧灰度均值窗口
-#define BRIDGE_MIN_EDGE_CONTRAST          (20)                   // 边缘两侧最小平均灰度差
-#define BRIDGE_LOCAL_SEARCH_RADIUS        (14)                   // 上一帧边线附近局部搜索半径
-#define BRIDGE_MAX_MISSING_ROWS           (2)                    // 允许连续缺失的行锚点数量
+#define BRIDGE_ROI_TOP                     (3)                    // 单边桥 ROI 最上行
+#define BRIDGE_ROI_BOTTOM                  (117)                  // 单边桥 ROI 最下行，降低该值可排除更多底部暗区
+#define BRIDGE_ROI_LEFT                    (3)                    // 单边桥 ROI 最左列
+#define BRIDGE_ROI_RIGHT                   (MT9V03X_W - 3)        // 单边桥 ROI 最右列
+
+#define BRIDGE_MIN_LANE_WIDTH             (20)                   // 左右边线最小间距
+#define BRIDGE_MAX_LANE_WIDTH             (180)                  // 左右边线最大间距
+
+#define BRIDGE_MAX_EDGE_JUMP              (2)                   // 相邻采样行边线最大横向变化
+#define BRIDGE_MIN_POINT_COUNT            (50)                    // 最少连续有效采样行数量
+#define BRIDGE_MIN_Y_SPAN                 (20)                   // 有效边线段最小纵向跨度
+#define BRIDGE_ROW_STEP                   (1)                    // 纵向采样行间隔
+#define BRIDGE_STABLE_PIXEL_COUNT         (4)                    // 边缘两侧连续黑白像素数量
+#define BRIDGE_MAX_MISSING_ROWS           (5)                    // 同一边线段允许连续缺失的采样行数量
 
 #define BRIDGE_TARGET_CENTER_X            (MT9V03X_W / 2)       // 赛道中线期望对齐横坐标
-#define BRIDGE_LOOKAHEAD_ROW              (60)                   // 计算转向控制量的前视行
-#define BRIDGE_ALIGN_FAR_ROW              (50)                   // 远处中线对齐检查行
-#define BRIDGE_ALIGN_NEAR_ROW             (70)                  // 近处中线对齐检查行
-#define BRIDGE_ALIGN_FAR_TOLERANCE_PX     (5)                    // 远处中线允许误差
-#define BRIDGE_ALIGN_NEAR_TOLERANCE_PX    (10)                    // 近处中线允许误差
-#define BRIDGE_CONTROL_DEADBAND_PX        (2)                    // 前视点控制误差死区
-#define BRIDGE_ALIGN_COMPLETE_CONFIRM_FRAMES (3)                 // 中线完成对准的连续确认帧数
-#define BRIDGE_ALIGN_LOST_RESET_FRAMES    (3)                    // 连续丢失目标后的复位帧数
-#define BRIDGE_ALIGN_POINT_FILTER_ALPHA   (0.6f)                 // 前视点横坐标低通滤波旧值权重
-#define BRIDGE_POINT_GAIN_D10_PER_PX      (8.0f)                 // 每像素误差产生的航向修正量
-#define BRIDGE_POINT_DIRECTION            (1.0f)                 // 前视点横向误差修正方向
-#define BRIDGE_YAW_OFFSET_LIMIT_D10       (120)                  // 最大航向修正量，单位 0.1 度
-#define BRIDGE_ALIGN_YAW_SLEW_LIMIT_D10   (30)                   // 每帧航向修正量最大变化
-#define BRIDGE_CONTROL_GAIN_PER_DEG       (20.0f)                 // 每 1 度对应的底盘 angle 控制量
+
+#define BRIDGE_ALIGN_FAR_TOLERANCE_PX     (3)                    // 远处中线允许误差
+#define BRIDGE_ALIGN_NEAR_TOLERANCE_PX    (3)                    // 近处中线允许误差
+
+#define BRIDGE_CONTROL_DEADBAND_PX        (1)                    // 当前倾角或中点控制误差死区
+#define BRIDGE_TILT_REFERENCE_SPAN         (64)                   // 倾斜误差归一化参考纵向跨度
+#define BRIDGE_TILT_ENTER_THRESHOLD_PX    (2)                    // 进入倾角优先控制的倾斜误差
+#define BRIDGE_TILT_EXIT_THRESHOLD_PX     (1)                    // 退出倾角优先控制的倾斜误差
+#define BRIDGE_TILT_GAIN_D10_PER_PX       (8.0f)                 // 每像素归一化倾斜误差产生的航向修正量
+#define BRIDGE_ALIGN_COMPLETE_CONFIRM_FRAMES (1)                 // 中线完成对准的连续确认帧数
+#define BRIDGE_ALIGN_LOST_RESET_FRAMES    (1)                    // 连续丢失目标后的复位帧数
+#define BRIDGE_ALIGN_POINT_FILTER_ALPHA   (0.6f)                 // 中线中点横坐标低通滤波旧值权重
+#define BRIDGE_POINT_GAIN_D10_PER_PX      (8.0f)                 // 每像素中点误差产生的航向修正量
+#define BRIDGE_POINT_DIRECTION            (1.0f)                 // 倾角和中点误差共用的修正方向
+#define BRIDGE_YAW_OFFSET_LIMIT_D10       (30)                  // 最大航向修正量，单位 0.1 度
+#define BRIDGE_ALIGN_YAW_SLEW_LIMIT_D10   (10)                   // 每帧航向修正量最大变化
+#define BRIDGE_CONTROL_GAIN_PER_DEG       (10.0f)                 // 每 1 度对应的底盘 angle 控制量
 #define BRIDGE_CONTROL_DIRECTION          (1.0f)                 // 底盘控制方向
-#define BRIDGE_CONTROL_LIMIT              (120)                  // 底盘 angle 控制量限制
+#define BRIDGE_CONTROL_LIMIT              (30)                  // 底盘 angle 控制量限制
 
 //=========================== 单边桥离开检测参数 ===========================
 #define BRIDGE_EXIT_BINARY_THRESHOLD   (85)    // 离桥检测固定二值化阈值
@@ -85,6 +85,7 @@ volatile uint8 vision_phase_bab                 = VISION_PHASE_BAB_BRIDGE_ALIGN;
 volatile uint32 sys_ms                          = 0;                                // 毫秒计时器
 static volatile uint16 core0_car_speed          = 0;                                // 实际车速
 static volatile uint8  core0_speed_updated      = 0;                                // 车速更新标志位
+static volatile uint8  core0_remote_ch9_value   = BRIDGE_BINARY_THRESHOLD;          // 核心0发送的通道9映射值
 
 // IPC 接收核0的车速和视觉工作模式
 static void appipc_speed_callback(uint32 data)
@@ -96,6 +97,7 @@ static void appipc_speed_callback(uint32 data)
         core0_car_speed = core0_data.car_speed;
         function_option = core0_data.vision_detect_mode;
         vision_phase_bab = core0_data.vision_phase_bab;
+        core0_remote_ch9_value = core0_data.remote_ch9_value;
         core0_speed_updated = 1;
     }
 }
@@ -103,6 +105,7 @@ static void appipc_speed_callback(uint32 data)
 // 屏幕显示函数
 void debug_image_screen_display(
     JumpDetectParams_t jump_params, 
+    const CameraBridgeParams_t *bridge_params,
     const CameraBridgeResult_t *bridge_result, 
     const CameraBridgeAlignParams_t *bridge_align_params,
     BridgeExitParams_t bridge_exit_params,
@@ -124,7 +127,8 @@ void debug_image_screen_display(
         camera_debug_on_screen();
         if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN)
         {
-            screen_show_bridge_align_box(bridge_align_params);       // 绘制红色中线对准范围
+            screen_show_bridge_roi(bridge_params);                              // 绘制绿色 ROI 边框
+            screen_show_bridge_align_box(bridge_result, bridge_align_params);       // 绘制红色中线对准范围
             screen_show_bridge_fitted_line(bridge_result);           // 绘制左右边线和绿色中线
         }
         screen_show_table_t3(bridge_exit_params, function_option, fps); // 显示信息 - 单边桥
@@ -181,38 +185,34 @@ int main(void)
     };
     CameraBridgeParams_t bridge_params =
     {
-        .search_top               = BRIDGE_SEARCH_TOP,
-        .search_bottom            = BRIDGE_SEARCH_BOTTOM,
-        .left_edge_min_x          = BRIDGE_LEFT_EDGE_MIN_X,
-        .left_edge_max_x          = BRIDGE_LEFT_EDGE_MAX_X,
-        .right_edge_min_x         = BRIDGE_RIGHT_EDGE_MIN_X,
-        .right_edge_max_x         = BRIDGE_RIGHT_EDGE_MAX_X,
+        .binary_threshold         = BRIDGE_BINARY_THRESHOLD,
+        .roi_top                  = BRIDGE_ROI_TOP,
+        .roi_bottom               = BRIDGE_ROI_BOTTOM,
+        .roi_left                 = BRIDGE_ROI_LEFT,
+        .roi_right                = BRIDGE_ROI_RIGHT,
         .min_lane_width           = BRIDGE_MIN_LANE_WIDTH,
         .max_lane_width           = BRIDGE_MAX_LANE_WIDTH,
         .max_edge_jump            = BRIDGE_MAX_EDGE_JUMP,
         .min_point_count          = BRIDGE_MIN_POINT_COUNT,
         .min_y_span               = BRIDGE_MIN_Y_SPAN,
-        .center_residual_limit    = BRIDGE_CENTER_RESIDUAL_LIMIT,
-        .width_residual_limit     = BRIDGE_WIDTH_RESIDUAL_LIMIT,
         .row_step                 = BRIDGE_ROW_STEP,
-        .edge_window              = BRIDGE_EDGE_WINDOW,
-        .min_edge_contrast        = BRIDGE_MIN_EDGE_CONTRAST,
-        .local_search_radius      = BRIDGE_LOCAL_SEARCH_RADIUS,
+        .stable_pixel_count       = BRIDGE_STABLE_PIXEL_COUNT,
         .max_missing_rows         = BRIDGE_MAX_MISSING_ROWS
     };                                                // 单边桥识别参数结构体
     CameraBridgeAlignParams_t bridge_align_params =
     {
         .target_center_x         = BRIDGE_TARGET_CENTER_X,
-        .lookahead_row           = BRIDGE_LOOKAHEAD_ROW,
-        .far_check_row           = BRIDGE_ALIGN_FAR_ROW,
-        .near_check_row          = BRIDGE_ALIGN_NEAR_ROW,
         .far_tolerance_px        = BRIDGE_ALIGN_FAR_TOLERANCE_PX,
         .near_tolerance_px       = BRIDGE_ALIGN_NEAR_TOLERANCE_PX,
         .control_deadband_px     = BRIDGE_CONTROL_DEADBAND_PX,
+        .tilt_reference_span     = BRIDGE_TILT_REFERENCE_SPAN,
+        .tilt_enter_threshold_px = BRIDGE_TILT_ENTER_THRESHOLD_PX,
+        .tilt_exit_threshold_px  = BRIDGE_TILT_EXIT_THRESHOLD_PX,
         .complete_confirm_frames = BRIDGE_ALIGN_COMPLETE_CONFIRM_FRAMES,
         .lost_reset_frames       = BRIDGE_ALIGN_LOST_RESET_FRAMES,
         .point_filter_alpha      = BRIDGE_ALIGN_POINT_FILTER_ALPHA,
         .point_gain_d10_per_px   = BRIDGE_POINT_GAIN_D10_PER_PX,
+        .tilt_gain_d10_per_px    = BRIDGE_TILT_GAIN_D10_PER_PX,
         .point_direction         = BRIDGE_POINT_DIRECTION,
         .yaw_offset_limit_d10    = BRIDGE_YAW_OFFSET_LIMIT_D10,
         .yaw_slew_limit_d10      = BRIDGE_ALIGN_YAW_SLEW_LIMIT_D10,
@@ -251,6 +251,8 @@ int main(void)
 
     while(true)
     {
+        bridge_params.binary_threshold = core0_remote_ch9_value;  // 通道9实时调整单边桥二值化阈值
+
         //=========================== 执行单边桥与颠簸路段检测程序 ===========================
         // 核心视觉步骤判断条件，目前有| 0 空闲 | 1 单边桥-颠簸路段 | 2 跳跃 | 后续可能增加的步骤：返回三级台阶
         if (function_option == VISION_BRIDGE_BUMP)
@@ -286,7 +288,7 @@ int main(void)
             // 进入单边桥对齐状态 并且 单边桥对齐处理函数工作正常
             if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) && camera_bridge_processing(&bridge_params, &bridge_result))
             {
-                // 根据拟合中线前视点计算转向控制量
+                // 根据中线倾斜和中点位置计算转向控制量
                 independent_fps = camera_fps_counter_update(&camera_fps, sys_ms);  // 独立 FPS 计算
                 camera_bridge_align_update(&bridge_result, &bridge_align_params, &bridge_align_state, &bridge_align_result);
 
@@ -295,9 +297,10 @@ int main(void)
                                         (uint8)bridge_result.bottom, bridge_align_result.control_value);
 
                 // 串口部分
-                sprintf(txt, "Valid %d |Aligned %d |Phase %d |Bottom %d |Point %d,%d |Err %d |Ctrl %d |FPS %d\r\n",
+                sprintf(txt, "Valid %d |Aligned %d |Phase %d |Bottom %d |Point %d,%d |Tilt %d,%d |Err %d |Ctrl %d |FPS %d\r\n",
                         bridge_align_result.valid, bridge_align_result.aligned, bridge_align_result.phase,
                         bridge_result.bottom, bridge_align_result.active_x, bridge_align_result.active_y,
+                        bridge_align_result.tilt_control_active, bridge_align_result.tilt_error_px,
                         bridge_align_result.point_error_px, bridge_align_result.control_value, independent_fps);
                 wireless_uart_send_string(txt);
             }
@@ -372,7 +375,7 @@ int main(void)
             }
         }
         // 统一视觉更新
-        debug_image_screen_display(jump_params, &bridge_result, &bridge_align_params, bridge_exit_params, independent_fps, core0_car_speed);
+        debug_image_screen_display(jump_params, &bridge_params, &bridge_result, &bridge_align_params, bridge_exit_params, independent_fps, core0_car_speed);
     }
 }
 

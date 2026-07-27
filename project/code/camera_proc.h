@@ -30,24 +30,14 @@ void camproc_pub_thresh_bin(uint8 image[MT9V03X_H][MT9V03X_W], uint8 threshold);
  */
 uint8 camproc_pub_check_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row, uint16 check_row_count, uint16 check_column, uint16 check_column_count, uint32 dot_count, uint32 dot_type);
 
+// ==================================================== 单边桥和颠簸路段函数 ====================================================
 /**
- * 颠簸路段离开检测，先确认黑色凸起，再连续确认白色出口
- * @param image              待检测的二值图像数组
- * @param bump_exit_params   颠簸路段离开检测参数结构体
- * @param exit_check_enabled 1 允许判断白色出口 | 0 仅确认黑色凸起
- *
- * @return 1 已确认离开颠簸路段 | 0 尚未离开
- */
-uint8 camproc_bump_exit_detect(uint8 image[MT9V03X_H][MT9V03X_W], BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled);
-
-// ==================================================== 单边桥函数 ====================================================
-/**
- * 在灰度图的稀疏行上搜索左右方向边缘，通过连续路径拟合左右边线和赛道中线
- * @param image  待检测的灰度图像数组
+ * 在二值图 ROI 的采样行上从两侧向内搜索稳定黑白跳变，提取最长连续双边线段及其中线
+ * @param image  待检测的二值图像数组
  * @param params 单边桥识别参数结构体
  * @param result 识别结果输出结构体，函数会在每次调用开始时清空该结构体
  *
- * @return 1 成功拟合赛道中线 | 0 未找到或者参数非法
+ * @return 1 成功提取左右边线和中线 | 0 未找到或者参数非法
  */
 uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const CameraBridgeParams_t *params, CameraBridgeResult_t *result);
 
@@ -58,15 +48,27 @@ uint8 camproc_bridge_detect(const uint8 image[MT9V03X_H][MT9V03X_W], const Camer
 void camproc_bridge_align_reset(CameraBridgeAlignState_t *align_state);
 
 /**
- * 根据拟合中线前视点计算底盘 angle 控制量，并使用远近检查点判断是否对齐
+ * 根据中线倾斜和中点位置计算底盘 angle 控制量，并使用中线上下端点判断是否对齐
  * @param bridge_result  单边桥识别结果结构体
  * @param align_params   单边桥对准控制参数结构体
  * @param align_state    单边桥对准控制运行状态
  * @param align_result   单边桥对准控制结果输出地址
  *
+ * @note 中线明显倾斜时优先修正方向，倾斜收敛后再修正中点位置。
+ * @note 对准结果不锁存，每一帧都会根据当前中线端点重新判断。
  * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
  */
 uint8 camproc_bridge_align_update(const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
+
+/**
+ * 颠簸路段离开检测，先确认黑色凸起，再连续确认白色出口
+ * @param image              待检测的二值图像数组
+ * @param bump_exit_params   颠簸路段离开检测参数结构体
+ * @param exit_check_enabled 1 允许判断白色出口 | 0 仅确认黑色凸起
+ *
+ * @return 1 已确认离开颠簸路段 | 0 尚未离开
+ */
+uint8 camproc_bump_exit_detect(uint8 image[MT9V03X_H][MT9V03X_W], BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled);
 
 // ==================================================== 跳跃检测、过滤、切换函数 ====================================================
 /**

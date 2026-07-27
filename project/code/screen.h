@@ -186,22 +186,33 @@ void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params);
 /**
  * @brief 在摄像头图像显示区域上绘制单边桥中线对准范围。
  *
- * 根据远近检查行及其容差绘制红色梯形，梯形内部为拟合中线允许进入的范围。
+ * 根据当前有效中线的动态上下端点及其容差绘制红色梯形。
+ * 当前帧没有有效中线时，目标范围会覆盖整个图像高度，便于继续调试。
  *
+ * @param bridge_result 单边桥识别结果，用于取得当前有效中线的上下端点行，可为空。
  * @param align_params 单边桥对准参数。指针为空、范围非法或坐标越界时不绘制。
  *
  * @note 应先显示摄像头图像，再调用本函数，否则对准范围可能被图像刷新覆盖。
  */
-void screen_show_bridge_align_box(const CameraBridgeAlignParams_t *align_params);
+void screen_show_bridge_align_box(const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params);
+
+/**
+ * @brief 在摄像头图像显示区域上使用绿色边框绘制单边桥识别 ROI。
+ *
+ * @param bridge_params 单边桥识别参数。指针为空或 ROI 越界时不绘制。
+ *
+ * @note 应先显示摄像头图像，再调用本函数，否则 ROI 边框可能被图像刷新覆盖。
+ */
+void screen_show_bridge_roi(const CameraBridgeParams_t *bridge_params);
 
 /**
  * @brief 在摄像头图像显示区域上绘制单边桥左右边线和中线。
  *
- * 左右赛道边线使用红色绘制，最终用于控制的赛道中线使用绿色绘制。
+ * 左右赛道边线使用 2 像素宽红线绘制，最终用于控制的赛道中线使用 3 像素宽绿线绘制。
  *
  * @param bridge_result 单边桥识别结果。指针为空、结果无效或端点越界时不绘制。
  *
- * @note 应先显示摄像头图像，再调用本函数，否则拟合线可能被图像刷新覆盖。
+ * @note 应先显示摄像头图像，再调用本函数，否则检测线可能被图像刷新覆盖。
  */
 void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result);
 

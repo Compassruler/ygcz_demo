@@ -86,6 +86,11 @@ int16 remote_left_right_ctrl(void)
     return remote_control_calc_channel(REMOTE_CONTROL_LEFT_RIGHT_CH);
 }
 
+int16 remote_lock_yaw_ctrl(void)
+{
+    return remote_control_calc_channel(REMOTE_CONTROL_LOCK_YAW_CH);
+}
+
 void remote_left_01_switch_ctrl(void)
 {
         if(!remote_is_online())

@@ -10,8 +10,7 @@ extern float true_speed;        // 车速（实际值m/s）
 extern int auto_protect_flag;       // 自动保护标志位
 extern int manual_protect_flag;     // 手动保护标志位
 extern int roll_control_flag;       // 横滚角运动模式标志位（0为运动模式，1为单边桥模式）
-
-
+extern int yaw_lock_ctrl;
 // 遥控器标志位
 extern uint8 remote_left_01_last_flag;
 extern uint8 remote_right_01_last_flag;

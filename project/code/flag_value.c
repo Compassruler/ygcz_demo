@@ -10,8 +10,7 @@ int roll_control_flag = 0;
 
 float target_yaw_remote = 0;
 float target_roll = 0;  //暂时没用
-
-
+int  yaw_lock_ctrl = 0;
 
 uint8 remote_left_01_last_flag = 0;            // 左三档上次遥控器标志位
 uint8 remote_right_01_last_flag = 0;           // 右三档上次遥控器标志位
@@ -30,7 +29,7 @@ int32 vision_target_yaw = 0;
 float KP_DIS = 10.0f;
 int MAX_SPEED = 3000;
 
-int MIN_SPEED = 0;
+int MIN_SPEED = 300;
 float YAW_TH = 1.0f; 
 
 bool track_flag = false;  // 回放标志位（按钮四控制）true为开启回放

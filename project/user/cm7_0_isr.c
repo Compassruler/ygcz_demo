@@ -11,7 +11,7 @@ void pit0_ch0_isr()
     remote_update();
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
-
+    int i; // 拿来清0航向角的
      // 速度环 
     if(system_time % 20 == 0)
     {
@@ -27,7 +27,7 @@ void pit0_ch0_isr()
       {
         pid_pos_calc(&banlance.speed_pid, vision_target_speed, car_speed);
       }
-      else 
+      else // 遥控器 
       {
         pid_pos_calc(&banlance.speed_pid, remote_front_rear_ctrl() , car_speed);
       }
@@ -66,8 +66,18 @@ void pit0_ch0_isr()
       }
       else 
       {
-        target_yaw_remote += remote_left_right_ctrl() * 0.002f;
-        pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
+        if(remote_lock_yaw_ctrl() <= -600)  yaw_lock_ctrl = 1; // 遥控器在线锁航向角
+        if(remote_lock_yaw_ctrl() >= 600)   yaw_lock_ctrl = 0;   // 遥控器在线解航向角
+        
+        if(yaw_lock_ctrl ==1)
+        {
+          for(i = 0;i<1;i++)
+          {
+           target_yaw = 0;
+          }
+           target_yaw_remote += remote_left_right_ctrl() * 0.002f;
+           pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
+         }
       }
         //      pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
       leg_control(); // 5ms调用一次      

@@ -255,7 +255,7 @@ int main(void)
 //        sprintf(txt, "tar|now:(%.3f,%.3f),(%.3f,%.3f)\r\n",target_x,target_y,x,y); 
         
 //        sprintf(txt, "x,y,yaw:%3f,%3f,%3f\r\n",replay_point[i].x,replay_point[i].y,replay_point[i].yaw); 
-        sprintf(txt, "path_yaw_change:%3f\r\n",path_yaw_change); 
+        sprintf(txt, "angle:%3f\r\n",get_path_turn_angle(path_index)); 
         
         i++;
         wireless_uart_send_string(txt);

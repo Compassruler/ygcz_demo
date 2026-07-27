@@ -4,12 +4,12 @@
 #define NEAREST_SELECT_NUM 10       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 #define MAX_ELEMENT_NUM 10              // 打断点数量
-#define TURN_CHECK_POINT  10          // 提前检测的点数
+#define TURN_CHECK_POINT  40          // 提前检测的点数
 #define TURN_ANGLE_LIMIT 30           // 检测判断转弯的角度
 #define MAX_PATH_POINT          (FLASH_PAGE_LENGTH * Use_page)             //最大点数
 
 
-#define TURN_SPEED_SCALE 0.10f // 降速比例
+#define TURN_SPEED_SCALE 0.30f // 降速比例
 
 uint16_t element_index[MAX_ELEMENT_NUM];        // 打断点索引
 
@@ -54,7 +54,6 @@ float dx_ins, dy_ins;
 float distance_ins;
 float x_now = 0.0f, y_now = 0.0f, yaw_now = 0.0f;
 float target_x, target_y, target_yaw;
-bool yaw_ready = true;
 float dx,dy,dyaw;
 float vx= 0.0f,vy=0.0f;
 float distance, target_v;
@@ -253,7 +252,7 @@ int find_nearest_point(int start_index)
 
         float dist = sqrtf(dx*dx + dy*dy);
 
-        if(dist < min_dist && yaw_ready)
+        if(dist < min_dist)
         {
             min_dist = dist;
             nearest_index = i;
@@ -313,7 +312,8 @@ void Track_update(void)
     y_now = y;
     if(course_load_flag == 2) segment_check(); // 检测当前段是否结束（只有科目三有用）
     if(!pause_flag) return; // 如果暂停标志为false，则不进行路径回放
-    find_lookahead_point(find_nearest_point(path_index));
+    int next_index = find_nearest_point(path_index);
+    find_lookahead_point(next_index);
  
     //--------------------------------------------------
     // 计算距离
@@ -347,7 +347,7 @@ void Track_update(void)
 
 
 //检测未来转弯
-check_future_turn(path_index);
+check_future_turn(next_index);
 
 
 //检测是否通过转弯点
@@ -416,13 +416,20 @@ if(future_turn_flag)
     //--------------------------------------------------
     // 限幅
     //--------------------------------------------------
-    if(target_speed > MAX_SPEED)        
-        target_speed = MAX_SPEED;
+    // 最大速度限制
+if(target_speed > MAX_SPEED)
+    target_speed = MAX_SPEED;
 
-    if(target_speed < -MAX_SPEED)
-        target_speed = -MAX_SPEED;
+if(target_speed < -MAX_SPEED)
+    target_speed = -MAX_SPEED;
 
 
+// 最小速度限制
+if(target_speed > 0 && target_speed < MIN_SPEED)
+    target_speed = MIN_SPEED;
+
+if(target_speed < 0 && target_speed > -MIN_SPEED)
+    target_speed = -MIN_SPEED;
     //--------------------------------------------------
     // 到终点判断
     //--------------------------------------------------

@@ -307,15 +307,15 @@ int main(void)
             switch (jump_count)
             {
                 case 0:
-                    vision_target_speed = 160;  // 第1次跳跃前的速度
+                    vision_target_speed = 220;  // 第1次跳跃前的速度
                     break;
 
                 case 1:
-                    vision_target_speed = 130;  // 第2次跳跃前的速度
+                    vision_target_speed = 150;  // 第2次跳跃前的速度
                     break;
 
                 case 2:
-                    vision_target_speed = 130;  // 第3次跳跃前的速度
+                    vision_target_speed = 150;  // 第3次跳跃前的速度
                     break;
             }
 

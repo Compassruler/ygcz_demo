@@ -353,7 +353,8 @@ int main(void)
             if(core0_speed_updated)
             {
                 core0_speed_updated = 0;
-                jump_params.check_row = camera_jump_check_row_from_speed(core0_car_speed, ADAPTIVE_ROW_COEFF);
+//                jump_params.check_row = camera_jump_check_row_from_speed(core0_car_speed, ADAPTIVE_ROW_COEFF);
+                 jump_params.check_row = 80;
             }
 
             // 当检测到有帧时 且 当计时器时间大于启动时暂停跳跃时间执行

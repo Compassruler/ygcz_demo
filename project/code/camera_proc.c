@@ -56,6 +56,94 @@ void camproc_pub_thresh_bin(uint8 image[MT9V03X_H][MT9V03X_W], uint8 threshold)
     }
 }
 
+// 八邻域方向
+static const int8 lane_neighbor_8[8][2]=
+{
+    {-1,-1}, {0,-1}, {1,-1},
+    {-1,0} ,         {1,0},
+    {-1,1} ,  {0,1}, {1,1}
+};
+
+// 判断是否为黑色
+static uint8 lane_is_black(const uint8 image[MT9V03X_H][MT9V03X_W], int16 x, int16 y)
+{
+    if(x < 0 || x >= MT9V03X_W || y < 0 || y >= MT9V03X_H) return 0;
+
+    return (image[y][x] == 0);
+}
+
+uint16 camproc_lane_search_8neighbor(const uint8 image[MT9V03X_H][MT9V03X_W], uint16 start_x, uint16 start_y, LanePoint_t point[])
+{
+    static uint8 visited[MT9V03X_H][MT9V03X_W];
+
+    LanePoint_t queue[LANE_MAX_POINT_NUM];
+
+    uint16 head=0;
+    uint16 tail=0;
+
+    uint16 count=0;
+
+    memset(visited,0,sizeof(visited));
+
+    if(!lane_is_black(image,start_x,start_y)) return 0; 
+
+    queue[tail].x=start_x;
+    queue[tail].y=start_y;
+
+    tail++;
+
+    visited[start_y][start_x]=1;
+
+    while(head < tail)
+    {
+        LanePoint_t p=queue[head++];
+
+        if(count < LANE_MAX_POINT_NUM)
+        {
+            point[count]=p;
+            count++;
+        }
+
+        for(uint8 i=0;i<8;i++)
+        {
+            int16 nx=p.x+lane_neighbor_8[i][0];
+            int16 ny=p.y+lane_neighbor_8[i][1];
+
+            if(!lane_is_black(image,nx,ny)) continue;
+            if(visited[ny][nx]) continue;
+
+            visited[ny][nx]=1;
+
+            if(tail < LANE_MAX_POINT_NUM)
+            {
+                queue[tail].x=nx;
+                queue[tail].y=ny;
+
+                tail++;
+            }
+        }
+    }
+    return count;
+}
+
+void camproc_lane_center_calculate(LanePoint_t point[], uint16 count, int16 *center_x)
+{
+    uint32 sum_x=0;
+    
+    if(count==0)
+    {
+        *center_x=MT9V03X_W/2;
+        return;
+    }
+
+    for(uint16 i=0;i<count;i++)
+    {
+        sum_x+=point[i].x;
+    }
+
+    *center_x=sum_x/count;
+}
+
 // ==================================================== 单边桥和颠簸路段函数 ====================================================
 typedef struct
 {

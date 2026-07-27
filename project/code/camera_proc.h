@@ -7,6 +7,7 @@
 #define CAMERA_IMAGE_DOT_BLACK         (0)    // 检测二值图中的黑色像素，像素值为 0
 #define CAMERA_IMAGE_DOT_WHITE         (1)    // 检测二值图中的白色像素，像素值为 255
 #define CAMERA_DOT_TYPE_LIST_COUNT     (3)    // 跳跃检测像素类型序列长度
+#define LANE_MAX_POINT_NUM   800              // 八邻域搜索点数
 
 // ==================================================== 公共函数 ====================================================
 /**
@@ -15,6 +16,31 @@
  * @param threshold 二值化阈值
  */
 void camproc_pub_thresh_bin(uint8 image[MT9V03X_H][MT9V03X_W], uint8 threshold);
+
+// 八邻域搜索得到的赛道像素点结构体
+typedef struct
+{
+    uint16 x;   // 像素点横坐标（图像列方向）
+    uint16 y;    // 像素点纵坐标（图像行方向）
+
+}LanePoint_t;
+
+// 函数功能：采用BFS八邻域算法搜索连续黑色赛道区域
+// 输入参数：
+// image   - 二值化图像
+// start_x - 搜索起始点横坐标
+// start_y - 搜索起始点纵坐标
+// point   - 保存搜索到的赛道像素点
+// 返回值：搜索到的像素点数量
+uint16 camproc_lane_search_8neighbor(const uint8 image[MT9V03X_H][MT9V03X_W], uint16 start_x, uint16 start_y, LanePoint_t point[]);
+
+// 函数功能：根据赛道像素点计算赛道中心横坐标
+// 输入参数：
+// point    - 八邻域搜索得到的像素点
+// count    - 像素点数量
+// center_x - 输出赛道中心坐标
+void camproc_lane_center_calculate(LanePoint_t point[], uint16 count, int16 *center_x);
+
 
 /**
  * 在指定矩形区域内执行指定颜色像素总量检测

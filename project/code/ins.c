@@ -7,7 +7,7 @@
 #define TURN_CHECK_POINT  40          // 提前检测的点数
 #define TURN_ANGLE_LIMIT 30           // 检测判断转弯的角度
 #define MAX_PATH_POINT          (FLASH_PAGE_LENGTH * Use_page)             //最大点数
-
+#define TURN_SPEED_LIMIT         300                                      // 小于该速度则不允许减速
 
 #define TURN_SPEED_SCALE 0.30f // 降速比例
 
@@ -357,8 +357,17 @@ check_turn_finish();
 //如果前方有转弯，降速
 if(future_turn_flag)
 {
-    target_v *= TURN_SPEED_SCALE;
+    if(fabs(car_speed) > TURN_SPEED_LIMIT &&
+       next_index < future_turn_index)
+    {
+        target_v *= TURN_SPEED_SCALE;
+    }
 }
+
+//if(future_turn_flag)
+//{
+//    target_v *= TURN_SPEED_SCALE;
+//}
     //--------------------------------------------------
     // 后退逻辑（滞回区）
     //--------------------------------------------------

@@ -554,7 +554,7 @@ void flash_path_load(void)
     segment_end_index = segment_header[0].point_num - 1;
     KP_DIS = 4.5;
     }
-    target_yaw = 0; // 发车航向角清0，防止歪了
+    yaw_angle = 0; // 发车航向角清0，防止歪了
 }
 
 void flash_turn_memery_store()

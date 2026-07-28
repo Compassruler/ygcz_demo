@@ -507,7 +507,7 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
-    KP_DIS = 10.0;
+    KP_DIS = 13.0;
     }
 
 

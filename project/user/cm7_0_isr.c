@@ -5,6 +5,9 @@
 #define VISION_ALIGN_TARGET_YAW_LIMIT_DEG   (85.0f)                             // 视觉对准允许设置的最大相对航向角
 #define VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG (90.0f)                             // 视觉对准允许转动的最大实际航向角
 extern volatile uint8 vision_phase_bab;                                         // 核心0当前的单边桥与颠簸路段子状态
+
+static uint8_t yaw_lock_init = 0; // 后续放在flag里面
+
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()
 {
@@ -17,7 +20,6 @@ void pit0_ch0_isr()
     remote_update();
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
-    int i; // 拿来清0航向角的
 
     // 边线识别对准阶段大角度盲转保护
     // 只限制单边桥对准过程，离桥和颠簸路段继续沿用已经锁定的航向
@@ -133,18 +135,22 @@ void pit0_ch0_isr()
       }
       else 
       {
-        if(remote_lock_yaw_ctrl() <= -600)  yaw_lock_ctrl = 1; // 遥控器在线锁航向角
-        if(remote_lock_yaw_ctrl() >= 600)   yaw_lock_ctrl = 0;   // 遥控器在线解航向角
+        if(remote_lock_yaw_ctrl() <= -500)  yaw_lock_ctrl = 1; // 遥控器在线锁航向角
+//        if(remote_lock_yaw_ctrl() >= 500)   yaw_lock_ctrl = 0;   // 遥控器在线解航向角
         
         if(yaw_lock_ctrl ==1)
         {
-          for(i = 0;i<1;i++)
-          {
-           target_yaw = 0;
-          }
+          if(yaw_lock_init == 0)
+            {
+                yaw_angle = 0;        //只执行一次
+                target_yaw_remote = 0;
+                yaw_lock_init = 1;
+             }
+          
            target_yaw_remote += remote_left_right_ctrl() * 0.002f;
            pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
          }
+
       }
         //      pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
       leg_control(); // 5ms调用一次      

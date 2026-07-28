@@ -507,7 +507,7 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
-    KP_DIS = 10.0;
+    KP_DIS = 13.0;
     }
 
 
@@ -554,7 +554,7 @@ void flash_path_load(void)
     segment_end_index = segment_header[0].point_num - 1;
     KP_DIS = 4.5;
     }
-    target_yaw = 0; // 发车航向角清0，防止歪了
+    yaw_angle = 0; // 发车航向角清0，防止歪了
 }
 
 void flash_turn_memery_store()

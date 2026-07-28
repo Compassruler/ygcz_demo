@@ -26,8 +26,8 @@ volatile int vision_detect_mode = 0;
 volatile int32 vision_target_speed = 0;
 volatile int32 vision_target_yaw = 0;
 
-float KP_DIS = 10.0f;
-int MAX_SPEED = 3000;
+float KP_DIS;
+int MAX_SPEED = 1000;
 
 int MIN_SPEED = 300;
 float YAW_TH = 1.0f; 

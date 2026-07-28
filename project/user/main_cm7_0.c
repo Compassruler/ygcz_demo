@@ -7,12 +7,12 @@
 #define KEY3                    (P20_2)
 #define KEY4                    (P20_3)
 
-#define BRIDGE_ALIGNED_CONFIRM_COUNT    (3u)        // 连续对齐确认次数
+#define BRIDGE_ALIGNED_CONFIRM_COUNT    (2)        // 连续对齐确认次数
 #define BRIDGE_ALIGN_START_Y            (35)       // 进入低速精确对齐区域的画面纵坐标
 
-#define BRIDGE_ALIGN_SPEED              (45)        // 距离较近且未对齐时的细调速度
-#define BRIDGE_CROSS_SPEED              (200)       // 对齐后冲过单边桥的速度
-#define BUMP_CROSS_SPEED                (300)        // 通过颠簸路段时的固定速度
+#define BRIDGE_ALIGN_SPEED              (80)        // 距离较近且未对齐时的细调速度
+#define BRIDGE_CROSS_SPEED              (300)       // 对齐后冲过单边桥的速度
+#define BUMP_CROSS_SPEED                (400)        // 通过颠簸路段时的固定速度
 
 
 char txt[128];
@@ -391,9 +391,9 @@ int main(void)
                     if(!bridge_aligned_from_core1)
                     {
                         // 太靠近，往回退
-                        if (85 < bridge_bottom_y_from_core1)
+                        if (100 < bridge_bottom_y_from_core1)
                         {
-                            vision_target_speed = -60;  // 回退速度
+                            vision_target_speed = -120;  // 回退速度
                             bridge_control_from_core1 = -bridge_control_from_core1;  // 角度反向
                         }
                         else
@@ -411,7 +411,7 @@ int main(void)
                 }
                 else
                 {
-                    vision_target_speed = 45;  // 识别丢失：慢慢向前寻找目标
+                    vision_target_speed = BRIDGE_ALIGN_SPEED;  // 识别丢失：慢慢向前寻找目标
                     vision_target_yaw = 0;
                 }
             }

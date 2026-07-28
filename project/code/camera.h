@@ -9,6 +9,9 @@
 #define IMAGE_DISPLAY_WIDTH     (188)
 #define IMAGE_DISPLAY_HEIGHT    (120)
 
+// WiFi SPI 图传默认分频：每处理 10 帧发送 1 帧
+#define CAMERA_WIFI_IMAGE_SEND_DIV_DEFAULT     (10U)
+
 
 // =================================== 结构体 ===================================
 // 摄像头帧率统计结构体
@@ -41,42 +44,51 @@ typedef struct
 typedef enum
 {
     CAMERA_BRIDGE_ALIGN_TRACK = 0,   // 根据检测中线持续进行对准
+    CAMERA_BRIDGE_ALIGN_FINE_HOLD,   // 接近对准时短时保持当前航向
+    CAMERA_BRIDGE_ALIGN_BLIND_TURN,  // 边线即将丢失时使用可靠历史控制盲转
+    CAMERA_BRIDGE_ALIGN_VERIFY,      // 保持或盲转结束后重新使用新鲜视觉确认
     CAMERA_BRIDGE_ALIGN_COMPLETE     // 当前帧动态上下中线点均已完成对准
 } CameraBridgeAlignPhase_t;
 
 // 单边桥赛道边线识别参数
 typedef struct
 {
-    uint8 binary_threshold;         // 固定二值化阈值，大于阈值为白色赛道
+    uint8 binary_threshold;         // 固定阈值模式使用的阈值，也是大津法失效时的备用阈值
+    uint8 use_otsu_threshold;       // 1 使用 ROI 大津法自动阈值 | 0 使用固定阈值
+    float threshold_filter_alpha;   // 自动阈值低通滤波旧值权重，范围 0.0~1.0
     uint16 roi_top;                 // ROI 最上行
     uint16 roi_bottom;              // ROI 最下行
     uint16 roi_left;                // ROI 最左列
     uint16 roi_right;               // ROI 最右列
     uint16 min_lane_width;          // 左右边线之间允许的最小宽度
-    uint16 max_lane_width;          // 左右边线之间允许的最大宽度，大于 ROI 宽度时由 ROI 自然限制
-    uint16 max_edge_jump;           // 相邻采样行边线允许的最大横向变化
-    uint16 min_point_count;         // 有效边线段所需的最少采样行数量
-    uint16 min_y_span;              // 有效边线点需要覆盖的最小纵向范围
+    uint16 max_lane_width;          // 左右边线之间允许的最大宽度
+    uint16 ransac_iterations;       // 每条边线执行的 RANSAC 采样次数
+    uint16 min_line_point_count;    // 单条有效拟合边线所需的最少内点数量
+    uint16 min_y_span;              // 单条有效边线需要覆盖的最小纵向范围
+    uint8 ransac_distance_px;       // RANSAC 内点到候选直线的最大距离
     uint8 row_step;                 // 纵向采样行间隔，数值越大处理速度越快
-    uint8 stable_pixel_count;       // 边缘两侧必须连续保持黑色和白色的像素数
-    uint8 max_missing_rows;         // 同一边线段允许连续缺失的采样行数量
+    uint8 stable_pixel_count;       // 跳变两侧必须连续保持黑色和白色的像素数
+    uint8 single_edge_hold_frames;  // 暂时只识别到单边线时允许使用历史赛道宽度的帧数
+    uint8 lost_hold_frames;         // 双边线完全丢失后允许保持上一结果的帧数
+    float lane_width_filter_alpha;  // 赛道宽度模型低通滤波旧值权重，范围 0.0~1.0
 } CameraBridgeParams_t;
 
 // 单边桥赛道边线识别结果
 typedef struct
 {
     uint8 valid;                    // 1 表示识别成功，0 表示当前帧没有有效目标
+    uint8 estimated;                // 1 表示当前结果由单边补线或短时丢线保持得到
     uint16 top;                     // 当前有效路径最上方的纵坐标
     uint16 bottom;                  // 当前有效路径最下方的纵坐标
-    uint16 point_count;             // 最长连续边线段包含的有效采样行数量
-    uint16 left_x1;                 // 左边线上端平均点横坐标
-    uint16 left_y1;                 // 左边线上端平均点纵坐标
-    uint16 left_x2;                 // 左边线下端平均点横坐标
-    uint16 left_y2;                 // 左边线下端平均点纵坐标
-    uint16 right_x1;                // 右边线上端平均点横坐标
-    uint16 right_y1;                // 右边线上端平均点纵坐标
-    uint16 right_x2;                // 右边线下端平均点横坐标
-    uint16 right_y2;                // 右边线下端平均点纵坐标
+    uint16 point_count;             // 左右拟合线中较少一侧的 RANSAC 内点数量
+    uint16 left_x1;                 // 左拟合线上端横坐标
+    uint16 left_y1;                 // 左拟合线上端纵坐标
+    uint16 left_x2;                 // 左拟合线下端横坐标
+    uint16 left_y2;                 // 左拟合线下端纵坐标
+    uint16 right_x1;                // 右拟合线上端横坐标
+    uint16 right_y1;                // 右拟合线上端纵坐标
+    uint16 right_x2;                // 右拟合线下端横坐标
+    uint16 right_y2;                // 右拟合线下端纵坐标
     uint16 center_x1;               // 中线上端横坐标
     uint16 center_y1;               // 中线上端纵坐标
     uint16 center_x2;               // 中线下端横坐标
@@ -86,52 +98,71 @@ typedef struct
 // 单边桥对准控制参数
 typedef struct
 {
-    uint16 target_center_x;         // 赛道中线期望对齐的横坐标
-    uint16 far_tolerance_px;        // 动态上端中线点允许的横向误差
-    uint16 near_tolerance_px;       // 动态下端中线点允许的横向误差
-    uint16 control_deadband_px;     // 当前倾角或中点控制误差死区
-    uint16 tilt_reference_span;     // 中线倾斜误差归一化使用的参考纵向跨度
-    uint16 tilt_enter_threshold_px; // 进入倾角优先控制的归一化倾斜误差
-    uint16 tilt_exit_threshold_px;  // 退出倾角优先控制的归一化倾斜误差
-    uint8 complete_confirm_frames;  // 上下中线点完成对准的连续确认帧数
-    uint8 lost_reset_frames;        // 连续丢失目标后复位对准过程的帧数
-    float point_filter_alpha;       // 中线中点横坐标低通滤波旧值权重，范围 0.0~1.0
-    float point_gain_d10_per_px;    // 每像素中点误差产生的航向修正量，单位 0.1 度/像素
-    float tilt_gain_d10_per_px;     // 每像素归一化倾斜误差产生的航向修正量
-    float point_direction;          // 倾角和中点误差共用的修正方向
-    int16 yaw_offset_limit_d10;     // 航向角修正量限制，单位 0.1 度
-    int16 yaw_slew_limit_d10;       // 每帧航向修正量允许的最大变化，单位 0.1 度
-    float control_gain_per_deg;     // 每 1 度航向修正转换成的底盘 angle 控制量
-    float control_direction;        // 底盘控制方向
-    int16 control_limit;            // 底盘 angle 控制量的最大绝对值
+    uint16 target_center_x;          // 车辆视觉中心对应的目标横坐标
+    uint16 far_tolerance_px;         // 中线上端允许的横向误差
+    uint16 near_tolerance_px;        // 中线下端允许的横向误差
+    uint16 angle_tolerance_d10;      // 完成对准允许的最大中线角度，单位 0.1 度
+    uint16 control_deadband_d10;     // 预瞄航向角控制死区，单位 0.1 度
+    uint16 lookahead_min_px;         // 大角度时使用的最小预瞄距离
+    uint16 lookahead_max_px;         // 小角度时使用的最大预瞄距离
+    uint16 lookahead_full_angle_d10; // 达到最小预瞄距离对应的中线角度，单位 0.1 度
+    uint8 complete_confirm_frames;   // 进入精调保持前所需的连续近似对准帧数
+    uint8 lost_reset_frames;         // 连续丢失目标后复位对准过程的帧数
+    float line_filter_alpha;         // 中线模型低通滤波旧值权重，范围 0.0~1.0
+    float yaw_gain;                  // 预瞄航向角增益
+    float yaw_direction;             // 预瞄航向角修正方向
+    int16 yaw_offset_limit_d10;      // 航向角修正量限制，单位 0.1 度
+    int16 yaw_slew_limit_d10;        // 每帧航向修正量允许的最大变化，单位 0.1 度
+    float control_gain_per_deg;      // 每 1 度航向修正转换成的底盘 angle 控制量
+    float control_direction;         // 底盘控制方向
+    int16 control_limit;             // 底盘 angle 控制量的最大绝对值
+    uint16 fine_hold_time_ms;         // 接近对准时停止更新转向控制的时间
+    int16 fine_control_limit;         // 精调阶段单次修正的最大底盘控制量
+    uint8 verify_confirm_frames;      // 保持或盲转结束后重新确认所需的新鲜帧数
+    uint16 blind_trigger_angle_d10;   // 允许进入盲转准备的最小中线角度，单位 0.1 度
+    uint16 blind_turn_time_ms;        // 单次盲转持续时间
+    uint8 blind_edge_margin_px;       // 边线接近画幅边界时允许触发盲转的距离
+    uint8 blind_reliable_frames;      // 保存盲转控制前所需的连续可靠帧数
+    uint8 blind_estimated_frames;     // 连续使用补线结果后触发盲转的帧数
+    uint8 blind_control_percent;      // 盲转控制量占可靠视觉控制量的百分比
 } CameraBridgeAlignParams_t;
 
 // 单边桥对准控制运行状态
 typedef struct
 {
     CameraBridgeAlignPhase_t phase; // 内部对准跟踪阶段，不锁存完成结果
-    uint8 complete_frame_count;     // 整条线已经连续满足要求的帧数
-    uint8 lost_frame_count;         // 连续丢失有效拟合线的帧数
-    uint8 point_filter_initialized; // 中线中点滤波值是否已经初始化
-    uint8 tilt_control_active;      // 1 表示当前优先修正中线倾斜
-    float filtered_point_x;         // 滤波后的当前中线中点横坐标
+    uint8 complete_frame_count;     // 中线连续进入精调范围的帧数
+    uint8 lost_frame_count;         // 连续丢失有效中线的帧数
+    uint8 line_filter_initialized;  // 中线模型滤波值是否已经初始化
+    uint8 verify_frame_count;       // 重新启用视觉后已经连续确认的帧数
+    uint8 blind_reliable_count;     // 当前连续获得可靠大角度控制的帧数
+    uint8 blind_estimated_count;    // 当前连续使用单边补线结果的帧数
+    uint32 phase_start_time_ms;     // 当前保持或盲转阶段的开始时间
+    float filtered_slope;           // 滤波后的中线 x/y 斜率
+    float filtered_intercept;       // 滤波后的中线截距
     int16 previous_yaw_offset_d10;  // 上一帧输出的航向修正量
+    int16 previous_control_value;   // 上一帧输出的底盘控制量
+    int16 blind_reference_control;  // 连续可靠视觉帧得到的盲转参考控制量
+    int16 blind_control_value;      // 当前盲转阶段实际使用的底盘控制量
+    uint16 held_bottom_y;           // 保持或盲转阶段沿用的路径下端纵坐标
 } CameraBridgeAlignState_t;
 
 // 单边桥对准控制结果
 typedef struct
 {
     uint8 valid;                    // 1 表示当前对准控制结果有效
-    uint8 point_inside;             // 1 表示动态上下中线点均位于容差内
-    uint8 aligned;                  // 1 表示当前连续帧已经满足中线对准要求
+    uint8 point_inside;             // 1 表示中线上下端点均位于红色对准框内
+    uint8 aligned;                  // 1 表示新鲜双边线的位置、角度和连续帧均满足要求
     CameraBridgeAlignPhase_t phase; // 当前帧的对准判断阶段
-    uint16 active_x;                // 当前中线中点横坐标
-    uint16 active_y;                // 当前中线中点纵坐标
-    uint8 tilt_control_active;      // 1 表示当前输出由中线倾斜误差生成
-    int16 tilt_error_px;            // 归一化后的中线有符号倾斜误差
-    int16 point_error_px;           // 当前用于生成控制量的有符号误差
-    int16 yaw_offset_d10;           // 目标点误差生成的航向修正量，单位 0.1 度
+    uint16 active_x;                // 当前预瞄目标点横坐标
+    uint16 active_y;                // 当前预瞄目标点纵坐标
+    uint16 lookahead_px;            // 当前根据中线角度选择的预瞄距离
+    int16 heading_error_d10;        // 中线相对车辆前向的角度误差，单位 0.1 度
+    int16 lateral_error_px;         // 中线在图像底部的横向位置误差
+    int16 lookahead_error_px;       // 预瞄目标点的横向误差
+    int16 yaw_offset_d10;           // 预瞄误差生成的航向修正量，单位 0.1 度
     int16 control_value;            // 最终底盘 angle 控制量
+    uint16 bottom_y;                // 当前控制阶段提供给核心0的路径下端纵坐标
 } CameraBridgeAlignResult_t;
 
 // 单边桥离开检测参数
@@ -166,6 +197,24 @@ typedef struct
     uint8 exited;                       // 1 表示已经确认离开颠簸路段
 } BumpExitParams_t;
 
+// WiFi SPI 图像叠加类型
+typedef enum
+{
+    CAMERA_WIFI_OVERLAY_NONE = 0,       // 只显示二值图像
+    CAMERA_WIFI_OVERLAY_JUMP,           // 显示跳跃检测矩形
+    CAMERA_WIFI_OVERLAY_BRIDGE          // 显示单边桥 ROI、对准框和拟合线
+} CameraWifiOverlayType_t;
+
+// WiFi SPI 图像叠加参数；结构体只保存引用，不复制视觉参数和结果
+typedef struct
+{
+    CameraWifiOverlayType_t type;
+    const JumpDetectParams_t *jump_params;
+    const CameraBridgeParams_t *bridge_params;
+    const CameraBridgeResult_t *bridge_result;
+    const CameraBridgeAlignParams_t *bridge_align_params;
+} CameraWifiOverlay_t;
+
 
 // =================================== 函数 ===================================
 // 摄像头基础接口
@@ -174,6 +223,29 @@ void camera_init(void);                 // 初始化摄像头模块 如果摄像
 
 // 屏幕调试接口
 void camera_debug_on_screen(void);      // 显示图像
+
+/**
+ * 初始化 WiFi SPI 图传，并通过 TCP 将逐飞助手连接到上位机。
+ * @param wifi_ssid   WiFi 名称
+ * @param pass_word   WiFi 密码；无密码时可传入 NULL
+ * @param target_ip   上位机 IP 地址字符串
+ * @param target_port 上位机端口字符串
+ * @param local_port  WiFi 模块本地端口字符串
+ *
+ * @return 0 初始化成功 | 非 0 WiFi 或 TCP 连接失败
+ */
+uint8 camera_wifi_spi_init(char *wifi_ssid, char *pass_word, char *target_ip, char *target_port, char *local_port);
+
+/**
+ * 将最近一次处理完成的二值图像压缩后通过 WiFi SPI 发送到逐飞助手。
+ * 图像按 1bit/像素打包，模块繁忙时直接跳过当前发送帧，不阻塞视觉算法。
+ * 可使用逐飞助手 XY 边线协议叠加检测框、赛道边线、拟合中线等调试元素。
+ * 边线颜色由逐飞助手上位机分配，嵌入端协议不提供 RGB 颜色设置。
+ * 本函数不采集新帧也不重复执行视觉算法，同一处理帧只会参与一次发送分频。
+ * @param send_div 发送分频；0 或 1 表示每个处理帧都发送，N 表示每 N 帧发送 1 帧
+ * @param overlay  叠加参数；传入 NULL 或 CAMERA_WIFI_OVERLAY_NONE 时只发送图像
+ */
+void camera_debug_on_wifi_spi(uint16 send_div, const CameraWifiOverlay_t *overlay);
 
 // 独立 FPS 计算接口
 void camera_fps_counter_init(fps_counter_t *counter, uint32 time_ms);       // FPS 计算初始化
@@ -199,17 +271,19 @@ uint8 camera_bridge_processing(const CameraBridgeParams_t *bridge_params, Camera
 void camera_bridge_align_reset(CameraBridgeAlignState_t *align_state);
 
 /**
- * 根据中线倾斜和中点位置计算单边桥对准控制量
+ * 根据拟合中线生成自适应预瞄目标并计算单边桥对准控制量
+ * @param time_ms        当前系统毫秒时间
  * @param bridge_result  单边桥识别结果结构体
  * @param align_params   单边桥对准控制参数结构体
  * @param align_state    单边桥对准控制运行状态
  * @param align_result   单边桥对准控制结果输出地址
  *
- * @note 中线明显倾斜时优先修正方向，倾斜收敛后再修正中点位置。
- * @note 对准结果不锁存，每一帧都会根据当前中线端点重新判断。
+ * @note 预瞄点同时包含横向位置与中线方向，避免两个独立控制量相互抵消。
+ * @note 接近对准时短时保持航向，大角度丢线前保存可靠控制并定时重新确认。
+ * @note 对准完成结果不锁存，后续帧仍会根据当前中线重新判断。
  * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
  */
-uint8 camera_bridge_align_update(const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
+uint8 camera_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
 
 /**
  * 单边桥离开检测接口

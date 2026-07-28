@@ -2,16 +2,54 @@
 #include "imu.h"
 
 #define LED1                    (P19_0)                                         // SPI 串口 SPI 两寸屏 这里宏定义填写 IPS200_TYPE_SP
+#define VISION_ALIGN_TARGET_YAW_LIMIT_DEG   (85.0f)                             // 视觉对准允许设置的最大相对航向角
+#define VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG (90.0f)                             // 视觉对准允许转动的最大实际航向角
+extern volatile uint8 vision_phase_bab;                                         // 核心0当前的单边桥与颠簸路段子状态
 // **************************** PIT中断函数 ****************************
 void pit0_ch0_isr()
 {
     pit_isr_flag_clear(PIT_CH0);
     static uint32 system_time = 0;
+    static uint8 vision_yaw_guard_active = 0;   // 盲转保护激活
+    static uint8 vision_yaw_guard_reached = 0;  // 盲转保护触发
+    static float vision_yaw_guard_start = 0.0f; // 盲转保护激活时航向角
     system_time ++;
     remote_update();
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
     int i; // 拿来清0航向角的
+
+    // 边线识别对准阶段大角度盲转保护
+    // 只限制单边桥对准过程，离桥和颠簸路段继续沿用已经锁定的航向
+    if((vision_detect_mode == VISION_BRIDGE_BUMP) && (vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN))
+    {
+      if(!vision_yaw_guard_active)
+      {
+        vision_yaw_guard_active = 1;
+        vision_yaw_guard_reached = 0;
+        vision_yaw_guard_start = yaw_angle;
+        target_yaw_remote = yaw_angle;
+      }
+      
+      // 盲转角度限制，不超过 VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG 
+      if(fabsf(yaw_angle - vision_yaw_guard_start) >= VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG)
+      {
+        vision_yaw_guard_reached = 1;  // 触发保护
+      }
+
+      // 触发保护后
+      if(vision_yaw_guard_reached)
+      {
+        vision_target_speed = 0;
+        vision_target_yaw = 0;
+      }
+    }
+    else
+    {
+      vision_yaw_guard_active = 0;
+      vision_yaw_guard_reached = 0;
+    }
+
      // 速度环 
     if(system_time % 20 == 0)
     {
@@ -57,12 +95,41 @@ void pit0_ch0_isr()
       
       else if (vision_detect_mode == VISION_BRIDGE_BUMP) // 需要视觉转向控制的模式
       {
-        target_yaw_remote += vision_target_yaw * 0.003f;
+        // 保护模式激活
+        if(vision_yaw_guard_active)
+        {
+          // 保护模式达到
+          if(vision_yaw_guard_reached)
+          {
+            target_yaw_remote = vision_yaw_guard_start + ((yaw_angle >= vision_yaw_guard_start) ?
+                 VISION_ALIGN_TARGET_YAW_LIMIT_DEG : -VISION_ALIGN_TARGET_YAW_LIMIT_DEG);
+          }
+          else
+          {
+            target_yaw_remote += vision_target_yaw * 0.003f;  // 先正常处理
+ 
+            // 限制最大角度 VISION_ALIGN_TARGET_YAW_LIMIT_DEG
+            if(target_yaw_remote > vision_yaw_guard_start + VISION_ALIGN_TARGET_YAW_LIMIT_DEG)
+            {
+              target_yaw_remote = vision_yaw_guard_start + VISION_ALIGN_TARGET_YAW_LIMIT_DEG;
+            }
+            else if(target_yaw_remote < vision_yaw_guard_start - VISION_ALIGN_TARGET_YAW_LIMIT_DEG)
+            {
+              target_yaw_remote = vision_yaw_guard_start - VISION_ALIGN_TARGET_YAW_LIMIT_DEG;
+            }
+          }
+        }
+        else
+        {
+          target_yaw_remote += vision_target_yaw * 0.003f;  // 正常处理方式
+        }
+
         pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
       }
       else if (vision_detect_mode == VISION_JUMP) // 跳跃
       {
         // 跳跃暂时不用改变航向角
+        pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
       }
       else 
       {
@@ -83,7 +150,6 @@ void pit0_ch0_isr()
       leg_control(); // 5ms调用一次      
     }
 
-    jump_control();
 
     // 角速度环
     pid_pos_calc(&banlance.pitch_gyro_pid,banlance.pitch_angle_pid.output, imu_data.gyro_y); // 俯仰角
@@ -93,8 +159,8 @@ void pit0_ch0_isr()
     int balance_out = (int)banlance.pitch_gyro_pid.output;
     int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
 
-//    if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
-      if(fabs(pitch_filter.filtering_angle) > 75.0f) // 自动保护
+    if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
+//      if(fabs(pitch_filter.filtering_angle) > 75.0f) // 自动保护
       {
         auto_protect_flag = 1;
       }
@@ -105,6 +171,7 @@ void pit0_ch0_isr()
       }
     else
     {
+      jump_control();
       small_driver_set_duty(&small_driver_value,-(balance_out + yaw_gyro_out),(balance_out - yaw_gyro_out)); 
     }
 }

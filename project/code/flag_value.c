@@ -22,9 +22,9 @@ uint8 remote_right_02_now_flag = 0;            // 右二档现在标志位
 int flash_task_flag = 0;
 bool pause_flag = true;           // 中断回放标志位（仅用于科目三）右边二档拨钮控制，检测跳变
 
-int vision_detect_mode = 0;
-int32 vision_target_speed = 0;
-int32 vision_target_yaw = 0;
+volatile int vision_detect_mode = 0;
+volatile int32 vision_target_speed = 0;
+volatile int32 vision_target_yaw = 0;
 
 float KP_DIS = 10.0f;
 int MAX_SPEED = 3000;

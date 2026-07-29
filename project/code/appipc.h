@@ -33,6 +33,9 @@ typedef struct
     uint8 exited;            // 1 表示已经确认离开当前阶段对应的路段
     uint8 bottom_y;          // 单边桥候选区域最下端纵坐标，用于估算前向距离
     int16 control_value;     // 核心1计算后的底盘航向控制量
+    uint8 force_blind;       // 1 表示核心0需要使用 IMU 强制完成大角度盲转
+    uint8 blind_release;     // 1 表示可靠视觉已经恢复，可以提前结束强制盲转
+    uint8 fresh_target;      // 1 表示连续获得了新鲜且非补线的赛道目标
 } appipc_bridge_data_t;
 
 // 核心0发送给核心1的运行状态
@@ -55,10 +58,14 @@ void  appipc_rx_init(appipc_callback_t callback);
 uint8 appipc_send_u32(uint32 data);
 
 // 打包并发送单边桥与颠簸路段视觉数据
-// 数据格式：bit31 为有效标志，bit30 为对齐标志，bit29 为离开标志，bit23~16 为 bottom_y，bit15~0 为 int16 控制量。
+// 数据格式：bit31 为有效标志，bit30 为对齐标志，bit29 为离开标志，bit28 为强制盲转标志，
+//           bit27 为提前结束盲转标志，bit26 为新鲜赛道目标标志，
+//           bit23~16 为 bottom_y，bit15~0 为 int16 控制量。
 // 离开标志独立于有效标志，由核心0结合当前 BAB 子状态判断离开的是哪一段路面。
 // 返回值：APPIPC_OK 表示发送成功，APPIPC_BUSY 表示通道忙。
-uint8 appipc_send_bridge_data(uint8 valid, uint8 aligned, uint8 exited, uint8 bottom_y, int16 control_value);
+uint8 appipc_send_bridge_data(uint8 valid, uint8 aligned, uint8 exited, uint8 bottom_y,
+                              int16 control_value, uint8 force_blind,
+                              uint8 blind_release, uint8 fresh_target);
 
 // 解包核心1发送的单边桥与颠簸路段视觉数据
 // 返回值：1 表示解包成功，0 表示参数为空。

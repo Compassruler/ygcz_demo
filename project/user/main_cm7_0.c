@@ -10,8 +10,9 @@
 #define BRIDGE_ALIGNED_CONFIRM_COUNT    (2)        // 连续对齐确认次数
 #define BRIDGE_ALIGN_START_Y            (35)       // 进入低速精确对齐区域的画面纵坐标
 
-#define BRIDGE_ALIGN_SPEED              (80)        // 距离较近且未对齐时的细调速度
-#define BRIDGE_CROSS_SPEED              (300)       // 对齐后冲过单边桥的速度
+#define BRIDGE_ALIGN_SPEED              (100)        // 距离较近且未对齐时的细调速度
+#define BRIDGE_BLIND_RECOVERY_SPEED     (-80)        // 盲转超调后倒车寻找赛道的速度
+#define BRIDGE_CROSS_SPEED              (-400)       // 对齐后冲过单边桥的速度
 #define BUMP_CROSS_SPEED                (400)        // 通过颠簸路段时的固定速度
 
 
@@ -22,6 +23,12 @@ volatile uint8 is_jump_from_core1 = 0;              // 核1发送是否跳跃标志位
 volatile uint8 is_jump_updated = 0;                 // 跳跃更新标志位
 volatile uint8 bridge_valid_from_core1 = 0;         // 单边桥是否识别标志位
 volatile uint8 bridge_aligned_from_core1 = 0;       // 单边桥是否已经对齐标志位
+volatile uint8 bridge_force_blind_from_core1 = 0;   // 核1是否请求使用 IMU 强制完成大角度盲转
+volatile uint8 bridge_blind_release_from_core1 = 0; // 核1是否请求提前结束强制盲转
+volatile uint8 bridge_fresh_target_from_core1 = 0;   // 核1是否连续识别到新鲜赛道目标
+volatile uint8 bridge_forced_blind_active = 0;       // 核0当前是否正在执行强制盲转
+volatile uint8 bridge_blind_recovery_active = 0;     // 核0当前是否正在倒车寻找赛道
+volatile uint8 bridge_forced_blind_fault = 0;        // 强制盲转异常停止标志位
 volatile uint8 bridge_bottom_y_from_core1 = 0;      // 单边桥最下端纵坐标，用于估算前向距离
 volatile int16 bridge_control_from_core1 = 0;       // 单边桥控制航向角数据
 volatile uint8 bridge_control_updated = 0;          // 单边桥控制更新标志位
@@ -48,6 +55,9 @@ static void appipc_callback(uint32 data)
         {
             bridge_valid_from_core1 = bridge_data.valid;
             bridge_aligned_from_core1 = bridge_data.aligned;
+            bridge_force_blind_from_core1 = bridge_data.force_blind;
+            bridge_blind_release_from_core1 = bridge_data.blind_release;
+            bridge_fresh_target_from_core1 = bridge_data.fresh_target;
             phase_exited_from_core1 = bridge_data.exited;
             bridge_bottom_y_from_core1 = bridge_data.bottom_y;
             bridge_control_from_core1 = bridge_data.control_value;
@@ -56,6 +66,9 @@ static void appipc_callback(uint32 data)
         {
             bridge_valid_from_core1 = 0;
             bridge_aligned_from_core1 = 0;
+            bridge_force_blind_from_core1 = 0;
+            bridge_blind_release_from_core1 = 0;
+            bridge_fresh_target_from_core1 = 0;
             phase_exited_from_core1 = 0;
             bridge_bottom_y_from_core1 = 0;
             bridge_control_from_core1 = 0;
@@ -64,7 +77,15 @@ static void appipc_callback(uint32 data)
         // 对齐阶段连续确认成功后，进入冲桥和离桥检测阶段
         if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN)
         {
-            if(bridge_valid_from_core1 && bridge_aligned_from_core1)
+            if(bridge_force_blind_from_core1 ||
+               bridge_blind_release_from_core1 ||
+               bridge_forced_blind_active ||
+               bridge_blind_recovery_active ||
+               bridge_forced_blind_fault)
+            {
+                bridge_aligned_count = 0;
+            }
+            else if(bridge_valid_from_core1 && bridge_aligned_from_core1)
             {
                 if(bridge_aligned_count < BRIDGE_ALIGNED_CONFIRM_COUNT)
                 {
@@ -113,7 +134,7 @@ int main(void)
   imu660rb_init();                                      // IMU初始化
   small_driver_uart_init();                             // 电机驱动初始化
   pit_ms_init(PIT_CH0,1);                               // PIT中断初始化
-  screen_init();                                        // 屏幕初始化
+  // screen_init();                                     // TFT180 由核心1负责，核心0暂不初始化屏幕
   flash_init();
   remote_control_init();                                // 遥控器初始化
   button_init();                                        // 按键初始化
@@ -174,7 +195,7 @@ int main(void)
         remote_table[8].value.float_value = distance_recover;
         remote_table[9].value.int_value = replay_point_num;
         remote_table[10].value.int_value = current_segment;//vision_detect_mode
-        screen_show_data_table(remote_table, 11);
+        // screen_show_data_table(remote_table, 11);     // TFT180 暂不显示通用数据表
         //==================================================
         // 01left: 0->1写入flash
         //==================================================
@@ -378,6 +399,30 @@ int main(void)
 
                 bridge_control_updated = 0;
                 vision_target_speed = BUMP_CROSS_SPEED;    // 保持单边桥出口航向通过颠簸路段
+                vision_target_yaw = 0;
+            }
+            // 强制盲转异常时停车，等待离开当前视觉阶段后复位
+            else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) &&
+                    bridge_forced_blind_fault)
+            {
+                bridge_control_updated = 0;
+                vision_target_speed = 0;
+                vision_target_yaw = 0;
+            }
+            // 盲转达到角度上限后仍未找到赛道，倒车并使用 IMU 进行小角度反向修正
+            else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) &&
+                    bridge_blind_recovery_active)
+            {
+                bridge_control_updated = 0;
+                vision_target_speed = BRIDGE_BLIND_RECOVERY_SPEED;
+                vision_target_yaw = 0;
+            }
+            // 强制盲转期间忽略中途视觉结果，航向角由核心0的 IMU 闭环控制
+            else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) &&
+                    (bridge_force_blind_from_core1 || bridge_forced_blind_active))
+            {
+                bridge_control_updated = 0;
+                vision_target_speed = BRIDGE_ALIGN_SPEED;
                 vision_target_yaw = 0;
             }
             // 如果状态为 单边桥对齐阶段 并且 数据已经更新

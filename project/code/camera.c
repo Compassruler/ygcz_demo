@@ -38,6 +38,7 @@ typedef char CameraWifiPacketSizeCheck[
 static uint8 image_copy[MT9V03X_H][MT9V03X_W];  // 复制的帧，所有后续图像处理和屏幕显示均使用该帧
 static CameraWifiImagePacket_t camera_wifi_packet;
 static uint32 camera_processed_frame_id = 0;     // 最近一次完成基础处理的图像序号
+static uint32 camera_screen_last_frame_id = 0;   // TFT180 已经显示的图像序号
 static uint32 camera_wifi_last_frame_id = 0;     // WiFi 图传已经检查过的图像序号
 static uint16 camera_wifi_frame_count = 0;       // WiFi 图传分频计数
 static uint8 camera_wifi_spi_ready = 0;          // WiFi SPI 图传初始化完成标志
@@ -421,11 +422,22 @@ void camera_init(void)
         gpio_toggle_level(LED1);
         system_delay_ms(500);
     }
+
+    camera_screen_last_frame_id = camera_processed_frame_id;
 }
 
-void camera_debug_on_screen(void)
+uint8 camera_debug_on_screen(void)
 {
+    if((0u == camera_processed_frame_id) ||
+       (camera_screen_last_frame_id == camera_processed_frame_id))
+    {
+        return 0;
+    }
+
     screen_show_camera_image(IMAGE_X, IMAGE_Y, image_copy[0], IMAGE_DISPLAY_WIDTH, IMAGE_DISPLAY_HEIGHT);
+    camera_screen_last_frame_id = camera_processed_frame_id;
+
+    return 1;
 }
 
 uint8 camera_wifi_spi_init(char *wifi_ssid, char *pass_word, char *target_ip, char *target_port, char *local_port)

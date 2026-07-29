@@ -1,4 +1,4 @@
-#include "appipc.h"
+﻿#include "appipc.h"
 
 #include "cy_project.h"
 #include "cy_device_headers.h"
@@ -27,6 +27,9 @@
 #define APPIPC_BRIDGE_VALID_MASK          (0x80000000ul)
 #define APPIPC_BRIDGE_ALIGNED_MASK        (0x40000000ul)
 #define APPIPC_BRIDGE_EXITED_MASK         (0x20000000ul)
+#define APPIPC_BRIDGE_FORCE_BLIND_MASK     (0x10000000ul)
+#define APPIPC_BRIDGE_BLIND_RELEASE_MASK   (0x08000000ul)
+#define APPIPC_BRIDGE_FRESH_TARGET_MASK    (0x04000000ul)
 #define APPIPC_BRIDGE_BOTTOM_MASK         (0x00FF0000ul)
 #define APPIPC_BRIDGE_BOTTOM_SHIFT        (16u)
 #define APPIPC_BRIDGE_CONTROL_MASK        (0x0000FFFFul)
@@ -52,9 +55,16 @@ static void appipc_default_callback(uint32 data)
     (void)data;
 }
 
-static uint32 appipc_pack_bridge_data(uint8 valid, uint8 aligned, uint8 exited, uint8 bottom_y, int16 control_value)
+static uint32 appipc_pack_bridge_data(uint8 valid, uint8 aligned, uint8 exited,
+                                     uint8 bottom_y, int16 control_value,
+                                     uint8 force_blind, uint8 blind_release,
+                                     uint8 fresh_target)
 {
-    uint32 data = exited ? APPIPC_BRIDGE_EXITED_MASK : 0u;
+    uint32 data =
+        (exited ? APPIPC_BRIDGE_EXITED_MASK : 0u) |
+        (force_blind ? APPIPC_BRIDGE_FORCE_BLIND_MASK : 0u) |
+        (blind_release ? APPIPC_BRIDGE_BLIND_RELEASE_MASK : 0u) |
+        (fresh_target ? APPIPC_BRIDGE_FRESH_TARGET_MASK : 0u);
 
     if(valid)
     {
@@ -131,9 +141,14 @@ uint8 appipc_send_u32(uint32 data)
     return APPIPC_BUSY;
 }
 
-uint8 appipc_send_bridge_data(uint8 valid, uint8 aligned, uint8 exited, uint8 bottom_y, int16 control_value)
+uint8 appipc_send_bridge_data(uint8 valid, uint8 aligned, uint8 exited,
+                              uint8 bottom_y, int16 control_value,
+                              uint8 force_blind, uint8 blind_release,
+                              uint8 fresh_target)
 {
-    return appipc_send_u32(appipc_pack_bridge_data(valid, aligned, exited, bottom_y, control_value));
+    return appipc_send_u32(appipc_pack_bridge_data(
+        valid, aligned, exited, bottom_y, control_value,
+        force_blind, blind_release, fresh_target));
 }
 
 uint8 appipc_decode_bridge_data(uint32 data, appipc_bridge_data_t *bridge_data)
@@ -146,6 +161,9 @@ uint8 appipc_decode_bridge_data(uint32 data, appipc_bridge_data_t *bridge_data)
     bridge_data->valid = (uint8)(0u != (data & APPIPC_BRIDGE_VALID_MASK));
     bridge_data->aligned = (uint8)(bridge_data->valid && (0u != (data & APPIPC_BRIDGE_ALIGNED_MASK)));
     bridge_data->exited = (uint8)(0u != (data & APPIPC_BRIDGE_EXITED_MASK));
+    bridge_data->force_blind = (uint8)(0u != (data & APPIPC_BRIDGE_FORCE_BLIND_MASK));
+    bridge_data->blind_release = (uint8)(0u != (data & APPIPC_BRIDGE_BLIND_RELEASE_MASK));
+    bridge_data->fresh_target = (uint8)(0u != (data & APPIPC_BRIDGE_FRESH_TARGET_MASK));
 
     if(!bridge_data->valid)
     {

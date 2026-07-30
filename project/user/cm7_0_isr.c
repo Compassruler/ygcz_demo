@@ -103,6 +103,8 @@ void pit0_ch0_isr()
       small_driver_get_speed(&small_driver_value);
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
       true_speed = rpmtotrue(car_speed); 
+      if(vision_bump_start && !vision_bump_finish) distance_recover += true_speed * 0.02;  // 积分计算颠簸路段距离
+      
       if (track_flag && pause_flag)
       {
         Track_update();
@@ -335,7 +337,7 @@ void pit0_ch0_isr()
         {
           if (vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
           {
-            target_yaw_remote = 0;  // 对齐之后航向角和发车相同
+            target_yaw_remote = -1;  // 对齐之后航向角和发车相同
           }
           else
           {
@@ -383,8 +385,8 @@ void pit0_ch0_isr()
     int balance_out = (int)banlance.pitch_gyro_pid.output;
     int yaw_gyro_out = (int)banlance.yaw_gyro_pid.output;
 
-    if(fabs(pitch_filter.filtering_angle) > 70.0f || fabs(true_speed) >=8.0f) // 自动保护
-//      if(fabs(pitch_filter.filtering_angle) > 75.0f) // 自动保护
+//    if(fabs(pitch_filter.filtering_angle) > 75.0f || fabs(true_speed) >=6.0f) // 自动保护
+      if(fabs(pitch_filter.filtering_angle) > 75.0f) // 自动保护
       {
         auto_protect_flag = 1;
       }

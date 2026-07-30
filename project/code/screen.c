@@ -762,7 +762,7 @@ void screen_show_table_t3(BridgeExitParams_t bridge_params, uint8 func_opt, uint
     
     sprintf(str_area_info,    "%d | %d | %d | %d", bridge_params.check_row, bridge_params.check_column, bridge_params.check_row_count, bridge_params.check_column_count);
     screen_table_3[0].value.uint_value   = func_opt;
-    screen_table_3[1].value.uint_value   = bridge_params.continuous_frame_count;
+    screen_table_3[1].value.uint_value   = bridge_params.white_frame_count;
     screen_table_3[2].value.uint_value   = (uint16)bridge_params.white_dot_count;
     screen_table_3[3].value.str_value    = str_area_info;
     screen_table_3[4].value.uint_value   = (uint16)fps;

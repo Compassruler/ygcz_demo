@@ -12,7 +12,7 @@
 
 #define BRIDGE_ALIGN_SPEED              (30)        // 距离较近且未对齐时的细调速度
 #define BRIDGE_BLIND_RECOVERY_SPEED     (-80)        // 盲转超调后倒车寻找赛道的速度
-#define BRIDGE_CROSS_SPEED              (200)       // 对齐后冲过单边桥的速度
+#define BRIDGE_CROSS_SPEED              (150)       // 对齐后冲过单边桥的速度
 #define BUMP_CROSS_SPEED                (300)        // 通过颠簸路段时的固定速度
 
 
@@ -371,16 +371,12 @@ int main(void)
         //=========================== 单边桥与颠簸路段模式 =========================
         else if(vision_detect_mode == VISION_BRIDGE_BUMP)
         {
-            // 设置腿重心为 70度
-            Y_left = 30.0f;
-            Y_right = 30.0f;
-            
             // 如果完全通过单边桥和颠簸路段
             if(vision_phase_bab == VISION_PHASE_BAB_COMPLETE)
             {
 
-                // sprintf(txt, "单边桥和颠簸路段全部完成\n");
-                // wireless_uart_send_string(txt);
+                sprintf(txt, "单边桥和颠簸路段全部完成\n");
+                wireless_uart_send_string(txt);
 
                 bridge_control_updated = 0;
                 vision_target_speed = 0;             // 完成后立即清除视觉速度，等待控制交接
@@ -390,8 +386,10 @@ int main(void)
             //如果状态为 离开单边桥检查，即冲刺过单边桥阶段
             else if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
             {
-                // sprintf(txt, "冲刺单边桥\n");
-                // wireless_uart_send_string(txt);
+                Y_left = 30.0f;
+                Y_right = 30.0f;
+                sprintf(txt, "冲刺单边桥\n");
+                wireless_uart_send_string(txt);
 
                 bridge_control_updated = 0;
                 vision_target_speed = BRIDGE_CROSS_SPEED;  // 保持对齐后的航向并冲过单边桥
@@ -400,8 +398,10 @@ int main(void)
             // 如果状态为 颠簸路段距离积分阶段，即冲刺过颠簸路段
             else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_DISTANCE)
             {
-                // sprintf(txt, "冲刺颠簸路段\n");
-                // wireless_uart_send_string(txt);
+                Y_left = 20.0f;
+                Y_right = 20.0f;
+                sprintf(txt, "冲刺颠簸路段 %f \n",distance_recover);
+                wireless_uart_send_string(txt);
 
                 bridge_control_updated = 0;
                 vision_target_speed = BUMP_CROSS_SPEED;    // 保持单边桥出口航向通过颠簸路段
@@ -409,8 +409,7 @@ int main(void)
                     
                 if(vision_bump_start && !vision_bump_finish)
                 {
-                    distance_recover += true_speed * 0.02f;  // 积分计算颠簸路段距离
-                    if(distance_recover >= 3)
+                    if(distance_recover >= 6)
                     {
                         vision_bump_finish = 1;  // 积分达到阈值，标记颠簸路段完成
                     }
@@ -443,6 +442,10 @@ int main(void)
             // 如果状态为 单边桥对齐阶段 并且 数据已经更新
             else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) && bridge_control_updated)
             {
+                Y_left = 30.0f;
+                Y_right = 30.0f;
+                sprintf(txt, "对准单边桥中 \n");
+                wireless_uart_send_string(txt);
                 bridge_control_updated = 0;
 
                 if(bridge_valid_from_core1)

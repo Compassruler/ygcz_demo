@@ -25,7 +25,7 @@
 #define ADAPTIVE_ROW_COEFF      (-5)                            // 自适应 Row 系数，数字为正，更晚切换到低 Row，更偏高 Row，跳跃时间更早；数字为负，更早切换到低 Row，更偏低 Row，跳跃时间越晚
 
 //=========================== 单边桥识别参数 ===========================
-#define BRIDGE_BINARY_THRESHOLD              (115)             // 固定阈值，也是大津法失效时的备用阈值
+#define BRIDGE_BINARY_THRESHOLD              (136)             // 固定阈值，也是大津法失效时的备用阈值
 #define BRIDGE_USE_OTSU_THRESHOLD             (0)               // 1 使用 ROI 大津法 | 0 使用固定阈值
 #define BRIDGE_THRESHOLD_FILTER_ALPHA         (0.70f)           // 自动阈值低通滤波旧值权重
 
@@ -101,14 +101,14 @@
 #define BRIDGE_BLIND_ESTIMATED_FRAMES         (2)               // 连续使用补线结果后允许盲转的帧数
 #define BRIDGE_BLIND_CONTROL_PERCENT          (90)              // 盲转控制量占可靠视觉控制量的百分比
 //=========================== 单边桥离开检测参数 ===========================
-#define BRIDGE_EXIT_BINARY_THRESHOLD   (85)    // 离桥检测固定二值化阈值（无效）
-#define BRIDGE_EXIT_CHECK_ROW          (100)    // 离桥检测矩形起始行
-#define BRIDGE_EXIT_CHECK_ROW_COUNT    (25)     // 从起始行向上检查的行数
-#define BRIDGE_EXIT_CHECK_COLUMN       (55)     // 离桥检测矩形起始列
-#define BRIDGE_EXIT_CHECK_COLUMN_COUNT (73)     // 从起始列向右检查的列数
-#define BRIDGE_EXIT_WHITE_DOT_COUNT    (1400)   // 判断离桥所需的白色像素数量
-#define BRIDGE_EXIT_CONFIRM_FRAMES     (5)      // 连续满足要求的帧数
-#define BRIDGE_EXIT_CHECK_DELAY_MS     (4000)    // 冲桥后延迟开始离桥检测的时间
+#define BRIDGE_EXIT_BINARY_THRESHOLD   (136)    // 离桥检测固定二值化阈值(无效)
+#define BRIDGE_EXIT_CHECK_ROW          (115)    // 离桥检测矩形起始行
+#define BRIDGE_EXIT_CHECK_ROW_COUNT    (80)     // 从起始行向上检查的行数
+#define BRIDGE_EXIT_CHECK_COLUMN       (10)     // 离桥检测矩形起始列
+#define BRIDGE_EXIT_CHECK_COLUMN_COUNT (160)     // 从起始列向右检查的列数
+#define BRIDGE_EXIT_WHITE_DOT_COUNT    (10000)   // 确认白色区域所需的白色像素数量
+#define BRIDGE_EXIT_BLACK_DOT_COUNT    (10000)   // 确认颠簸路段所需的黑色像素数量
+#define BRIDGE_EXIT_WHITE_CONFIRM_FRAMES (5)    // 连续检测到白色区域的帧数
 
 
 //================================================================
@@ -223,8 +223,10 @@ int main(void)
         .check_column             = BRIDGE_EXIT_CHECK_COLUMN,
         .check_column_count       = BRIDGE_EXIT_CHECK_COLUMN_COUNT,
         .white_dot_count          = BRIDGE_EXIT_WHITE_DOT_COUNT,
-        .confirm_frame_count      = BRIDGE_EXIT_CONFIRM_FRAMES,
-        .continuous_frame_count   = 0,
+        .black_dot_count          = BRIDGE_EXIT_BLACK_DOT_COUNT,
+        .white_confirm_frames     = BRIDGE_EXIT_WHITE_CONFIRM_FRAMES,
+        .white_frame_count        = 0,
+        .stage                    = CAMERA_BRIDGE_EXIT_WAIT_WHITE,
         .exited                   = 0
     };
 
@@ -305,7 +307,6 @@ int main(void)
     uint32 uart_last_ms         = 0;                  // 串口更新计时
     uint8  actual_jump_count    = 0;                  // 实际跳跃次数计数
     uint8  last_vision_phase_bab = VISION_PHASE_BAB_BRIDGE_ALIGN; // 上一次执行的 BAB 子状态
-    uint32 bridge_exit_start_ms  = 0;                 // 进入单边桥离开检测阶段的时间
     uint8  bridge_exit_ipc_sent  = 0;                 // 颠簸路段积分开始信号是否发送成功
     uint8  bump_finish_ipc_sent  = 0;                 // 核心0积分完成后的视觉完成应答是否发送成功
     uint8  bridge_align_updated  = 0;                 // 当前帧对准控制计算是否有效
@@ -339,8 +340,9 @@ int main(void)
     while(true)
     {
         bridge_params.binary_threshold = core0_remote_ch9_value;  // 固定阈值模式使用，自动阈值模式下作为备用值
-        bridge_exit_params.binary_threshold = core0_remote_ch9_value;
-
+        bridge_exit_params.binary_threshold= core0_remote_ch9_value;
+        sprintf(txt, "Bin: %d", core0_remote_ch9_value);
+        wireless_uart_send_string(txt);
         //=========================== 执行单边桥与颠簸路段检测程序 ===========================
         // 核心视觉步骤判断条件，目前有| 0 空闲 | 1 单边桥-颠簸路段 | 2 跳跃 | 后续可能增加的步骤：返回三级台阶
         if (function_option == VISION_BRIDGE_BUMP)
@@ -366,8 +368,8 @@ int main(void)
                 }
                 else if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
                 {
-                    bridge_exit_start_ms = sys_ms;  // 时间更新
-                    bridge_exit_params.continuous_frame_count = 0;
+                    bridge_exit_params.white_frame_count = 0;
+                    bridge_exit_params.stage = CAMERA_BRIDGE_EXIT_WAIT_WHITE;
                     bridge_exit_params.exited = 0;
                     bridge_exit_ipc_sent = 0;
                 }
@@ -505,21 +507,17 @@ int main(void)
                 }
             }
 
-            // 如果不是对齐状态，那进入 离开单边桥检测阶段 
-            // 需要满足的条件是 子状态进入 单边桥离开检测 状态 并且 状态更新时间到实际使能时间 大于 最短检测延时，防止过早检测而提前离开单边桥
-            else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK) &&      // 子状态为 单边桥离开检测
-                    ((sys_ms - bridge_exit_start_ms) >= BRIDGE_EXIT_CHECK_DELAY_MS)) // 满足单边桥离开检测使能延时
+            // 冲桥阶段立即进行视觉检测，白色区域连续确认后等待黑色颠簸路段
+            else if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
             {
-                // 离桥检测部分
-                // 单边桥离开检测标志位为 非离开状态，即尚未离开 并且 摄像头有新帧
+                // 使用同一个检测框依次确认白色区域和黑色颠簸路段
                 if(!bridge_exit_params.exited && camera_has_frame())
                 {
                     independent_fps = camera_fps_counter_update(&camera_fps, sys_ms);  // 独立 FPS 计算
-                    camera_bridge_exit_processing(&bridge_exit_params);  // 单边桥离开检测，通过修改 bridge_exit_params 返回检测状态
+                    camera_bridge_exit_processing(&bridge_exit_params);
                 }
                 
-                // 离桥 IPC 发送部分
-                // 已经离桥 并且 IPC 尚未成功发送时，尝试发送，一旦发送成功则立即停止，防止死循环
+                // 白色到黑色的变化已经确认后，通知核心0开始颠簸路段积分
                 if(bridge_exit_params.exited && !bridge_exit_ipc_sent)
                 {
                     bridge_exit_ipc_sent = (APPIPC_OK == appipc_send_bridge_data(0, 0, 0, 0, 0, 0, 0, 0, 1)) ? 1 : 0;  // 发送积分开始信号

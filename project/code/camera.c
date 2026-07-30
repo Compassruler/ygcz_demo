@@ -592,6 +592,7 @@ uint8 camera_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bri
 uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params)
 {
     uint8 white_detected = 0;  // 当前帧的白色像素是否达到阈值
+    uint8 black_detected = 0;  // 当前帧的黑色像素是否达到阈值
 
     // 如果没有有效结构体
     if(NULL == bridge_exit_params)
@@ -611,7 +612,7 @@ uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params)
         return 0;
     }
 
-    // 固定统计矩形区域内的白色像素总数
+    // 对同一个检测区域分别统计白色和黑色像素
     white_detected = camproc_pub_check_area(
         image_copy,
         bridge_exit_params->check_row,
@@ -622,21 +623,57 @@ uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params)
         CAMERA_IMAGE_DOT_WHITE
     );
 
-    // 任意一帧不满足要求，连续帧计数立即清零
-    if(!white_detected)
-    {
-        bridge_exit_params->continuous_frame_count = 0;
-        return 0;
-    }
+    black_detected = camproc_pub_check_area(
+        image_copy,
+        bridge_exit_params->check_row,
+        bridge_exit_params->check_row_count,
+        bridge_exit_params->check_column,
+        bridge_exit_params->check_column_count,
+        bridge_exit_params->black_dot_count,
+        CAMERA_IMAGE_DOT_BLACK
+    );
 
-    if(bridge_exit_params->continuous_frame_count < bridge_exit_params->confirm_frame_count)
+    switch(bridge_exit_params->stage)
     {
-        bridge_exit_params->continuous_frame_count++;
-    }
+        // 连续检测到白色区域后，进入黑色区域等待阶段
+        case CAMERA_BRIDGE_EXIT_WAIT_WHITE:
+            if(white_detected)
+            {
+                if(bridge_exit_params->white_frame_count <
+                   bridge_exit_params->white_confirm_frames)
+                {
+                    bridge_exit_params->white_frame_count++;
+                }
 
-    if(bridge_exit_params->continuous_frame_count >= bridge_exit_params->confirm_frame_count)
-    {
-        bridge_exit_params->exited = 1;
+                if(bridge_exit_params->white_frame_count >=
+                   bridge_exit_params->white_confirm_frames)
+                {
+                    bridge_exit_params->stage = CAMERA_BRIDGE_EXIT_WAIT_BLACK;
+                }
+            }
+            else
+            {
+                bridge_exit_params->white_frame_count = 0;
+            }
+            break;
+
+        // 白色区域已经确认，检测到大面积黑色后立即完成离桥判断
+        case CAMERA_BRIDGE_EXIT_WAIT_BLACK:
+            if(black_detected)
+            {
+                bridge_exit_params->stage = CAMERA_BRIDGE_EXIT_COMPLETE;
+                bridge_exit_params->exited = 1;
+            }
+            break;
+
+        case CAMERA_BRIDGE_EXIT_COMPLETE:
+            bridge_exit_params->exited = 1;
+            break;
+
+        default:
+            bridge_exit_params->stage = CAMERA_BRIDGE_EXIT_WAIT_WHITE;
+            bridge_exit_params->white_frame_count = 0;
+            break;
     }
 
     return bridge_exit_params->exited;

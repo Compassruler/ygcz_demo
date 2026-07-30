@@ -179,6 +179,14 @@ typedef struct
     uint16 bottom_y;                // 当前控制阶段提供给核心0的路径下端纵坐标
 } CameraBridgeAlignResult_t;
 
+// 单边桥离开检测阶段
+typedef enum
+{
+    CAMERA_BRIDGE_EXIT_WAIT_WHITE = 0,  // 等待检测区域连续出现白色
+    CAMERA_BRIDGE_EXIT_WAIT_BLACK,      // 白色已经确认，等待检测区域变为黑色
+    CAMERA_BRIDGE_EXIT_COMPLETE         // 已经确认进入颠簸路段
+} CameraBridgeExitStage_t;
+
 // 单边桥离开检测参数
 typedef struct
 {
@@ -187,10 +195,12 @@ typedef struct
     uint16 check_row_count;         // 从起始行向上检查的行数量
     uint16 check_column;            // 检测矩形的起始列，后续从该列向右检查
     uint16 check_column_count;      // 从起始列向右检查的列数量
-    uint32 white_dot_count;         // 矩形检测区域内的白色像素总数阈值
-    uint8 confirm_frame_count;      // 确认离开所需的连续有效帧数
-    uint8 continuous_frame_count;   // 当前已经连续检测到白色的帧数
-    uint8 exited;                   // 1 表示已经确认离开单边桥
+    uint32 white_dot_count;         // 确认白色区域所需的白色像素数量
+    uint32 black_dot_count;         // 确认颠簸路段所需的黑色像素数量
+    uint8 white_confirm_frames;     // 确认白色区域所需的连续帧数
+    uint8 white_frame_count;        // 当前连续检测到白色区域的帧数
+    CameraBridgeExitStage_t stage;  // 当前离桥视觉检测阶段
+    uint8 exited;                   // 1 表示白色到黑色的变化已经确认
 } BridgeExitParams_t;
 
 // WiFi SPI 图像叠加类型
@@ -284,10 +294,10 @@ uint8 camera_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bri
 
 /**
  * 单边桥离开检测接口
- * 固定统计检测区域内的白色像素，连续满足指定帧数后锁存离开状态。
+ * 同一检测区域先连续确认白色，再检测大面积黑色并锁存离桥状态。
  * @param bridge_exit_params 单边桥离开检测参数结构体
  *
- * @return 1 已经确认离开单边桥 | 0 尚未离开或当前没有新帧
+ * @return 1 已经确认白色到黑色的变化 | 0 尚未完成或当前没有新帧
  */
 uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params);
 

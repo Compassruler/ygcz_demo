@@ -102,6 +102,7 @@ void pit0_ch0_isr()
     {
       small_driver_get_speed(&small_driver_value);
       car_speed = ((-small_driver_value.receive_left_speed_data) + small_driver_value.receive_right_speed_data) / 2;
+      true_speed = rpmtotrue(car_speed); 
       if (track_flag && pause_flag)
       {
         Track_update();
@@ -121,7 +122,6 @@ void pit0_ch0_isr()
       
       if ((road_memery_flag == 1 && pause_flag) || remote_right_01_now_flag == 0)
       {
-        true_speed = rpmtotrue(car_speed); 
         ins_update();  // ins数据更新       
       }      
     }

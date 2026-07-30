@@ -406,6 +406,15 @@ int main(void)
                 bridge_control_updated = 0;
                 vision_target_speed = BUMP_CROSS_SPEED;    // 保持单边桥出口航向通过颠簸路段
                 vision_target_yaw = 0;
+                    
+                if(vision_bump_start && !vision_bump_finish)
+                {
+                    distance_recover += true_speed * 0.02f;  // 积分计算颠簸路段距离
+                    if(distance_recover >= 3)
+                    {
+                        vision_bump_finish = 1;  // 积分达到阈值，标记颠簸路段完成
+                    }
+                }
             }
             // 强制盲转异常时停车，等待离开当前视觉阶段后复位
             else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) &&

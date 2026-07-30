@@ -68,6 +68,8 @@ float dt = 0.020;  // ins调用周期（s）
 
 float distance_recover = 0;   // 判断恢复点的距离(写在这里为了调试)
 
+float x_vision = 0;  // 视觉x坐标
+float y_vision = 0;  // 视觉y坐标
 // ins初始化
 void ins_init(void)
 {
@@ -222,6 +224,10 @@ void ins_update(void)
     x += vx * dt;
     y += vy * dt;
     
+
+
+
+
     // 计算和上一个记录点的距离
      dx_ins = x - x_last;
      dy_ins = y - y_last;

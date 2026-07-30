@@ -528,7 +528,10 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
-    KP_DIS = 7.0;
+    KP_DIS = 9.5;
+    TURN_CHECK_POINT = 60;
+    TURN_SPEED_LIMIT = 100;
+    TURN_SPEED_SCALE = 0.2;
     }
 
 
@@ -555,6 +558,10 @@ void flash_path_load(void)
     KP_DIS = 4.5;
     }
     yaw_angle = 0; // 发车航向角清0，防止歪了
+    x = 0;
+    y = 0;
+    x_last = 0;
+    y_last = 0;// 给惯导数据清零
 }
 
 void flash_turn_memery_store()

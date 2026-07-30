@@ -26,9 +26,9 @@ float speed_to_x_offset, balance_to_y_offset;
 // Y 坐标:10mm 舵机:80度
 // Y 坐标:0mm  舵机:70度
 float X_left = 0.0f;
-float Y_left = 10.0f;
+float Y_left = 0.0f;
 float X_right = 0.0f;
-float Y_right = 10.0f;
+float Y_right = 0.0f;
 
 // 当前实际坐标（0为初始值）
 float XLeft = 0.0f, YLeft = 0.0f;
@@ -229,6 +229,9 @@ void leg_control(void)
     float target_Y_left  = Y_left  + Y_OFFSET + balance_to_y_offset;
     float target_Y_right = Y_right + Y_OFFSET - balance_to_y_offset;
 
+//      float target_Y_left  = 0;
+//      float target_Y_right = 0;
+    
     // Y 方向：目标坐标计算 只做伸长
 //    float target_Y_left  = Y_left  + Y_OFFSET + (balance_to_y_offset > 0.0f ? balance_to_y_offset : 0.0f);
 //    float target_Y_right = Y_right + Y_OFFSET - (balance_to_y_offset > 0.0f ? 0.0f : balance_to_y_offset);

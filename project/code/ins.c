@@ -4,12 +4,12 @@
 #define NEAREST_SELECT_NUM 10       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 #define MAX_ELEMENT_NUM 10              // 打断点数量
-#define TURN_CHECK_POINT  40          // 提前检测的点数
+int TURN_CHECK_POINT = 40;          // 提前检测的点数  // 科一40
 #define TURN_ANGLE_LIMIT 30           // 检测判断转弯的角度
 #define MAX_PATH_POINT          (FLASH_PAGE_LENGTH * Use_page)             //最大点数
-#define TURN_SPEED_LIMIT         300                                      // 小于该速度则不允许减速
+int TURN_SPEED_LIMIT  =       350;                                      // 小于该速度则不允许减速 // 科一350
 
-#define TURN_SPEED_SCALE 0.30f // 降速比例
+float TURN_SPEED_SCALE = 0.30f; // 降速比例 科一0.3
 
 uint16_t element_index[MAX_ELEMENT_NUM];        // 打断点索引
 
@@ -331,9 +331,9 @@ void Track_update(void)
     //--------------------------------------------------
     // 航向误差
     //--------------------------------------------------
-    if(fabs(yaw_angle - angle) >= 30)
+    if(fabs(yaw_angle - angle) >= 35)
     {
-        target_yaw = yaw_angle + 30;
+        target_yaw = yaw_angle + 35;
         target_speed = 0;
         return;
     }
@@ -357,8 +357,7 @@ check_turn_finish();
 //如果前方有转弯，降速
 if(future_turn_flag)
 {
-    if(fabs(car_speed) > TURN_SPEED_LIMIT &&
-       next_index < future_turn_index)
+    if(fabs(car_speed) > TURN_SPEED_LIMIT && next_index < future_turn_index)
     {
         target_v *= TURN_SPEED_SCALE;
     }

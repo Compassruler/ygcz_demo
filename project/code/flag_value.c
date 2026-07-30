@@ -29,7 +29,7 @@ volatile int32 vision_target_yaw = 0;
 float KP_DIS;
 int MAX_SPEED = 1000;
 
-int MIN_SPEED = 300;
+int MIN_SPEED = 100;
 float YAW_TH = 1.0f; 
 
 bool track_flag = false;  // 回放标志位（按钮四控制）true为开启回放

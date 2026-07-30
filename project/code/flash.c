@@ -205,6 +205,17 @@ void flash_write_all_points(PathPoint *path,uint32_t point_num)
     }
 
 }
+// flash 写入摄像头二值化阈值
+void flash_write_vision_threshold()
+{
+    flash_buffer_clear(); // 清除缓冲区
+    flash_union_buffer[0].uint32_type = 二值化阈值;
+  
+  flash_write_page_from_buffer(0,VISION_THRESHOLD_PAGE, 1);
+ 
+}
+
+
 // flash写入总
 void flash_path_store(void)
 {
@@ -259,9 +270,12 @@ void flash_path_store(void)
             record_path,
             mul_header.total_point_num
         );
+        flash_write_vision_threshold();
 
     }
-
+    
+    
+    
 }
 
 // flash读取科目三总头
@@ -486,6 +500,15 @@ void flash_read_all_points(PathPoint *path,uint32_t point_num)
     }
 
 }
+
+
+// flash读取摄像头二值化阈值
+void flash_read_vision_threshold()
+{
+  flash_read_page_to_buffer(0,VISION_THRESHOLD_PAGE,1);
+  二值化阈值 = flash_union_buffer[0].uint32_type;
+}
+
 // flash读取总
 void flash_path_load(void)
 {
@@ -553,9 +576,11 @@ void flash_path_load(void)
             replay_point,
             mul_header.total_point_num
         );
+        
     replay_point_num = mul_header.total_point_num;
     segment_end_index = segment_header[0].point_num - 1;
     KP_DIS = 4.5;
+    flash_read_vision_threshold();
     }
     yaw_angle = 0; // 发车航向角清0，防止歪了
     x = 0;

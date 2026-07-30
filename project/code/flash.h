@@ -33,6 +33,10 @@ void flash_write_segment_header(SegmentHeader *header);
 // flash写入路径点
 void flash_write_all_points(PathPoint *path, uint32_t point_num); //path：开始位置 point_num：该段点数
 
+
+// flash 写入摄像头二值化阈值
+void flash_write_vision_threshold();
+
 // flash写入总
 void flash_path_store(void);
 
@@ -44,6 +48,9 @@ void flash_read_segment_headers(void);
 
 // flash读取路径点
 void flash_read_all_points(PathPoint *path,uint32_t point_num);
+
+// flash读取摄像头二值化阈值
+void flash_read_vision_threshold();
 
 //flash读取总
 void flash_path_load(void);
@@ -95,6 +102,8 @@ void flash_path_load(void);
 #define COURSE3_POINT_END_PAGE       80                    // 写入flash路径点结束页
 
 
+
+#define VISION_THRESHOLD_PAGE        81                    // 写入摄像头二值化阈值页
 //======================
 // 擦除信息区
 //======================

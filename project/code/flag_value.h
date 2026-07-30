@@ -28,6 +28,9 @@ extern volatile int vision_detect_mode;     // ÊÓ¾õÊ¶±ğÀàĞÍ | 0 ¿Õ×´Ì¬ | 1 µ¥±ßÇ
 extern volatile int32 vision_target_speed;  // ÊÓ¾õËÙ¶È
 extern volatile int32 vision_target_yaw;    // ÊÓ¾õº½Ïò½Ç
 
+extern volatile uint8 vision_bump_start;    // ºË1È·ÈÏÀëÇÅºóÖÃ1£¬¼¤»îºË0µßô¤Â·¶Î¾àÀë»ı·Ö
+extern volatile uint8 vision_bump_finish;   // ºË0¾àÀë»ı·Öµ½Î»ºóÖÃ1£¬Í¨ÖªºË1Íê³ÉÊÓ¾õ½×¶Î
+
 extern float KP_DIS;
 
 extern int MAX_SPEED;

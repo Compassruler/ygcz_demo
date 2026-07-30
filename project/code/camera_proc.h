@@ -97,20 +97,11 @@ void camproc_bridge_align_reset(CameraBridgeAlignState_t *align_state);
  *
  * @note 预瞄点同时包含中线横向位置和方向信息，避免两项控制量相互抵消。
  * @note 接近对准时短时保持航向，大角度丢线前保存可靠控制并定时重新确认。
+ * @note 严格条件未触发时，连续处于保底范围达到设定时间也会确认对准。
  * @note 对准完成结果不锁存，后续帧仍会根据当前中线重新判断。
  * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
  */
 uint8 camproc_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
-
-/**
- * 颠簸路段离开检测，先确认黑色凸起，再连续确认白色出口
- * @param image              待检测的二值图像数组
- * @param bump_exit_params   颠簸路段离开检测参数结构体
- * @param exit_check_enabled 1 允许判断白色出口 | 0 仅确认黑色凸起
- *
- * @return 1 已确认离开颠簸路段 | 0 尚未离开
- */
-uint8 camproc_bump_exit_detect(uint8 image[MT9V03X_H][MT9V03X_W], BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled);
 
 // ==================================================== 跳跃检测、过滤、切换函数 ====================================================
 /**

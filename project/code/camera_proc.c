@@ -1,4 +1,4 @@
-#include "camera_proc.h"
+﻿#include "camera_proc.h"
 #include <math.h>
 #include <string.h>
 
@@ -6,7 +6,6 @@
 #define CAMERA_BRIDGE_MAX_EDGE_POINTS           (1024u) // 单侧边线最多保存的候选点数量
 #define CAMERA_BRIDGE_MAX_POINTS_PER_ROW        (8u)    // 每行单侧最多保存的黑白跳变数量
 #define CAMERA_BRIDGE_RAD_TO_D10                 (572.9578f)
-#define CAMERA_BRIDGE_FINE_POSITION_MARGIN_PX    (2u)    // 精调状态相对完成框额外允许的位置范围
 #define CAMERA_BRIDGE_CONTROL_STABLE_DELTA       (4)     // 连续可靠控制量允许的最大变化
 #define CAMERA_ROW_SPEED_RULE_COUNT              (5u)
 #define CAMERA_LANE_VISITED_BYTE_COUNT           ((MT9V03X_H * MT9V03X_W + 7u) / 8u)
@@ -859,10 +858,12 @@ uint8 camproc_bridge_detect(
         lane_width_top = right_top_x - left_top_x;
         lane_width_bottom = right_bottom_x - left_bottom_x;
 
+        // 透视下赛道远端宽度不能大于近端宽度，排除起点横线造成的 V 形误拟合
         if((lane_width_top < params->min_lane_width) ||
            (lane_width_top > params->max_lane_width) ||
            (lane_width_bottom < params->min_lane_width) ||
-           (lane_width_bottom > params->max_lane_width))
+           (lane_width_bottom > params->max_lane_width) ||
+           (lane_width_top > lane_width_bottom))
         {
             return camera_bridge_hold_last_result(params, result);
         }
@@ -923,10 +924,12 @@ uint8 camproc_bridge_detect(
         lane_width_top = right_top_x - left_top_x;
         lane_width_bottom = right_bottom_x - left_bottom_x;
 
+        // 补线结果同样必须满足远端不宽于近端，防止继续沿用错误的透视模型
         if((lane_width_top < params->min_lane_width) ||
            (lane_width_top > params->max_lane_width) ||
            (lane_width_bottom < params->min_lane_width) ||
-           (lane_width_bottom > params->max_lane_width))
+           (lane_width_bottom > params->max_lane_width) ||
+           (lane_width_top > lane_width_bottom))
         {
             return camera_bridge_hold_last_result(params, result);
         }
@@ -968,13 +971,14 @@ uint8 camproc_bridge_detect(
 
 static int16 camproc_bridge_yaw_offset_to_control(
     int16 yaw_offset_d10,
+    float control_gain_per_deg,
     const CameraBridgeAlignParams_t *align_params)
 {
     float control_output = 0.0f;
     int32 control_value = 0;
 
     control_output = (float)yaw_offset_d10 * 0.1f
-                   * align_params->control_gain_per_deg
+                   * control_gain_per_deg
                    * align_params->control_direction;
     control_value = (control_output >= 0.0f) ?
         (int32)(control_output + 0.5f) : (int32)(control_output - 0.5f);
@@ -1013,17 +1017,21 @@ uint8 camproc_bridge_align_update(
     uint16 lookahead_px = 0;
     uint16 active_y = 0;
     uint8 position_inside = 0;
-    uint8 angle_inside = 0;
-    uint8 fine_position_inside = 0;
-    uint8 fine_angle_inside = 0;
+    uint8 strict_inside = 0;
+    uint8 fallback_inside = 0;
+    uint8 fallback_triggered = 0;
     uint8 edge_near_border = 0;
     uint8 control_sign_changed = 0;
     uint8 control_stable = 0;
+    int8 control_sign = 0;
     float raw_slope = 0.0f;
     float raw_intercept = 0.0f;
     float raw_heading_d10 = 0.0f;
     float heading_d10 = 0.0f;
     float heading_abs_d10 = 0.0f;
+    float active_line_filter_alpha = 0.0f;
+    float active_yaw_gain = 0.0f;
+    float active_control_gain_per_deg = 0.0f;
     float lookahead_ratio = 0.0f;
     float line_norm = 0.0f;
     float projection_y = 0.0f;
@@ -1042,8 +1050,9 @@ uint8 camproc_bridge_align_update(
     int32 yaw_offset_d10 = 0;
     int32 yaw_change_d10 = 0;
     int32 control_delta = 0;
-    int32 control_abs = 0;
     int32 scaled_control = 0;
+    uint16 active_control_deadband_d10 = 0;
+    int16 active_yaw_slew_limit_d10 = 0;
 
     if(NULL == align_result)
     {
@@ -1060,13 +1069,26 @@ uint8 camproc_bridge_align_update(
     if((align_params->target_center_x >= MT9V03X_W) ||
        (0u == align_params->far_tolerance_px) ||
        (0u == align_params->near_tolerance_px) ||
-       (0u == align_params->angle_tolerance_d10) ||
+       (0u == align_params->fallback_far_tolerance_px) ||
+       (0u == align_params->fallback_near_tolerance_px) ||
+       (0u == align_params->fallback_timeout_ms) ||
+       (0u == align_params->fallback_estimated_grace_frames) ||
        (0u == align_params->lookahead_min_px) ||
        (align_params->lookahead_min_px > align_params->lookahead_max_px) ||
        (align_params->lookahead_max_px >= MT9V03X_H) ||
        (0u == align_params->lookahead_full_angle_d10) ||
        (0u == align_params->complete_confirm_frames) ||
        (0u == align_params->lost_reset_frames) ||
+       (0u == align_params->near_enter_angle_d10) ||
+       (align_params->near_enter_angle_d10 >=
+        align_params->near_exit_angle_d10) ||
+       (align_params->near_line_filter_alpha < 0.0f) ||
+       (align_params->near_line_filter_alpha > 1.0f) ||
+       (align_params->near_yaw_gain <= 0.0f) ||
+       (0u == align_params->near_control_deadband_d10) ||
+       (align_params->near_yaw_slew_limit_d10 <= 0) ||
+       (align_params->near_control_gain_per_deg <= 0.0f) ||
+       (0u == align_params->near_reverse_confirm_frames) ||
        (align_params->line_filter_alpha < 0.0f) ||
        (align_params->line_filter_alpha > 1.0f) ||
        (align_params->yaw_gain <= 0.0f) ||
@@ -1076,10 +1098,6 @@ uint8 camproc_bridge_align_update(
        (align_params->control_gain_per_deg <= 0.0f) ||
        (0.0f == align_params->control_direction) ||
        (align_params->control_limit <= 0) ||
-       (0u == align_params->fine_hold_time_ms) ||
-       (align_params->fine_control_limit <= 0) ||
-       (align_params->fine_control_limit > align_params->control_limit) ||
-       (0u == align_params->verify_confirm_frames) ||
        (0u == align_params->blind_trigger_angle_d10) ||
        (0u == align_params->blind_turn_time_ms) ||
        (0u == align_params->blind_edge_margin_px) ||
@@ -1094,27 +1112,30 @@ uint8 camproc_bridge_align_update(
 
     align_result->phase = align_state->phase;
     align_result->bottom_y = align_state->held_bottom_y;
+    align_result->near_mode = align_state->near_mode_active;
 
-    // 精调保持期间继续前进，只停止更新航向目标，避免追逐小幅视觉抖动
-    if(CAMERA_BRIDGE_ALIGN_FINE_HOLD == align_state->phase)
+    // 对准完成后持续锁存结果，保证核心0能够稳定收到连续确认信号
+    if(CAMERA_BRIDGE_ALIGN_COMPLETE == align_state->phase)
     {
         align_result->valid = 1;
-
-        if((time_ms - align_state->phase_start_time_ms) <
-           align_params->fine_hold_time_ms)
-        {
-            return 1;
-        }
-
-        align_state->phase = CAMERA_BRIDGE_ALIGN_VERIFY;
-        align_state->verify_frame_count = 0;
-        align_result->phase = align_state->phase;
+        align_result->point_inside = 1;
+        align_result->aligned = 1;
+        align_result->control_value = 0;
+        return 1;
     }
 
     // 盲转阶段沿用可靠视觉控制，时间结束后重新读取当前新鲜图像
     if(CAMERA_BRIDGE_ALIGN_BLIND_TURN == align_state->phase)
     {
+        align_state->near_mode_active = 0;
+        align_state->near_reverse_count = 0;
+        align_state->near_control_sign = 0;
+        align_state->near_pending_sign = 0;
+        align_state->fallback_timer_active = 0;
+        align_state->fallback_start_time_ms = 0;
+        align_state->fallback_estimated_count = 0;
         align_result->valid = 1;
+        align_result->near_mode = 0;
         align_result->control_value = align_state->blind_control_value;
 
         if((time_ms - align_state->phase_start_time_ms) <
@@ -1123,8 +1144,7 @@ uint8 camproc_bridge_align_update(
             return 1;
         }
 
-        align_state->phase = CAMERA_BRIDGE_ALIGN_VERIFY;
-        align_state->verify_frame_count = 0;
+        align_state->phase = CAMERA_BRIDGE_ALIGN_TRACK;
         align_state->blind_reliable_count = 0;
         align_state->blind_estimated_count = 0;
         align_state->blind_reference_control = 0;
@@ -1139,8 +1159,15 @@ uint8 camproc_bridge_align_update(
     if(!bridge_result->valid ||
        (bridge_result->center_y1 >= bridge_result->center_y2))
     {
+        align_state->near_mode_active = 0;
+        align_state->near_reverse_count = 0;
+        align_state->near_control_sign = 0;
+        align_state->near_pending_sign = 0;
+        align_result->near_mode = 0;
         align_state->complete_frame_count = 0;
-        align_state->verify_frame_count = 0;
+        align_state->fallback_timer_active = 0;
+        align_state->fallback_start_time_ms = 0;
+        align_state->fallback_estimated_count = 0;
 
         // 大角度可靠方向已经确定后，短暂丢线时继续执行分段盲转
         if((align_state->blind_reliable_count >=
@@ -1160,6 +1187,9 @@ uint8 camproc_bridge_align_update(
             align_state->blind_control_value = (int16)scaled_control;
             align_state->phase = CAMERA_BRIDGE_ALIGN_BLIND_TURN;
             align_state->phase_start_time_ms = time_ms;
+            align_state->fallback_timer_active = 0;
+            align_state->fallback_start_time_ms = 0;
+            align_state->fallback_estimated_count = 0;
             align_state->blind_reliable_count = 0;
             align_state->blind_estimated_count = 0;
             align_state->blind_reference_control = 0;
@@ -1184,6 +1214,7 @@ uint8 camproc_bridge_align_update(
         }
 
         align_result->phase = align_state->phase;
+        align_result->near_mode = 0;
         return 0;
     }
 
@@ -1210,64 +1241,119 @@ uint8 camproc_bridge_align_update(
         (far_error <=  (int32)align_params->far_tolerance_px) &&
         (near_error >= -(int32)align_params->near_tolerance_px) &&
         (near_error <=  (int32)align_params->near_tolerance_px));
-    angle_inside = (uint8)(
-        fabsf(raw_heading_d10) <= align_params->angle_tolerance_d10);
     align_result->point_inside = position_inside;
+    strict_inside = (uint8)(!bridge_result->estimated && position_inside);
+    fallback_inside = (uint8)(
+        (far_error_abs <= (int32)align_params->fallback_far_tolerance_px) &&
+        (near_error_abs <= (int32)align_params->fallback_near_tolerance_px));
 
-    fine_position_inside = (uint8)(
-        (far_error_abs <=
-         ((int32)align_params->far_tolerance_px +
-          (int32)CAMERA_BRIDGE_FINE_POSITION_MARGIN_PX)) &&
-        (near_error_abs <=
-         ((int32)align_params->near_tolerance_px +
-          (int32)CAMERA_BRIDGE_FINE_POSITION_MARGIN_PX)));
-    fine_angle_inside = (uint8)(
-        fabsf(raw_heading_d10) <=
-        ((float)align_params->angle_tolerance_d10 * 2.0f));
-
-    // 重新观察阶段必须使用连续的新鲜双边线完成确认
-    if(CAMERA_BRIDGE_ALIGN_VERIFY == align_state->phase)
+    // 小角度且已经靠近目标范围时进入近对准，使用迟滞避免反复切换
+    if(!align_state->near_mode_active)
     {
-        if(!bridge_result->estimated && position_inside && angle_inside)
+        if(!bridge_result->estimated &&
+           fallback_inside &&
+           (fabsf(raw_heading_d10) <= align_params->near_enter_angle_d10))
         {
-            if(align_state->verify_frame_count <
-               align_params->verify_confirm_frames)
-            {
-                align_state->verify_frame_count++;
-            }
+            align_state->near_mode_active = 1;
+            align_state->near_reverse_count = 0;
+            align_state->near_control_sign = 0;
+            align_state->near_pending_sign = 0;
         }
-        else
-        {
-            align_state->verify_frame_count = 0;
-        }
+    }
+    else if(!fallback_inside ||
+            (fabsf(raw_heading_d10) >= align_params->near_exit_angle_d10))
+    {
+        align_state->near_mode_active = 0;
+        align_state->near_reverse_count = 0;
+        align_state->near_control_sign = 0;
+        align_state->near_pending_sign = 0;
+    }
+    align_result->near_mode = align_state->near_mode_active;
 
-        if(align_state->verify_frame_count >=
-           align_params->verify_confirm_frames)
+    // 新鲜中线上下端点连续进入红框后直接完成对准
+    if(strict_inside)
+    {
+        if(align_state->complete_frame_count <
+           align_params->complete_confirm_frames)
         {
-            align_state->previous_yaw_offset_d10 = 0;
-            align_state->previous_control_value = 0;
-            align_result->point_inside = 1;
-            align_result->aligned = 1;
-            align_result->phase = CAMERA_BRIDGE_ALIGN_COMPLETE;
-            return 1;
+            align_state->complete_frame_count++;
         }
     }
     else
     {
-        if(!bridge_result->estimated &&
-           fine_position_inside &&
-           fine_angle_inside)
+        align_state->complete_frame_count = 0;
+    }
+
+    // 保底范围允许少量估算帧，避免单帧补线反复清空驻留计时
+    if(fallback_inside)
+    {
+        if(bridge_result->estimated)
         {
-            if(align_state->complete_frame_count <
-               align_params->complete_confirm_frames)
+            if(align_state->fallback_timer_active &&
+               (align_state->fallback_estimated_count <
+                align_params->fallback_estimated_grace_frames))
             {
-                align_state->complete_frame_count++;
+                align_state->fallback_estimated_count++;
+            }
+            else
+            {
+                align_state->fallback_timer_active = 0;
+                align_state->fallback_start_time_ms = 0;
+                align_state->fallback_estimated_count = 0;
             }
         }
         else
         {
-            align_state->complete_frame_count = 0;
+            align_state->fallback_estimated_count = 0;
+
+            if(!align_state->fallback_timer_active)
+            {
+                align_state->fallback_timer_active = 1;
+                align_state->fallback_start_time_ms = time_ms;
+            }
+            else if((time_ms - align_state->fallback_start_time_ms) >=
+                    align_params->fallback_timeout_ms)
+            {
+                fallback_triggered = 1;
+            }
         }
+    }
+    else
+    {
+        align_state->fallback_timer_active = 0;
+        align_state->fallback_start_time_ms = 0;
+        align_state->fallback_estimated_count = 0;
+    }
+
+    if((align_state->complete_frame_count >=
+        align_params->complete_confirm_frames) ||
+       fallback_triggered)
+    {
+        align_state->phase = CAMERA_BRIDGE_ALIGN_COMPLETE;
+        align_state->previous_yaw_offset_d10 = 0;
+        align_state->previous_control_value = 0;
+        align_result->point_inside = 1;
+        align_result->aligned = 1;
+        align_result->phase = align_state->phase;
+        align_result->control_value = 0;
+        return 1;
+    }
+
+    if(align_state->near_mode_active)
+    {
+        active_line_filter_alpha = align_params->near_line_filter_alpha;
+        active_yaw_gain = align_params->near_yaw_gain;
+        active_control_deadband_d10 = align_params->near_control_deadband_d10;
+        active_yaw_slew_limit_d10 = align_params->near_yaw_slew_limit_d10;
+        active_control_gain_per_deg = align_params->near_control_gain_per_deg;
+    }
+    else
+    {
+        active_line_filter_alpha = align_params->line_filter_alpha;
+        active_yaw_gain = align_params->yaw_gain;
+        active_control_deadband_d10 = align_params->control_deadband_d10;
+        active_yaw_slew_limit_d10 = align_params->yaw_slew_limit_d10;
+        active_control_gain_per_deg = align_params->control_gain_per_deg;
     }
 
     // 对直线参数而不是单个端点滤波，端点纵坐标变化时仍保持同一条中线
@@ -1280,11 +1366,11 @@ uint8 camproc_bridge_align_update(
     else
     {
         align_state->filtered_slope =
-              align_params->line_filter_alpha * align_state->filtered_slope
-            + (1.0f - align_params->line_filter_alpha) * raw_slope;
+              active_line_filter_alpha * align_state->filtered_slope
+            + (1.0f - active_line_filter_alpha) * raw_slope;
         align_state->filtered_intercept =
-              align_params->line_filter_alpha * align_state->filtered_intercept
-            + (1.0f - align_params->line_filter_alpha) * raw_intercept;
+              active_line_filter_alpha * align_state->filtered_intercept
+            + (1.0f - active_line_filter_alpha) * raw_intercept;
     }
 
     heading_d10 =
@@ -1368,16 +1454,16 @@ uint8 camproc_bridge_align_update(
     yaw_offset =
           atan2f(lookahead_error, forward_distance)
         * CAMERA_BRIDGE_RAD_TO_D10
-        * align_params->yaw_gain
+        * active_yaw_gain
         * align_params->yaw_direction;
 
-    if(yaw_offset > align_params->control_deadband_d10)
+    if(yaw_offset > active_control_deadband_d10)
     {
-        yaw_offset -= align_params->control_deadband_d10;
+        yaw_offset -= active_control_deadband_d10;
     }
-    else if(yaw_offset < -(float)align_params->control_deadband_d10)
+    else if(yaw_offset < -(float)active_control_deadband_d10)
     {
-        yaw_offset += align_params->control_deadband_d10;
+        yaw_offset += active_control_deadband_d10;
     }
     else
     {
@@ -1397,24 +1483,68 @@ uint8 camproc_bridge_align_update(
     }
 
     yaw_change_d10 = yaw_offset_d10 - align_state->previous_yaw_offset_d10;
-    if(yaw_change_d10 > align_params->yaw_slew_limit_d10)
+    if(yaw_change_d10 > active_yaw_slew_limit_d10)
     {
         yaw_offset_d10 =
-            align_state->previous_yaw_offset_d10 + align_params->yaw_slew_limit_d10;
+            align_state->previous_yaw_offset_d10 + active_yaw_slew_limit_d10;
     }
-    else if(yaw_change_d10 < -align_params->yaw_slew_limit_d10)
+    else if(yaw_change_d10 < -active_yaw_slew_limit_d10)
     {
         yaw_offset_d10 =
-            align_state->previous_yaw_offset_d10 - align_params->yaw_slew_limit_d10;
+            align_state->previous_yaw_offset_d10 - active_yaw_slew_limit_d10;
     }
 
     align_state->previous_yaw_offset_d10 = (int16)yaw_offset_d10;
     align_result->yaw_offset_d10 = (int16)yaw_offset_d10;
     align_result->control_value = camproc_bridge_yaw_offset_to_control(
-        align_result->yaw_offset_d10, align_params);
+        align_result->yaw_offset_d10,
+        active_control_gain_per_deg,
+        align_params);
 
-    control_abs = (align_result->control_value >= 0) ?
-        align_result->control_value : -align_result->control_value;
+    // 近对准时反向控制必须连续出现，避免拟合线抖动造成左右快速换向
+    control_sign = (align_result->control_value > 0) ? 1 :
+                   ((align_result->control_value < 0) ? -1 : 0);
+    if(align_state->near_mode_active)
+    {
+        if(0 == control_sign)
+        {
+            align_state->near_reverse_count = 0;
+            align_state->near_pending_sign = 0;
+        }
+        else if((0 == align_state->near_control_sign) ||
+                (control_sign == align_state->near_control_sign))
+        {
+            align_state->near_control_sign = control_sign;
+            align_state->near_reverse_count = 0;
+            align_state->near_pending_sign = 0;
+        }
+        else
+        {
+            if(control_sign != align_state->near_pending_sign)
+            {
+                align_state->near_pending_sign = control_sign;
+                align_state->near_reverse_count = 1;
+            }
+            else if(align_state->near_reverse_count <
+                    align_params->near_reverse_confirm_frames)
+            {
+                align_state->near_reverse_count++;
+            }
+
+            if(align_state->near_reverse_count >=
+               align_params->near_reverse_confirm_frames)
+            {
+                align_state->near_control_sign = control_sign;
+                align_state->near_reverse_count = 0;
+                align_state->near_pending_sign = 0;
+            }
+            else
+            {
+                align_result->control_value = 0;
+            }
+        }
+    }
+
     control_delta =
         (int32)align_result->control_value -
         align_state->previous_control_value;
@@ -1513,59 +1643,22 @@ uint8 camproc_bridge_align_update(
         align_state->blind_control_value = (int16)scaled_control;
         align_state->phase = CAMERA_BRIDGE_ALIGN_BLIND_TURN;
         align_state->phase_start_time_ms = time_ms;
+        align_state->near_mode_active = 0;
+        align_state->near_reverse_count = 0;
+        align_state->near_control_sign = 0;
+        align_state->near_pending_sign = 0;
+        align_state->fallback_timer_active = 0;
+        align_state->fallback_start_time_ms = 0;
+        align_state->fallback_estimated_count = 0;
         align_state->blind_reliable_count = 0;
         align_state->blind_estimated_count = 0;
         align_state->blind_reference_control = 0;
         align_result->phase = align_state->phase;
+        align_result->near_mode = 0;
         align_result->control_value = align_state->blind_control_value;
         align_state->previous_control_value =
             align_state->blind_control_value;
         return 1;
-    }
-
-    // 接近对准且控制量较小或反复换向时，短时锁航后重新观察
-    if((CAMERA_BRIDGE_ALIGN_TRACK == align_state->phase) &&
-       !bridge_result->estimated &&
-       fine_position_inside &&
-       fine_angle_inside &&
-       (align_state->complete_frame_count >=
-        align_params->complete_confirm_frames) &&
-       ((control_abs <= align_params->fine_control_limit) ||
-        control_sign_changed))
-    {
-        align_result->control_value = 0;
-        align_state->phase = CAMERA_BRIDGE_ALIGN_FINE_HOLD;
-        align_state->phase_start_time_ms = time_ms;
-        align_state->verify_frame_count = 0;
-        align_result->phase = align_state->phase;
-        align_state->previous_control_value =
-            align_result->control_value;
-        return 1;
-    }
-
-    if(CAMERA_BRIDGE_ALIGN_VERIFY == align_state->phase)
-    {
-        if(fine_position_inside && fine_angle_inside)
-        {
-            if(align_result->control_value > align_params->fine_control_limit)
-            {
-                align_result->control_value =
-                    align_params->fine_control_limit;
-            }
-            else if(align_result->control_value <
-                    -align_params->fine_control_limit)
-            {
-                align_result->control_value =
-                    -align_params->fine_control_limit;
-            }
-        }
-        else
-        {
-            align_state->phase = CAMERA_BRIDGE_ALIGN_TRACK;
-            align_state->verify_frame_count = 0;
-            align_state->complete_frame_count = 0;
-            align_result->phase = align_state->phase;
-        }
     }
 
     align_state->previous_control_value = align_result->control_value;
@@ -1628,79 +1721,6 @@ uint8 camproc_pub_check_area(uint8 image[MT9V03X_H][MT9V03X_W], uint16 check_row
     }
 
     return 0;
-}
-
-uint8 camproc_bump_exit_detect(uint8 image[MT9V03X_H][MT9V03X_W], BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled)
-{
-    uint8 black_detected = 0;
-    uint8 white_detected = 0;
-
-    // 必须先连续看到黑色凸起，防止入口处的白色地面被误判为出口
-    if(!bump_exit_params->bump_seen)
-    {
-        black_detected = camproc_pub_check_area(
-            image,
-            bump_exit_params->check_row,
-            bump_exit_params->check_row_count,
-            bump_exit_params->check_column,
-            bump_exit_params->check_column_count,
-            bump_exit_params->black_dot_count,
-            CAMERA_IMAGE_DOT_BLACK
-        );
-
-        if(!black_detected)
-        {
-            bump_exit_params->black_continuous_frame_count = 0;
-            return 0;
-        }
-
-        if(bump_exit_params->black_continuous_frame_count < bump_exit_params->black_confirm_frame_count)
-        {
-            bump_exit_params->black_continuous_frame_count++;
-        }
-
-        if(bump_exit_params->black_continuous_frame_count >= bump_exit_params->black_confirm_frame_count)
-        {
-            bump_exit_params->bump_seen = 1;
-        }
-
-        return 0;
-    }
-
-    // 最短行驶时间结束前不进行白色出口判断
-    if(!exit_check_enabled)
-    {
-        bump_exit_params->white_continuous_frame_count = 0;
-        return 0;
-    }
-
-    white_detected = camproc_pub_check_area(
-        image,
-        bump_exit_params->check_row,
-        bump_exit_params->check_row_count,
-        bump_exit_params->check_column,
-        bump_exit_params->check_column_count,
-        bump_exit_params->white_dot_count,
-        CAMERA_IMAGE_DOT_WHITE
-    );
-
-    if(!white_detected)
-    {
-        bump_exit_params->white_continuous_frame_count = 0;
-        return 0;
-    }
-
-    if(bump_exit_params->white_continuous_frame_count < bump_exit_params->white_confirm_frame_count)
-    {
-        bump_exit_params->white_continuous_frame_count++;
-    }
-
-    if(bump_exit_params->white_continuous_frame_count >= bump_exit_params->white_confirm_frame_count)
-    {
-        bump_exit_params->exited = 1;
-    }
-
-    return bump_exit_params->exited;
 }
 
 uint8 camproc_jump_cooldown_filter(uint32 time_ms, uint32 cooldown_time_ms)

@@ -3,11 +3,12 @@
 
 #include "zf_common_typedef.h"
 
-// 屏幕显示坐标
-#define IMAGE_X                 (0)
-#define IMAGE_Y                 (120)
-#define IMAGE_DISPLAY_WIDTH     (188)
-#define IMAGE_DISPLAY_HEIGHT    (120)
+// TFT180 横屏中的摄像头显示区域
+// MT9V03X 为 188x120，等比例缩放到 160x102 后上下各保留约 13 像素
+#define IMAGE_X                 (0u)
+#define IMAGE_Y                 (13u)
+#define IMAGE_DISPLAY_WIDTH     (160u)
+#define IMAGE_DISPLAY_HEIGHT    (102u)
 
 // WiFi SPI 图传默认分频：每处理 10 帧发送 1 帧
 #define CAMERA_WIFI_IMAGE_SEND_DIV_DEFAULT     (10U)
@@ -44,10 +45,8 @@ typedef struct
 typedef enum
 {
     CAMERA_BRIDGE_ALIGN_TRACK = 0,   // 根据检测中线持续进行对准
-    CAMERA_BRIDGE_ALIGN_FINE_HOLD,   // 接近对准时短时保持当前航向
     CAMERA_BRIDGE_ALIGN_BLIND_TURN,  // 边线即将丢失时使用可靠历史控制盲转
-    CAMERA_BRIDGE_ALIGN_VERIFY,      // 保持或盲转结束后重新使用新鲜视觉确认
-    CAMERA_BRIDGE_ALIGN_COMPLETE     // 当前帧动态上下中线点均已完成对准
+    CAMERA_BRIDGE_ALIGN_COMPLETE     // 连续入框或保底条件已经确认对准
 } CameraBridgeAlignPhase_t;
 
 // 单边桥赛道边线识别参数
@@ -101,13 +100,24 @@ typedef struct
     uint16 target_center_x;          // 车辆视觉中心对应的目标横坐标
     uint16 far_tolerance_px;         // 中线上端允许的横向误差
     uint16 near_tolerance_px;        // 中线下端允许的横向误差
-    uint16 angle_tolerance_d10;      // 完成对准允许的最大中线角度，单位 0.1 度
+    uint16 fallback_far_tolerance_px;   // 保底冲刺允许的中线上端横向误差
+    uint16 fallback_near_tolerance_px;  // 保底冲刺允许的中线下端横向误差
+    uint16 fallback_timeout_ms;          // 连续处于保底范围后强制完成对准的时间
+    uint8 fallback_estimated_grace_frames; // 保底计时允许连续出现的估算结果帧数
     uint16 control_deadband_d10;     // 预瞄航向角控制死区，单位 0.1 度
     uint16 lookahead_min_px;         // 大角度时使用的最小预瞄距离
     uint16 lookahead_max_px;         // 小角度时使用的最大预瞄距离
     uint16 lookahead_full_angle_d10; // 达到最小预瞄距离对应的中线角度，单位 0.1 度
-    uint8 complete_confirm_frames;   // 进入精调保持前所需的连续近似对准帧数
+    uint8 complete_confirm_frames;   // 完成对准所需的连续新鲜入框帧数
     uint8 lost_reset_frames;         // 连续丢失目标后复位对准过程的帧数
+    uint16 near_enter_angle_d10;     // 进入近对准模式的最大中线角度，单位 0.1 度
+    uint16 near_exit_angle_d10;      // 退出近对准模式的中线角度，单位 0.1 度
+    float near_line_filter_alpha;    // 近对准模式中线滤波旧值权重，范围 0.0~1.0
+    float near_yaw_gain;             // 近对准模式预瞄航向角增益
+    uint16 near_control_deadband_d10; // 近对准模式控制死区，单位 0.1 度
+    int16 near_yaw_slew_limit_d10;   // 近对准模式每帧航向修正量最大变化
+    float near_control_gain_per_deg; // 近对准模式每 1 度对应的底盘控制量
+    uint8 near_reverse_confirm_frames; // 近对准模式反向控制所需连续确认帧数
     float line_filter_alpha;         // 中线模型低通滤波旧值权重，范围 0.0~1.0
     float yaw_gain;                  // 预瞄航向角增益
     float yaw_direction;             // 预瞄航向角修正方向
@@ -116,9 +126,6 @@ typedef struct
     float control_gain_per_deg;      // 每 1 度航向修正转换成的底盘 angle 控制量
     float control_direction;         // 底盘控制方向
     int16 control_limit;             // 底盘 angle 控制量的最大绝对值
-    uint16 fine_hold_time_ms;         // 接近对准时停止更新转向控制的时间
-    int16 fine_control_limit;         // 精调阶段单次修正的最大底盘控制量
-    uint8 verify_confirm_frames;      // 保持或盲转结束后重新确认所需的新鲜帧数
     uint16 blind_trigger_angle_d10;   // 允许进入盲转准备的最小中线角度，单位 0.1 度
     uint16 blind_turn_time_ms;        // 单次盲转持续时间
     uint8 blind_edge_margin_px;       // 边线接近画幅边界时允许触发盲转的距离
@@ -130,14 +137,20 @@ typedef struct
 // 单边桥对准控制运行状态
 typedef struct
 {
-    CameraBridgeAlignPhase_t phase; // 内部对准跟踪阶段，不锁存完成结果
-    uint8 complete_frame_count;     // 中线连续进入精调范围的帧数
+    CameraBridgeAlignPhase_t phase; // 内部对准阶段，完成后保持锁存
+    uint8 complete_frame_count;     // 新鲜中线连续进入对准框的帧数
+    uint8 fallback_timer_active;    // 保底冲刺计时器是否已经启动
+    uint8 fallback_estimated_count; // 保底计时期间连续出现的估算结果帧数
     uint8 lost_frame_count;         // 连续丢失有效中线的帧数
     uint8 line_filter_initialized;  // 中线模型滤波值是否已经初始化
-    uint8 verify_frame_count;       // 重新启用视觉后已经连续确认的帧数
+    uint8 near_mode_active;         // 当前是否正在使用近对准控制参数
+    uint8 near_reverse_count;       // 当前反向控制已经连续确认的帧数
+    int8 near_control_sign;         // 近对准模式最近接受的非零控制方向
+    int8 near_pending_sign;         // 当前等待确认的反向控制方向
     uint8 blind_reliable_count;     // 当前连续获得可靠大角度控制的帧数
     uint8 blind_estimated_count;    // 当前连续使用单边补线结果的帧数
-    uint32 phase_start_time_ms;     // 当前保持或盲转阶段的开始时间
+    uint32 phase_start_time_ms;     // 当前盲转阶段的开始时间
+    uint32 fallback_start_time_ms;  // 连续进入保底范围的开始时间
     float filtered_slope;           // 滤波后的中线 x/y 斜率
     float filtered_intercept;       // 滤波后的中线截距
     int16 previous_yaw_offset_d10;  // 上一帧输出的航向修正量
@@ -152,7 +165,8 @@ typedef struct
 {
     uint8 valid;                    // 1 表示当前对准控制结果有效
     uint8 point_inside;             // 1 表示中线上下端点均位于红色对准框内
-    uint8 aligned;                  // 1 表示新鲜双边线的位置、角度和连续帧均满足要求
+    uint8 aligned;                  // 1 表示连续入框或保底条件已经满足
+    uint8 near_mode;                // 1 表示当前使用近对准控制参数
     CameraBridgeAlignPhase_t phase; // 当前帧的对准判断阶段
     uint16 active_x;                // 当前预瞄目标点横坐标
     uint16 active_y;                // 当前预瞄目标点纵坐标
@@ -179,24 +193,6 @@ typedef struct
     uint8 exited;                   // 1 表示已经确认离开单边桥
 } BridgeExitParams_t;
 
-// 颠簸路段离开检测参数
-typedef struct
-{
-    uint8 binary_threshold;             // 固定二值化阈值
-    uint16 check_row;                   // 检测矩形的起始行，后续从该行向上检查
-    uint16 check_row_count;             // 从起始行向上检查的行数量
-    uint16 check_column;                // 检测矩形的起始列，后续从该列向右检查
-    uint16 check_column_count;          // 从起始列向右检查的列数量
-    uint32 black_dot_count;             // 确认看到黑色凸起所需的黑色像素数量
-    uint32 white_dot_count;             // 确认驶出颠簸路段所需的白色像素数量
-    uint8 black_confirm_frame_count;    // 确认看到黑色凸起所需的连续帧数
-    uint8 white_confirm_frame_count;    // 确认驶出所需的连续白色帧数
-    uint8 black_continuous_frame_count; // 当前连续检测到黑色凸起的帧数
-    uint8 white_continuous_frame_count; // 当前连续检测到白色出口的帧数
-    uint8 bump_seen;                    // 1 表示已经确认进入颠簸路段
-    uint8 exited;                       // 1 表示已经确认离开颠簸路段
-} BumpExitParams_t;
-
 // WiFi SPI 图像叠加类型
 typedef enum
 {
@@ -222,7 +218,7 @@ uint8 camera_has_frame(void);           // 是否有新帧
 void camera_init(void);                 // 初始化摄像头模块 如果摄像头初始化失败，函数会一直重试并慢速闪烁 LED
 
 // 屏幕调试接口
-void camera_debug_on_screen(void);      // 显示图像
+uint8 camera_debug_on_screen(void);     // 有新处理帧时显示图像；1 已刷新 | 0 没有新帧
 
 /**
  * 初始化 WiFi SPI 图传，并通过 TCP 将逐飞助手连接到上位机。
@@ -280,6 +276,7 @@ void camera_bridge_align_reset(CameraBridgeAlignState_t *align_state);
  *
  * @note 预瞄点同时包含横向位置与中线方向，避免两个独立控制量相互抵消。
  * @note 接近对准时短时保持航向，大角度丢线前保存可靠控制并定时重新确认。
+ * @note 严格条件未触发时，连续处于保底范围达到设定时间也会确认对准。
  * @note 对准完成结果不锁存，后续帧仍会根据当前中线重新判断。
  * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
  */
@@ -293,16 +290,6 @@ uint8 camera_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bri
  * @return 1 已经确认离开单边桥 | 0 尚未离开或当前没有新帧
  */
 uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params);
-
-/**
- * 颠簸路段离开检测接口
- * 先确认检测区域内出现黑色凸起，允许出口检测后，再连续检测指定帧数的白色区域。
- * @param bump_exit_params 颠簸路段离开检测参数结构体
- * @param exit_check_enabled 1 允许判断白色出口 | 0 仅确认黑色凸起
- *
- * @return 1 已经确认离开颠簸路段 | 0 尚未离开或当前没有新帧
- */
-uint8 camera_bump_exit_processing(BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled);
 
 /**
  * 跳跃检测接口

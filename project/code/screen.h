@@ -3,7 +3,7 @@
 
 #include "zf_common_typedef.h"
 #include "zf_common_font.h"
-#include "zf_device_ips200.h"
+#include "zf_device_tft180.h"
 #include "camera.h"
 
 /**
@@ -11,43 +11,39 @@
  *      在 main 的 while 中调用下面的函数即可：
  *      screen_show_table_t1();  
  * 
- * 由于 screen.c / .h 依赖视觉相关代码，使用前需要在工程中加入 camera.c / .h camera_image_processing.c / .h
+ * 当前 TFT180 主要用于显示摄像头画面，通用显示列表的调用暂时停用，相关代码保留。
+ * 由于 screen.c / .h 依赖视觉相关代码，使用前需要在工程中加入 camera.c / .h camera_proc.c / .h。
  */
 
 // 屏幕基础信息
-// IPS200 横屏分辨率为 320x240
-// 6x8 字体：单个 ASCII 字符宽 6 像素、高 8 像素，一行最多显示 53 个 ASCII 字符
-// 8x16 字体：单个 ASCII 字符宽 8 像素、高 16 像素，一行最多显示 40 个 ASCII 字符
-
-// IPS200 屏幕接口类型配置。
-// 默认使用 SPI 两寸屏；如果硬件使用八位并口屏，可改为 IPS200_TYPE_PARALLEL8。
-#define SCREEN_IPS200_TYPE              IPS200_TYPE_SPI
+// TFT180 使用横屏方向，实际显示分辨率为 160x128
+#define SCREEN_WIDTH                    (160u)
+#define SCREEN_HEIGHT                   (128u)
 
 // ========================= 通用纯文本数据显示函数配置 =========================
-// 6x8 字体时：10 字符名称 + 5 字符间隔 + 38 字符数据 = 53 字符，刚好适配 320 像素横屏宽度
-#define SCREEN_LINE_CHAR_MAX_6x8        53          // 一行最大 ASCII 字符数
-#define SCREEN_DATA_MAX_COUNT_6x8       24          // 最大数据种类显示数量
-#define SCREEN_NAME_WIDTH_6x8           10          // 参数名称部分最大字符数
-#define SCREEN_VALUE_WIDTH_6x8          38          // 参数数据部分最大字符数
+// 以下配置保留给后续重新启用的数据表，当前主程序不调用
+#define SCREEN_LINE_CHAR_MAX_6x8        26          // 一行最大 ASCII 字符数
+#define SCREEN_DATA_MAX_COUNT_6x8       12          // 最大数据种类显示数量
+#define SCREEN_NAME_WIDTH_6x8           8           // 参数名称部分最大字符数
+#define SCREEN_VALUE_WIDTH_6x8          16          // 参数数据部分最大字符数
 #define SCREEN_ROW_HEIGHT_6x8           10          // 行高
 
-// 8x16 字体时：10 字符名称 + 5 字符间隔 + 25 字符数据 = 40 字符，刚好适配 320 像素横屏宽度
-#define SCREEN_LINE_CHAR_MAX_8x16       40          // 一行最大 ASCII 字符数
-#define SCREEN_DATA_MAX_COUNT_8x16      12          // 最大数据种类显示数量
-#define SCREEN_NAME_WIDTH_8x16          10          // 参数名称部分最大字符数
-#define SCREEN_VALUE_WIDTH_8x16         25          // 参数数据部分最大字符数
-#define SCREEN_ROW_HEIGHT_8x16          20          // 行高
+#define SCREEN_LINE_CHAR_MAX_8x16       20          // 一行最大 ASCII 字符数
+#define SCREEN_DATA_MAX_COUNT_8x16      8           // 最大数据种类显示数量
+#define SCREEN_NAME_WIDTH_8x16          7           // 参数名称部分最大字符数
+#define SCREEN_VALUE_WIDTH_8x16         12          // 参数数据部分最大字符数
+#define SCREEN_ROW_HEIGHT_8x16          16          // 行高
 
-// 名称与数据本体之间固定保留 5 个空格
-#define SCREEN_NAME_VALUE_SPACE_WIDTH    5
+// 名称与数据本体之间固定保留 1 个空格
+#define SCREEN_NAME_VALUE_SPACE_WIDTH    1
 
 // 字体宽度，用于计算数据区域刷新位置
 #define SCREEN_FONT_WIDTH_6x8            6
 #define SCREEN_FONT_WIDTH_8x16           8
 
 // 内部缓冲区使用的最大宽度
-#define SCREEN_NAME_WIDTH_MAX           10
-#define SCREEN_VALUE_WIDTH_MAX          38
+#define SCREEN_NAME_WIDTH_MAX           8
+#define SCREEN_VALUE_WIDTH_MAX          16
 
 // 数据类型枚举
 // screen_show_data_table() 会把不同类型统一转换成字符串后显示。
@@ -92,7 +88,7 @@ typedef struct
 
 // 屏幕初始化。
 // 函数内部带有初始化标志，多次调用不会重复初始化屏幕硬件。
-// 默认设置为横屏、8x16 字体、白色前景、黑色背景。
+// 默认设置为 TFT180 横屏 160x128、8x16 字体、白色前景、黑色背景。
 void screen_init(void);
 
 
@@ -108,12 +104,12 @@ void screen_set_color(uint16 pen_color, uint16 bg_color);
 
 // 在指定坐标显示字符串。
 // x、y 为像素坐标；text 为待显示字符串。
-// 当前字体由 ips200_set_font() 或 screen_data_table_set_font() 决定。
+// 当前字体由 tft180_set_font() 或 screen_data_table_set_font() 决定。
 void screen_show_string(uint16 x, uint16 y, const char *text);
 
 
 /**
- * @brief 在 IPS200 屏幕上显示处理后的 MT9V03X 图像。
+ * @brief 在 TFT180 屏幕上显示处理后的 MT9V03X 图像。
  *
  * 该函数用于显示已经完成二值化、滤噪等处理后的摄像头图像。
  * 图像源尺寸固定按照 MT9V03X 当前配置，即 `MT9V03X_W * MT9V03X_H`；
@@ -127,7 +123,8 @@ void screen_show_string(uint16 x, uint16 y, const char *text);
  *
  * @return void
  *
- * @note 本函数使用 IPS200 灰度图显示接口，适合显示 0/255 二值图或 8bit 灰度图。
+ * @note 本函数使用 TFT180 灰度图显示接口，适合显示 0/255 二值图或 8bit 灰度图。
+ * @note 当前默认显示区域为 160x102，保持 188x120 图像比例并在横屏内垂直居中。
  * @note 若显示区域超过屏幕边界，函数会自动裁剪显示宽高，避免越界。
  * @note 函数内部会自动调用 screen_init()，无需重复初始化屏幕。
  */
@@ -135,7 +132,7 @@ void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 dis
 
 
 /**
- * @brief 在 IPS200 屏幕上绘制绿色横向阈值标记条。
+ * @brief 在 TFT180 屏幕上绘制横向阈值标记条。
  *
  * 该函数从屏幕最左侧 x=0 开始，在指定 y 坐标处绘制一条绿色横线；
  * 可通过 `width` 设置线条厚度，用于在摄像头图像显示区域上叠加横向检测行、
@@ -147,15 +144,15 @@ void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 dis
  *
  * @return void
  *
- * @note 当前颜色固定为 RGB565_GREEN。
- * @note 调用时需确保 length 小于 ips200_width_max，且 y + width - 1 小于 ips200_height_max。
+ * @note 线条颜色由 color 参数指定。
+ * @note 函数会按照 TFT180 的 160x128 范围自动裁剪。
  * @note 如果该线用于叠加在图像上，应在显示图像之后调用，否则可能被图像刷新覆盖。
  */
 void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width, rgb565_color_enum color);
 
 
 /**
- * @brief 在 IPS200 屏幕上绘制绿色纵向阈值标记条。
+ * @brief 在 TFT180 屏幕上绘制纵向阈值标记条。
  *
  * 该函数从指定坐标 `(x, y)` 开始，向下绘制一条绿色竖线；
  * 可通过 `width` 设置线条厚度，用于在摄像头图像显示区域上叠加纵向检测列、
@@ -168,8 +165,8 @@ void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width, 
  *
  * @return void
  *
- * @note 当前颜色固定为 RGB565_GREEN。
- * @note 调用时需确保 x + width - 1 小于 ips200_width_max，且 y + length 小于 ips200_height_max。
+ * @note 线条颜色由 color 参数指定。
+ * @note 函数会按照 TFT180 的 160x128 范围自动裁剪。
  * @note 如果该线用于叠加在图像上，应在显示图像之后调用，否则可能被图像刷新覆盖。
  */
 void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8 width, rgb565_color_enum color);
@@ -186,7 +183,8 @@ void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params);
 /**
  * @brief 在摄像头图像显示区域上绘制单边桥中线对准范围。
  *
- * 根据当前有效中线的动态上下端点及其容差绘制红色梯形。
+ * 根据当前有效中线的动态上下端点绘制两层梯形：
+ * 红色内框表示正常连续帧对准范围，黄色外框表示保底冲刺范围。
  * 当前帧没有有效中线时，目标范围会覆盖整个图像高度，便于继续调试。
  *
  * @param bridge_result 单边桥识别结果，用于取得当前有效中线的上下端点行，可为空。
@@ -228,16 +226,16 @@ void screen_show_roi_threshold_bar(JumpDetectParams_t jump_params);
 void screen_data_table_reset(void);
 
 // 设置通用数据表使用的字体
-// 当前支持 IPS200_6X8_FONT 与 IPS200_8X16_FONT
-// 6x8 字体最多显示 24 行，名称 10 字符，间隔 5 字符，数据 38 字符
-// 8x16 字体最多显示 12 行，名称 10 字符，间隔 5 字符，数据 25 字符
+// 当前支持 TFT180_6X8_FONT 与 TFT180_8X16_FONT
+// 6x8 字体最多显示 12 行，名称 8 字符，间隔 1 字符，数据 16 字符
+// 8x16 字体最多显示 8 行，名称 7 字符，间隔 1 字符，数据 12 字符
 // 设置字体后会自动重置数据表绘制状态
-void screen_data_table_set_font(ips200_font_size_enum font);
+void screen_data_table_set_font(tft180_font_size_enum font);
 
 /**
  * @brief 显示并刷新通用纯文本数据表。
  *
- * 本函数用于把一组“名称 + 数值”数据按行显示在 IPS200 屏幕上，适合显示
+ * 本函数用于把一组“名称 + 数值”数据按行显示在 TFT180 屏幕上，适合显示
  * IMU 原始值、PID 参数、电机速度、姿态角等周期性变化的数据。
  *
  * 显示区域固定从屏幕左上角 (0, 0) 开始：
@@ -271,11 +269,11 @@ void screen_data_table_set_font(ips200_font_size_enum font);
  * @param count 数据项数量，即 items 数组中希望显示的元素个数。
  *              本函数会根据当前字体自动限制最大显示数量：
  * 
- *              - IPS200_6X8_FONT  ：最多显示 SCREEN_DATA_MAX_COUNT_6x8 行，即 24 行。
- *                每行名称 10 字符，中间间隔 5 字符，数据最多 38 字符。
+ *              - TFT180_6X8_FONT  ：最多显示 SCREEN_DATA_MAX_COUNT_6x8 行，即 12 行。
+ *                每行名称 8 字符，中间间隔 1 字符，数据最多 16 字符。
  * 
- *              - IPS200_8X16_FONT ：最多显示 SCREEN_DATA_MAX_COUNT_8x16 行，即 12 行。
- *                每行名称 10 字符，中间间隔 5 字符，数据最多 25 字符。
+ *              - TFT180_8X16_FONT ：最多显示 SCREEN_DATA_MAX_COUNT_8x16 行，即 8 行。
+ *                每行名称 7 字符，中间间隔 1 字符，数据最多 12 字符。
  * 
  *              - 当前默认是 8x16 字体
  * 
@@ -287,8 +285,8 @@ void screen_data_table_set_font(ips200_font_size_enum font);
  * @note 若数据名称、数据数量、显示字体或页面内容发生变化，应先调用
  *       screen_data_table_reset()，让下一次刷新重新绘制名称区域
  * 
- * @note 可通过 screen_data_table_set_font(IPS200_6X8_FONT) 或
- *       screen_data_table_set_font(IPS200_8X16_FONT) 切换数据表字体
+ * @note 可通过 screen_data_table_set_font(TFT180_6X8_FONT) 或
+ *       screen_data_table_set_font(TFT180_8X16_FONT) 切换数据表字体
  * 
  * 例程
  * @code

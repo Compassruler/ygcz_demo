@@ -2,9 +2,28 @@
 #include "imu.h"
 
 #define LED1                    (P19_0)                                         // SPI 串口 SPI 两寸屏 这里宏定义填写 IPS200_TYPE_SP
-#define VISION_ALIGN_TARGET_YAW_LIMIT_DEG   (85.0f)                             // 视觉对准允许设置的最大相对航向角
+#define VISION_ALIGN_TARGET_YAW_LIMIT_DEG   (55.0f)                             // 视觉对准允许设置的最大相对航向角
 #define VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG (90.0f)                             // 视觉对准允许转动的最大实际航向角
+#define VISION_FORCE_BLIND_TIMEOUT_MS       (4000u)                             // 强制盲转最长执行时间
+#define VISION_FORCE_BLIND_DIRECTION        (-1.0f)                             // 强制盲转方向修正，方向相反时在 1.0f 和 -1.0f 之间切换
+#define VISION_FORCE_BLIND_YAW_STEP_DEG     (0.09f)                             // 每 5ms 增加的目标航向角，数值越小转向越慢
+#define VISION_BLIND_RECOVERY_YAW_DEG       (15.0f)                             // 以当前航向为起点，向盲转反方向最多修正 15 度
+#define VISION_BLIND_RECOVERY_YAW_STEP_DEG  (0.025f)                            // 每 5ms 增加的恢复目标角，降低恢复阶段转向速度
+#define VISION_BLIND_RECOVERY_MIN_TIME_MS   (100u)                              // 倒车后允许重新前进的最短时间
+#define VISION_BLIND_RECOVERY_MAX_TIME_MS   (4000u)                             // 允许缓慢完成 15 度修正，并预留实际航向跟随时间
+#define VISION_BLIND_RECOVERY_COOLDOWN_MS   (300u)                              // 找回赛道后禁止再次强制盲转的时间
 extern volatile uint8 vision_phase_bab;                                         // 核心0当前的单边桥与颠簸路段子状态
+extern volatile uint8 bridge_force_blind_from_core1;                            // 核心1发送的强制盲转请求
+extern volatile uint8 bridge_blind_release_from_core1;                          // 核心1发送的提前结束盲转请求
+extern volatile uint8 bridge_fresh_target_from_core1;                           // 核心1发送的新鲜赛道目标标志位
+extern volatile uint8 bridge_forced_blind_active;                               // 核心0当前是否正在执行强制盲转
+extern volatile uint8 bridge_blind_recovery_active;                             // 核心0当前是否正在倒车寻找赛道
+extern volatile uint8 bridge_forced_blind_fault;                                // 强制盲转异常停止标志位
+extern volatile uint8 bridge_valid_from_core1;
+extern volatile uint8 bridge_aligned_from_core1;
+extern volatile uint8 bridge_control_updated;
+extern volatile uint8 bridge_aligned_count;
+extern volatile int16 bridge_control_from_core1;
 
 static uint8_t yaw_lock_init = 0; // 后续放在flag里面
 
@@ -16,6 +35,18 @@ void pit0_ch0_isr()
     static uint8 vision_yaw_guard_active = 0;   // 盲转保护激活
     static uint8 vision_yaw_guard_reached = 0;  // 盲转保护触发
     static float vision_yaw_guard_start = 0.0f; // 盲转保护激活时航向角
+    static uint8 force_blind_request_latched = 0; // 当前强制盲转请求是否已经锁存
+    static uint32 force_blind_start_time = 0;     // 强制盲转开始时间
+    static float force_blind_start_yaw = 0.0f;    // 强制盲转开始时的实际航向角
+    static float force_blind_target_yaw = 0.0f;   // 强制盲转的目标航向角
+    static float force_blind_command_yaw = 0.0f;  // 逐步发送给航向环的目标航向角
+    static float force_blind_direction = 1.0f;    // 强制盲转方向
+    static uint32 blind_recovery_start_time = 0;  // 倒车恢复开始时间
+    static uint32 force_blind_cooldown_until = 0; // 下一次允许强制盲转的时间
+    static float blind_recovery_target_yaw = 0.0f;  // 倒车恢复的最终目标航向角
+    static float blind_recovery_command_yaw = 0.0f; // 倒车恢复逐步使用的目标航向角
+    static float blind_recovery_direction = 1.0f;   // 倒车恢复的航向修正方向
+    float force_blind_progress = 0.0f;
     system_time ++;
     remote_update();
     imu_data_get();               // 原始数据
@@ -33,8 +64,10 @@ void pit0_ch0_isr()
         target_yaw_remote = yaw_angle;
       }
       
-      // 盲转角度限制，不超过 VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG 
-      if(fabsf(yaw_angle - vision_yaw_guard_start) >= VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG)
+      // 普通视觉对准不超过允许的最大实际航向角，强制盲转使用自己的起点单独计角
+      if(!bridge_forced_blind_active &&
+         !bridge_blind_recovery_active &&
+         (fabsf(yaw_angle - vision_yaw_guard_start) >= VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG))
       {
         vision_yaw_guard_reached = 1;  // 触发保护
       }
@@ -50,6 +83,18 @@ void pit0_ch0_isr()
     {
       vision_yaw_guard_active = 0;
       vision_yaw_guard_reached = 0;
+      bridge_forced_blind_active = 0;
+      bridge_blind_recovery_active = 0;
+      bridge_forced_blind_fault = 0;
+      bridge_force_blind_from_core1 = 0;
+      bridge_blind_release_from_core1 = 0;
+      bridge_fresh_target_from_core1 = 0;
+      force_blind_request_latched = 0;
+    }
+
+    if(!bridge_force_blind_from_core1 && !bridge_forced_blind_active)
+    {
+      force_blind_request_latched = 0;
     }
 
      // 速度环 
@@ -98,8 +143,172 @@ void pit0_ch0_isr()
       
       else if (vision_detect_mode == VISION_BRIDGE_BUMP) // 需要视觉转向控制的模式
       {
+        // 强制盲转请求只在上升沿锁存一次，中途忽略视觉识别结果
+        if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) &&
+           bridge_force_blind_from_core1 &&
+           !force_blind_request_latched &&
+           !bridge_forced_blind_active &&
+           !bridge_blind_recovery_active &&
+           !bridge_forced_blind_fault &&
+           (system_time >= force_blind_cooldown_until) &&
+           (0 != bridge_control_from_core1))
+        {
+          force_blind_request_latched = 1;
+          bridge_forced_blind_active = 1;
+          bridge_forced_blind_fault = 0;
+          force_blind_start_time = system_time;
+          force_blind_start_yaw = yaw_angle;
+          force_blind_direction =
+              ((bridge_control_from_core1 > 0) ? 1.0f : -1.0f) *
+              VISION_FORCE_BLIND_DIRECTION;
+          force_blind_target_yaw =
+              force_blind_start_yaw +
+              force_blind_direction * VISION_ALIGN_TARGET_YAW_LIMIT_DEG;
+          force_blind_command_yaw = force_blind_start_yaw;
+          vision_yaw_guard_start = force_blind_start_yaw;
+          vision_yaw_guard_reached = 0;
+          bridge_aligned_count = 0;
+          bridge_fresh_target_from_core1 = 0;
+          target_yaw_remote = force_blind_command_yaw;
+        }
+
+        if(bridge_blind_recovery_active)
+        {
+          // 找回连续可靠的新鲜赛道目标后，锁定当前航向并恢复普通视觉控制
+          if(((system_time - blind_recovery_start_time) >=
+              VISION_BLIND_RECOVERY_MIN_TIME_MS) &&
+             bridge_fresh_target_from_core1)
+          {
+            bridge_blind_recovery_active = 0;
+            force_blind_cooldown_until =
+                system_time + VISION_BLIND_RECOVERY_COOLDOWN_MS;
+            vision_yaw_guard_start = yaw_angle;
+            vision_yaw_guard_reached = 0;
+            target_yaw_remote = yaw_angle;
+            vision_target_yaw = 0;
+            if(vision_target_speed < 0)
+            {
+              vision_target_speed = -vision_target_speed;
+            }
+            bridge_control_updated = 1;
+            bridge_aligned_count = 0;
+          }
+          // 倒车超过最长时间仍找不到赛道，停车并保持故障状态
+          else if((system_time - blind_recovery_start_time) >=
+                  VISION_BLIND_RECOVERY_MAX_TIME_MS)
+          {
+            bridge_blind_recovery_active = 0;
+            bridge_forced_blind_fault = 1;
+            vision_yaw_guard_reached = 1;
+            target_yaw_remote = yaw_angle;
+            vision_target_speed = 0;
+            vision_target_yaw = 0;
+            bridge_control_updated = 0;
+            bridge_aligned_count = 0;
+          }
+          else
+          {
+            blind_recovery_command_yaw +=
+                blind_recovery_direction * VISION_BLIND_RECOVERY_YAW_STEP_DEG;
+
+            if(((blind_recovery_direction > 0.0f) &&
+                (blind_recovery_command_yaw > blind_recovery_target_yaw)) ||
+               ((blind_recovery_direction < 0.0f) &&
+                (blind_recovery_command_yaw < blind_recovery_target_yaw)))
+            {
+              blind_recovery_command_yaw = blind_recovery_target_yaw;
+            }
+
+            target_yaw_remote = blind_recovery_command_yaw;
+          }
+        }
+        else if(bridge_forced_blind_active)
+        {
+          force_blind_progress =
+              (yaw_angle - force_blind_start_yaw) * force_blind_direction;
+
+          // 可靠视觉重新出现且夹角足够小时，锁定当前航向并提前退出盲转
+          if(bridge_blind_release_from_core1)
+          {
+            bridge_forced_blind_active = 0;
+            bridge_forced_blind_fault = 0;
+            bridge_blind_release_from_core1 = 0;
+            force_blind_cooldown_until =
+                system_time + VISION_BLIND_RECOVERY_COOLDOWN_MS;
+            vision_yaw_guard_start = yaw_angle;
+            vision_yaw_guard_reached = 0;
+            target_yaw_remote = yaw_angle;
+            vision_target_yaw = 0;
+            bridge_valid_from_core1 = 0;
+            bridge_aligned_from_core1 = 0;
+            bridge_control_updated = 0;
+            bridge_aligned_count = 0;
+          }
+          // 达到盲转角度上限后，没有找到赛道则进入倒车恢复
+          else if(force_blind_progress >= VISION_ALIGN_TARGET_YAW_LIMIT_DEG)
+          {
+            bridge_forced_blind_active = 0;
+            bridge_forced_blind_fault = 0;
+            vision_yaw_guard_start = yaw_angle;
+            vision_yaw_guard_reached = 0;
+            target_yaw_remote = yaw_angle;
+            vision_target_yaw = 0;
+            bridge_valid_from_core1 = 0;
+            bridge_aligned_from_core1 = 0;
+            bridge_control_updated = 0;
+            bridge_aligned_count = 0;
+
+            if(!bridge_fresh_target_from_core1)
+            {
+              bridge_blind_recovery_active = 1;
+              blind_recovery_start_time = system_time;
+              // 恢复方向始终与刚才的盲转方向相反
+              blind_recovery_direction = -force_blind_direction;
+              blind_recovery_target_yaw =
+                  yaw_angle +
+                  blind_recovery_direction * VISION_BLIND_RECOVERY_YAW_DEG;
+              blind_recovery_command_yaw = yaw_angle;
+            }
+            else
+            {
+              force_blind_cooldown_until =
+                  system_time + VISION_BLIND_RECOVERY_COOLDOWN_MS;
+            }
+          }
+          // 转向方向异常、超过 90 度或者执行超时，立即停止并保持保护状态
+          else if((fabsf(yaw_angle - force_blind_start_yaw) >=
+                   VISION_ALIGN_ABSOLUTE_YAW_LIMIT_DEG) ||
+                  ((system_time - force_blind_start_time) >=
+                   VISION_FORCE_BLIND_TIMEOUT_MS))
+          {
+            bridge_forced_blind_active = 0;
+            bridge_forced_blind_fault = 1;
+            vision_yaw_guard_reached = 1;
+            target_yaw_remote = yaw_angle;
+            vision_target_speed = 0;
+            vision_target_yaw = 0;
+            bridge_control_updated = 0;
+            bridge_aligned_count = 0;
+          }
+          else
+          {
+            // 目标航向角逐步变化，避免一次跳到 85 度导致航向环满输出
+            force_blind_command_yaw +=
+                force_blind_direction * VISION_FORCE_BLIND_YAW_STEP_DEG;
+
+            if(((force_blind_direction > 0.0f) &&
+                (force_blind_command_yaw > force_blind_target_yaw)) ||
+               ((force_blind_direction < 0.0f) &&
+                (force_blind_command_yaw < force_blind_target_yaw)))
+            {
+              force_blind_command_yaw = force_blind_target_yaw;
+            }
+
+            target_yaw_remote = force_blind_command_yaw;
+          }
+        }
         // 保护模式激活
-        if(vision_yaw_guard_active)
+        else if(vision_yaw_guard_active)
         {
           // 保护模式达到
           if(vision_yaw_guard_reached)
@@ -124,8 +333,16 @@ void pit0_ch0_isr()
         }
         else
         {
-          target_yaw_remote += vision_target_yaw * 0.003f;  // 正常处理方式
+          if (vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
+          {
+            target_yaw_remote = 0;  // 对齐之后航向角和发车相同
+          }
+          else
+          {
+            target_yaw_remote += vision_target_yaw * 0.003f;  // 正常处理方式
+          }
         }
+
 
         pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
       }

@@ -19,7 +19,7 @@ typedef struct
 
 static uint8 screen_initialized = 0;
 static uint8 screen_data_table_first_draw = 1;
-static ips200_font_size_enum screen_data_table_font = IPS200_8X16_FONT;
+static tft180_font_size_enum screen_data_table_font = TFT180_8X16_FONT;
 
 // ========================= 固定显示内容列表 1 =========================
 static screen_data_item_t screen_table_1[] =
@@ -65,7 +65,7 @@ static screen_data_layout_t screen_get_data_layout(void)
 {
     screen_data_layout_t layout;
 
-    if(IPS200_8X16_FONT == screen_data_table_font)
+    if(TFT180_8X16_FONT == screen_data_table_font)
     {
         layout.max_count   = SCREEN_DATA_MAX_COUNT_8x16;
         layout.name_width  = SCREEN_NAME_WIDTH_8x16;
@@ -188,6 +188,85 @@ static void screen_format_value(char *out, const screen_data_item_t *item, uint8
     screen_format_text_field(out, temp, width);
 }
 
+// 将 MT9V03X 原始坐标映射到 TFT180 中的等比例图像区域
+static uint16 screen_camera_map_x(uint16 source_x)
+{
+    if(source_x >= MT9V03X_W)
+    {
+        source_x = MT9V03X_W - 1u;
+    }
+
+    return (uint16)(
+        IMAGE_X +
+        (uint32)source_x * (IMAGE_DISPLAY_WIDTH - 1u) / (MT9V03X_W - 1u)
+    );
+}
+
+static uint16 screen_camera_map_y(uint16 source_y)
+{
+    if(source_y >= MT9V03X_H)
+    {
+        source_y = MT9V03X_H - 1u;
+    }
+
+    return (uint16)(
+        IMAGE_Y +
+        (uint32)source_y * (IMAGE_DISPLAY_HEIGHT - 1u) / (MT9V03X_H - 1u)
+    );
+}
+
+// 在缩放后的摄像头画面上绘制带宽度的线段
+static void screen_draw_camera_line(
+    uint16 source_x1,
+    uint16 source_y1,
+    uint16 source_x2,
+    uint16 source_y2,
+    uint8 width,
+    rgb565_color_enum color)
+{
+    uint16 x1 = screen_camera_map_x(source_x1);
+    uint16 y1 = screen_camera_map_y(source_y1);
+    uint16 x2 = screen_camera_map_x(source_x2);
+    uint16 y2 = screen_camera_map_y(source_y2);
+    int32 delta_x = (int32)x2 - (int32)x1;
+    int32 delta_y = (int32)y2 - (int32)y1;
+    uint8 offset = 0;
+
+    screen_init();
+
+    if(0u == width)
+    {
+        width = 1u;
+    }
+
+    if(delta_x < 0)
+    {
+        delta_x = -delta_x;
+    }
+    if(delta_y < 0)
+    {
+        delta_y = -delta_y;
+    }
+
+    for(offset = 0; offset < width; offset++)
+    {
+        // 接近水平的线沿 Y 加粗，其余线沿 X 加粗
+        if(delta_x >= delta_y)
+        {
+            if(((uint32)y1 + offset < tft180_height_max) &&
+               ((uint32)y2 + offset < tft180_height_max))
+            {
+                tft180_draw_line(x1, y1 + offset, x2, y2 + offset, color);
+            }
+        }
+        else if(((uint32)x1 + offset < tft180_width_max) &&
+                ((uint32)x2 + offset < tft180_width_max))
+        {
+            tft180_draw_line(x1 + offset, y1, x2 + offset, y2, color);
+        }
+    }
+}
+
 // ========================= 屏幕基础封装函数 =========================
 
 void screen_init(void)
@@ -197,10 +276,10 @@ void screen_init(void)
         return;
     }
 
-    ips200_set_dir(IPS200_CROSSWISE);
-    ips200_set_font(IPS200_8X16_FONT);
-    ips200_set_color(RGB565_WHITE, RGB565_BLACK);
-    ips200_init(SCREEN_IPS200_TYPE);
+    tft180_set_dir(TFT180_CROSSWISE);
+    tft180_set_color(RGB565_WHITE, RGB565_BLACK);
+    tft180_init();
+    tft180_set_font(TFT180_8X16_FONT);
 
     screen_initialized = 1;
 }
@@ -208,13 +287,13 @@ void screen_init(void)
 void screen_clear(void)
 {
     screen_init();
-    ips200_clear();
+    tft180_clear();
 }
 
 void screen_set_color(uint16 pen_color, uint16 bg_color)
 {
     screen_init();
-    ips200_set_color(pen_color, bg_color);
+    tft180_set_color(pen_color, bg_color);
 }
 
 void screen_show_string(uint16 x, uint16 y, const char *text)
@@ -226,7 +305,10 @@ void screen_show_string(uint16 x, uint16 y, const char *text)
         return;
     }
 
-    ips200_show_string(x, y, text);
+    if((x < tft180_width_max) && (y < tft180_height_max))
+    {
+        tft180_show_string(x, y, text);
+    }
 }
 
 void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 display_width, uint16 display_height)
@@ -238,49 +320,79 @@ void screen_show_camera_image(uint16 x, uint16 y, const uint8 *image, uint16 dis
         return;
     }
 
-    if((x >= ips200_width_max) || (y >= ips200_height_max))
+    if((x >= tft180_width_max) || (y >= tft180_height_max))
     {
         return;
     }
 
-    if(display_width > (ips200_width_max - x))
+    if(display_width > (tft180_width_max - x))
     {
-        display_width = ips200_width_max - x;
+        display_width = tft180_width_max - x;
     }
 
-    if(display_height > (ips200_height_max - y))
+    if(display_height > (tft180_height_max - y))
     {
-        display_height = ips200_height_max - y;
+        display_height = tft180_height_max - y;
     }
 
-    ips200_show_gray_image(x, y, image, MT9V03X_W, MT9V03X_H, display_width, display_height, 0);
+    tft180_show_gray_image(x, y, image, MT9V03X_W, MT9V03X_H, display_width, display_height, 0);
 }
 
 void screen_show_threshold_horizontal_bar(uint16 y, uint16 length, uint8 width, rgb565_color_enum color)
 {
-    for (uint8 i = 0; i < width; i++)
+    uint8 i = 0;
+
+    screen_init();
+
+    if((y >= tft180_height_max) || (0u == width))
     {
-        ips200_draw_line(0, y + i, length, y + i, color);
+        return;
+    }
+
+    if(length >= tft180_width_max)
+    {
+        length = (uint16)(tft180_width_max - 1u);
+    }
+
+    for(i = 0; (i < width) && ((uint32)y + i < tft180_height_max); i++)
+    {
+        tft180_draw_line(0, y + i, length, y + i, color);
     }
 }
 
 void screen_show_threshold_vertical_bar(uint16 x, uint16 y, uint16 length, uint8 width, rgb565_color_enum color)
 {
-    for (uint8 i = 0; i < width; i++)
+    uint8 i = 0;
+    uint16 end_y = 0;
+
+    screen_init();
+
+    if((x >= tft180_width_max) || (y >= tft180_height_max) || (0u == width))
     {
-        ips200_draw_line(x + i, y, x + i , y + length, color);
+        return;
+    }
+
+    end_y = (uint16)((uint32)y + length);
+    if(end_y >= tft180_height_max)
+    {
+        end_y = (uint16)(tft180_height_max - 1u);
+    }
+
+    for(i = 0; (i < width) && ((uint32)x + i < tft180_width_max); i++)
+    {
+        tft180_draw_line(x + i, y, x + i, end_y, color);
     }
 }
 
 void show_string_demo(void)
 {
     screen_init();
-    ips200_set_font(IPS200_6X8_FONT);
-    ips200_clear();
+    tft180_set_font(TFT180_6X8_FONT);
+    tft180_clear();
 
-    ips200_show_string(0, 0,  "hello world!");
-    ips200_show_string(0, 12, "abcdefghijklmnopqrstuvwxyz");
-    ips200_show_string(0, 24, "0123456789");
+    tft180_show_string(0, 0,  "hello world!");
+    tft180_show_string(0, 12, "abcdefghijklmnopqrstuvwxyz");
+    tft180_show_string(0, 24, "0123456789");
 }
 
 // ========================= 通用数据表显示函数 =========================
@@ -290,20 +402,20 @@ void screen_data_table_reset(void)
     screen_data_table_first_draw = 1;
 }
 
-void screen_data_table_set_font(ips200_font_size_enum font)
+void screen_data_table_set_font(tft180_font_size_enum font)
 {
     screen_init();
 
-    if(IPS200_8X16_FONT == font)
+    if(TFT180_8X16_FONT == font)
     {
-        screen_data_table_font = IPS200_8X16_FONT;
+        screen_data_table_font = TFT180_8X16_FONT;
     }
     else
     {
-        screen_data_table_font = IPS200_6X8_FONT;
+        screen_data_table_font = TFT180_6X8_FONT;
     }
 
-    ips200_set_font(screen_data_table_font);
+    tft180_set_font(screen_data_table_font);
     screen_data_table_reset();
 }
 
@@ -323,7 +435,7 @@ void screen_show_data_table(const screen_data_item_t *items, uint8 count)
     }
 
     screen_init();
-    ips200_set_font(screen_data_table_font);
+    tft180_set_font(screen_data_table_font);
 
     layout = screen_get_data_layout();
     draw_count = count;
@@ -336,13 +448,13 @@ void screen_show_data_table(const screen_data_item_t *items, uint8 count)
 
     if(screen_data_table_first_draw)
     {
-        ips200_clear();
+        tft180_clear();
 
         for(index = 0; index < draw_count; index++)
         {
             y = (uint16)(index * layout.row_height);
             screen_format_text_field(name_buf, items[index].name, layout.name_width);
-            ips200_show_string(0, y, name_buf);
+            tft180_show_string(0, y, name_buf);
         }
 
         screen_data_table_first_draw = 0;
@@ -352,29 +464,39 @@ void screen_show_data_table(const screen_data_item_t *items, uint8 count)
     {
         y = (uint16)(index * layout.row_height);
         screen_format_value(value_buf, &items[index], layout.value_width);
-        ips200_show_string(value_x, y, value_buf);
+        tft180_show_string(value_x, y, value_buf);
     }
 }
 
 void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params)
 {
-    // 四个绘制绿色标识线屏幕函数
+    if((jump_params.check_row >= MT9V03X_H) ||
+       (0u == jump_params.check_row_count) ||
+       (jump_params.check_row_count > jump_params.check_row + 1u) ||
+       (jump_params.check_column >= MT9V03X_W) ||
+       (0u == jump_params.check_column_count) ||
+       (jump_params.check_column_count > MT9V03X_W - jump_params.check_column))
+    {
+        return;
+    }
+
+    // 四条参考线贯穿缩放后的摄像头显示区域
     screen_show_threshold_horizontal_bar(
-        IMAGE_Y + jump_params.check_row - jump_params.check_row_count + 1,
+        screen_camera_map_y((uint16)(jump_params.check_row - jump_params.check_row_count + 1u)),
         IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
         2,
         RGB565_GREEN
     );
 
     screen_show_threshold_horizontal_bar(
-        IMAGE_Y + jump_params.check_row,
+        screen_camera_map_y(jump_params.check_row),
         IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
         2,
         RGB565_GREEN
     );
 
     screen_show_threshold_vertical_bar(
-        IMAGE_X + jump_params.check_column,
+        screen_camera_map_x(jump_params.check_column),
         IMAGE_Y,
         IMAGE_DISPLAY_HEIGHT - 1,
         2,
@@ -382,7 +504,7 @@ void screen_show_detect_threshold_bar(JumpDetectParams_t jump_params)
     );
 
     screen_show_threshold_vertical_bar(
-        IMAGE_X + jump_params.check_column + jump_params.check_column_count - 1,
+        screen_camera_map_x((uint16)(jump_params.check_column + jump_params.check_column_count - 1u)),
         IMAGE_Y,
         IMAGE_DISPLAY_HEIGHT - 1,
         2,
@@ -398,14 +520,19 @@ void screen_show_bridge_align_box(
     uint16 far_right = 0;
     uint16 near_left = 0;
     uint16 near_right = 0;
+    uint16 fallback_far_left = 0;
+    uint16 fallback_far_right = 0;
+    uint16 fallback_near_left = 0;
+    uint16 fallback_near_right = 0;
     uint16 far_y = 0;
     uint16 near_y = MT9V03X_H - 1u;
-    uint8 width = 0;
 
     if((0 == align_params) ||
        (align_params->target_center_x >= MT9V03X_W) ||
        (0u == align_params->far_tolerance_px) ||
-       (0u == align_params->near_tolerance_px))
+       (0u == align_params->near_tolerance_px) ||
+       (0u == align_params->fallback_far_tolerance_px) ||
+       (0u == align_params->fallback_near_tolerance_px))
     {
         return;
     }
@@ -433,34 +560,41 @@ void screen_show_bridge_align_box(
         (MT9V03X_W - 1u) :
         (uint16)(align_params->target_center_x + align_params->near_tolerance_px);
 
-    // 红色梯形表示远近两个中线检查点允许进入的范围
-    for(width = 0; width < 2; width++)
-    {
-        ips200_draw_line(
-            IMAGE_X + far_left,
-            IMAGE_Y + far_y + width,
-            IMAGE_X + far_right,
-            IMAGE_Y + far_y + width,
-            RGB565_RED);
-        ips200_draw_line(
-            IMAGE_X + near_left,
-            IMAGE_Y + near_y - width,
-            IMAGE_X + near_right,
-            IMAGE_Y + near_y - width,
-            RGB565_RED);
-        ips200_draw_line(
-            IMAGE_X + far_left + width,
-            IMAGE_Y + far_y,
-            IMAGE_X + near_left + width,
-            IMAGE_Y + near_y,
-            RGB565_RED);
-        ips200_draw_line(
-            IMAGE_X + far_right - width,
-            IMAGE_Y + far_y,
-            IMAGE_X + near_right - width,
-            IMAGE_Y + near_y,
-            RGB565_RED);
-    }
+    fallback_far_left =
+        (align_params->target_center_x > align_params->fallback_far_tolerance_px) ?
+        (uint16)(align_params->target_center_x -
+                 align_params->fallback_far_tolerance_px) : 0u;
+    fallback_far_right =
+        (align_params->fallback_far_tolerance_px >=
+         (MT9V03X_W - align_params->target_center_x)) ?
+        (MT9V03X_W - 1u) :
+        (uint16)(align_params->target_center_x +
+                 align_params->fallback_far_tolerance_px);
+    fallback_near_left =
+        (align_params->target_center_x > align_params->fallback_near_tolerance_px) ?
+        (uint16)(align_params->target_center_x -
+                 align_params->fallback_near_tolerance_px) : 0u;
+    fallback_near_right =
+        (align_params->fallback_near_tolerance_px >=
+         (MT9V03X_W - align_params->target_center_x)) ?
+        (MT9V03X_W - 1u) :
+        (uint16)(align_params->target_center_x +
+                 align_params->fallback_near_tolerance_px);
+
+    // 紫色外框表示保底冲刺范围，红色内框表示正常连续帧对准范围
+    screen_draw_camera_line(
+        fallback_far_left, far_y, fallback_far_right, far_y, 1u, RGB565_PURPLE);
+    screen_draw_camera_line(
+        fallback_near_left, near_y, fallback_near_right, near_y, 1u, RGB565_PURPLE);
+    screen_draw_camera_line(
+        fallback_far_left, far_y, fallback_near_left, near_y, 1u, RGB565_PURPLE);
+    screen_draw_camera_line(
+        fallback_far_right, far_y, fallback_near_right, near_y, 1u, RGB565_PURPLE);
+
+    screen_draw_camera_line(far_left, far_y, far_right, far_y, 2u, RGB565_RED);
+    screen_draw_camera_line(near_left, near_y, near_right, near_y, 2u, RGB565_RED);
+    screen_draw_camera_line(far_left, far_y, near_left, near_y, 2u, RGB565_RED);
+    screen_draw_camera_line(far_right, far_y, near_right, near_y, 2u, RGB565_RED);
 }
 
 void screen_show_bridge_roi(const CameraBridgeParams_t *bridge_params)
@@ -475,33 +609,25 @@ void screen_show_bridge_roi(const CameraBridgeParams_t *bridge_params)
     }
 
     // 绿色矩形表示当前双边线扫描的有效区域
-    ips200_draw_line(
-        IMAGE_X + bridge_params->roi_left,
-        IMAGE_Y + bridge_params->roi_top,
-        IMAGE_X + bridge_params->roi_right,
-        IMAGE_Y + bridge_params->roi_top,
-        RGB565_GREEN
+    screen_draw_camera_line(
+        bridge_params->roi_left, bridge_params->roi_top,
+        bridge_params->roi_right, bridge_params->roi_top,
+        1u, RGB565_GREEN
     );
-    ips200_draw_line(
-        IMAGE_X + bridge_params->roi_left,
-        IMAGE_Y + bridge_params->roi_bottom,
-        IMAGE_X + bridge_params->roi_right,
-        IMAGE_Y + bridge_params->roi_bottom,
-        RGB565_GREEN
+    screen_draw_camera_line(
+        bridge_params->roi_left, bridge_params->roi_bottom,
+        bridge_params->roi_right, bridge_params->roi_bottom,
+        1u, RGB565_GREEN
     );
-    ips200_draw_line(
-        IMAGE_X + bridge_params->roi_left,
-        IMAGE_Y + bridge_params->roi_top,
-        IMAGE_X + bridge_params->roi_left,
-        IMAGE_Y + bridge_params->roi_bottom,
-        RGB565_GREEN
+    screen_draw_camera_line(
+        bridge_params->roi_left, bridge_params->roi_top,
+        bridge_params->roi_left, bridge_params->roi_bottom,
+        1u, RGB565_GREEN
     );
-    ips200_draw_line(
-        IMAGE_X + bridge_params->roi_right,
-        IMAGE_Y + bridge_params->roi_top,
-        IMAGE_X + bridge_params->roi_right,
-        IMAGE_Y + bridge_params->roi_bottom,
-        RGB565_GREEN
+    screen_draw_camera_line(
+        bridge_params->roi_right, bridge_params->roi_top,
+        bridge_params->roi_right, bridge_params->roi_bottom,
+        1u, RGB565_GREEN
     );
 }
 
@@ -528,101 +654,54 @@ void screen_show_bridge_fitted_line(const CameraBridgeResult_t *bridge_result)
         return;
     }
 
-    // 红色左右边线各绘制 2 像素宽，向赛道内部加粗
-    ips200_draw_line(
-        IMAGE_X + bridge_result->left_x1,
-        IMAGE_Y + bridge_result->left_y1,
-        IMAGE_X + bridge_result->left_x2,
-        IMAGE_Y + bridge_result->left_y2,
-        RGB565_RED
+    // 左右边线使用 2 像素红线，控制中线使用 3 像素绿线
+    screen_draw_camera_line(
+        bridge_result->left_x1, bridge_result->left_y1,
+        bridge_result->left_x2, bridge_result->left_y2,
+        2u, RGB565_RED
     );
-
-    if((bridge_result->left_x1 + 1u < MT9V03X_W) &&
-       (bridge_result->left_x2 + 1u < MT9V03X_W))
-    {
-        ips200_draw_line(
-            IMAGE_X + bridge_result->left_x1 + 1u,
-            IMAGE_Y + bridge_result->left_y1,
-            IMAGE_X + bridge_result->left_x2 + 1u,
-            IMAGE_Y + bridge_result->left_y2,
-            RGB565_RED
-        );
-    }
-
-    ips200_draw_line(
-        IMAGE_X + bridge_result->right_x1,
-        IMAGE_Y + bridge_result->right_y1,
-        IMAGE_X + bridge_result->right_x2,
-        IMAGE_Y + bridge_result->right_y2,
-        RGB565_RED
+    screen_draw_camera_line(
+        bridge_result->right_x1, bridge_result->right_y1,
+        bridge_result->right_x2, bridge_result->right_y2,
+        2u, RGB565_RED
     );
-
-    if((bridge_result->right_x1 > 0u) &&
-       (bridge_result->right_x2 > 0u))
-    {
-        ips200_draw_line(
-            IMAGE_X + bridge_result->right_x1 - 1u,
-            IMAGE_Y + bridge_result->right_y1,
-            IMAGE_X + bridge_result->right_x2 - 1u,
-            IMAGE_Y + bridge_result->right_y2,
-            RGB565_RED
-        );
-    }
-
-    // 绿色控制中线绘制 3 像素宽
-    ips200_draw_line(
-        IMAGE_X + bridge_result->center_x1,
-        IMAGE_Y + bridge_result->center_y1,
-        IMAGE_X + bridge_result->center_x2,
-        IMAGE_Y + bridge_result->center_y2,
-        RGB565_GREEN
+    screen_draw_camera_line(
+        bridge_result->center_x1, bridge_result->center_y1,
+        bridge_result->center_x2, bridge_result->center_y2,
+        3u, RGB565_GREEN
     );
-
-    if((bridge_result->center_x1 > 0u) &&
-       (bridge_result->center_x2 > 0u))
-    {
-        ips200_draw_line(
-            IMAGE_X + bridge_result->center_x1 - 1u,
-            IMAGE_Y + bridge_result->center_y1,
-            IMAGE_X + bridge_result->center_x2 - 1u,
-            IMAGE_Y + bridge_result->center_y2,
-            RGB565_GREEN
-        );
-    }
-
-    if((bridge_result->center_x1 + 1u < MT9V03X_W) &&
-       (bridge_result->center_x2 + 1u < MT9V03X_W))
-    {
-        ips200_draw_line(
-            IMAGE_X + bridge_result->center_x1 + 1u,
-            IMAGE_Y + bridge_result->center_y1,
-            IMAGE_X + bridge_result->center_x2 + 1u,
-            IMAGE_Y + bridge_result->center_y2,
-            RGB565_GREEN
-        );
-    }
 }
 
 
 void screen_show_roi_threshold_bar(JumpDetectParams_t jump_params)
 {
-    // 四个绘制绿色标识线屏幕函数
+    if((jump_params.otsu_roi_row >= MT9V03X_H) ||
+       (0u == jump_params.otsu_roi_row_count) ||
+       (jump_params.otsu_roi_row_count > jump_params.otsu_roi_row + 1u) ||
+       (jump_params.otsu_roi_column >= MT9V03X_W) ||
+       (0u == jump_params.otsu_roi_column_count) ||
+       (jump_params.otsu_roi_column_count > MT9V03X_W - jump_params.otsu_roi_column))
+    {
+        return;
+    }
+
+    // 四条粉色参考线使用缩放后的摄像头坐标
     screen_show_threshold_horizontal_bar(
-        IMAGE_Y + jump_params.otsu_roi_row - jump_params.otsu_roi_row_count + 1,
+        screen_camera_map_y((uint16)(jump_params.otsu_roi_row - jump_params.otsu_roi_row_count + 1u)),
         IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
         2,
         RGB565_PINK
     );
 
     screen_show_threshold_horizontal_bar(
-        IMAGE_Y + jump_params.otsu_roi_row,
+        screen_camera_map_y(jump_params.otsu_roi_row),
         IMAGE_X + IMAGE_DISPLAY_WIDTH - 1,
         2,
         RGB565_PINK
     );
 
     screen_show_threshold_vertical_bar(
-        IMAGE_X + jump_params.otsu_roi_column,
+        screen_camera_map_x(jump_params.otsu_roi_column),
         IMAGE_Y,
         IMAGE_DISPLAY_HEIGHT - 1,
         2,
@@ -630,7 +709,7 @@ void screen_show_roi_threshold_bar(JumpDetectParams_t jump_params)
     );
 
     screen_show_threshold_vertical_bar(
-        IMAGE_X + jump_params.otsu_roi_column + jump_params.otsu_roi_column_count - 1,
+        screen_camera_map_x((uint16)(jump_params.otsu_roi_column + jump_params.otsu_roi_column_count - 1u)),
         IMAGE_Y,
         IMAGE_DISPLAY_HEIGHT - 1,
         2,
@@ -668,7 +747,7 @@ void screen_show_table_t2(JumpDetectParams_t jump_params, uint32 fps, uint32 is_
     sprintf(str_limit_info,   "Spd %d | CD %d",          carspd,  jump_params.cooldown_time_ms);
     sprintf(str_dot_info,     "%d | (%d)%s",               jump_params.dot_count,    jump_params.steps,           (jump_params.dot_type) ? "White" : "Black");
     screen_table_2[0].value.str_value   = (is_jump) ? "JUMP" : "Waiting...";
-    screen_table_2[1].value.uint_value  = fps;
+    screen_table_2[1].value.uint_value  = (uint16)fps;
     screen_table_2[2].value.str_value   = str_roi_info;  // data_table[2].value.str_value   = (ipc_result == APPIPC_OK) ? "OK" : "Failed";  // 显示 IPC 状态
     screen_table_2[3].value.str_value   = str_area_info;
     screen_table_2[4].value.str_value   = str_limit_info;
@@ -684,9 +763,9 @@ void screen_show_table_t3(BridgeExitParams_t bridge_params, uint8 func_opt, uint
     sprintf(str_area_info,    "%d | %d | %d | %d", bridge_params.check_row, bridge_params.check_column, bridge_params.check_row_count, bridge_params.check_column_count);
     screen_table_3[0].value.uint_value   = func_opt;
     screen_table_3[1].value.uint_value   = bridge_params.continuous_frame_count;
-    screen_table_3[2].value.uint_value   = bridge_params.white_dot_count;
+    screen_table_3[2].value.uint_value   = (uint16)bridge_params.white_dot_count;
     screen_table_3[3].value.str_value    = str_area_info;
-    screen_table_3[4].value.uint_value   = fps;
+    screen_table_3[4].value.uint_value   = (uint16)fps;
 
     screen_show_data_table(screen_table_3, (uint8)(sizeof(screen_table_3) / sizeof(screen_table_3[0])));
 }

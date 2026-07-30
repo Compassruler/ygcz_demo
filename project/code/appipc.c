@@ -30,16 +30,18 @@
 #define APPIPC_BRIDGE_FORCE_BLIND_MASK     (0x10000000ul)
 #define APPIPC_BRIDGE_BLIND_RELEASE_MASK   (0x08000000ul)
 #define APPIPC_BRIDGE_FRESH_TARGET_MASK    (0x04000000ul)
+#define APPIPC_BRIDGE_BUMP_START_MASK      (0x02000000ul)
 #define APPIPC_BRIDGE_BOTTOM_MASK         (0x00FF0000ul)
 #define APPIPC_BRIDGE_BOTTOM_SHIFT        (16u)
 #define APPIPC_BRIDGE_CONTROL_MASK        (0x0000FFFFul)
 
+#define APPIPC_CORE0_BUMP_FINISH_MASK      (0x80000000ul)
 #define APPIPC_CORE0_SPEED_MASK            (0x0000FFFFul)
 #define APPIPC_CORE0_REMOTE_CH9_MASK       (0x00FF0000ul)
 #define APPIPC_CORE0_REMOTE_CH9_SHIFT      (16u)
 #define APPIPC_CORE0_MODE_MASK             (0x0F000000ul)
 #define APPIPC_CORE0_MODE_SHIFT            (24u)
-#define APPIPC_CORE0_BAB_PHASE_MASK        (0xF0000000ul)
+#define APPIPC_CORE0_BAB_PHASE_MASK        (0x70000000ul)
 #define APPIPC_CORE0_BAB_PHASE_SHIFT       (28u)
 
 static appipc_callback_t appipc_user_callback = (appipc_callback_t)0;
@@ -58,13 +60,14 @@ static void appipc_default_callback(uint32 data)
 static uint32 appipc_pack_bridge_data(uint8 valid, uint8 aligned, uint8 exited,
                                      uint8 bottom_y, int16 control_value,
                                      uint8 force_blind, uint8 blind_release,
-                                     uint8 fresh_target)
+                                     uint8 fresh_target, uint8 vision_bump_start)
 {
     uint32 data =
         (exited ? APPIPC_BRIDGE_EXITED_MASK : 0u) |
         (force_blind ? APPIPC_BRIDGE_FORCE_BLIND_MASK : 0u) |
         (blind_release ? APPIPC_BRIDGE_BLIND_RELEASE_MASK : 0u) |
-        (fresh_target ? APPIPC_BRIDGE_FRESH_TARGET_MASK : 0u);
+        (fresh_target ? APPIPC_BRIDGE_FRESH_TARGET_MASK : 0u) |
+        (vision_bump_start ? APPIPC_BRIDGE_BUMP_START_MASK : 0u);
 
     if(valid)
     {
@@ -144,11 +147,11 @@ uint8 appipc_send_u32(uint32 data)
 uint8 appipc_send_bridge_data(uint8 valid, uint8 aligned, uint8 exited,
                               uint8 bottom_y, int16 control_value,
                               uint8 force_blind, uint8 blind_release,
-                              uint8 fresh_target)
+                              uint8 fresh_target, uint8 vision_bump_start)
 {
     return appipc_send_u32(appipc_pack_bridge_data(
         valid, aligned, exited, bottom_y, control_value,
-        force_blind, blind_release, fresh_target));
+        force_blind, blind_release, fresh_target, vision_bump_start));
 }
 
 uint8 appipc_decode_bridge_data(uint32 data, appipc_bridge_data_t *bridge_data)
@@ -164,6 +167,7 @@ uint8 appipc_decode_bridge_data(uint32 data, appipc_bridge_data_t *bridge_data)
     bridge_data->force_blind = (uint8)(0u != (data & APPIPC_BRIDGE_FORCE_BLIND_MASK));
     bridge_data->blind_release = (uint8)(0u != (data & APPIPC_BRIDGE_BLIND_RELEASE_MASK));
     bridge_data->fresh_target = (uint8)(0u != (data & APPIPC_BRIDGE_FRESH_TARGET_MASK));
+    bridge_data->vision_bump_start = (uint8)(0u != (data & APPIPC_BRIDGE_BUMP_START_MASK));
 
     if(!bridge_data->valid)
     {
@@ -243,11 +247,13 @@ uint8 appipc_send_speed_u32(uint32 data)
     return APPIPC_BUSY;
 }
 
-uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode, uint8 vision_phase_bab, uint8 remote_ch9_value)
+uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode, uint8 vision_phase_bab,
+                             uint8 remote_ch9_value, uint8 vision_bump_finish)
 {
     uint32 data;
 
-    data = (((uint32)vision_phase_bab << APPIPC_CORE0_BAB_PHASE_SHIFT) & APPIPC_CORE0_BAB_PHASE_MASK) |
+    data = (vision_bump_finish ? APPIPC_CORE0_BUMP_FINISH_MASK : 0u) |
+           (((uint32)vision_phase_bab << APPIPC_CORE0_BAB_PHASE_SHIFT) & APPIPC_CORE0_BAB_PHASE_MASK) |
            (((uint32)vision_detect_mode << APPIPC_CORE0_MODE_SHIFT) & APPIPC_CORE0_MODE_MASK) |
            ((uint32)remote_ch9_value << APPIPC_CORE0_REMOTE_CH9_SHIFT) |
            (uint32)car_speed;
@@ -281,6 +287,7 @@ uint8 appipc_decode_core0_data(uint32 data, appipc_core0_data_t *core0_data)
     core0_data->vision_detect_mode = vision_detect_mode;
     core0_data->vision_phase_bab = vision_phase_bab;
     core0_data->remote_ch9_value = (uint8)((data & APPIPC_CORE0_REMOTE_CH9_MASK) >> APPIPC_CORE0_REMOTE_CH9_SHIFT);
+    core0_data->vision_bump_finish = (uint8)(0u != (data & APPIPC_CORE0_BUMP_FINISH_MASK));
 
     return 1;
 }

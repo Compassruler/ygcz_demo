@@ -193,24 +193,6 @@ typedef struct
     uint8 exited;                   // 1 表示已经确认离开单边桥
 } BridgeExitParams_t;
 
-// 颠簸路段离开检测参数
-typedef struct
-{
-    uint8 binary_threshold;             // 固定二值化阈值
-    uint16 check_row;                   // 检测矩形的起始行，后续从该行向上检查
-    uint16 check_row_count;             // 从起始行向上检查的行数量
-    uint16 check_column;                // 检测矩形的起始列，后续从该列向右检查
-    uint16 check_column_count;          // 从起始列向右检查的列数量
-    uint32 black_dot_count;             // 确认看到黑色凸起所需的黑色像素数量
-    uint32 white_dot_count;             // 确认驶出颠簸路段所需的白色像素数量
-    uint8 black_confirm_frame_count;    // 确认看到黑色凸起所需的连续帧数
-    uint8 white_confirm_frame_count;    // 确认驶出所需的连续白色帧数
-    uint8 black_continuous_frame_count; // 当前连续检测到黑色凸起的帧数
-    uint8 white_continuous_frame_count; // 当前连续检测到白色出口的帧数
-    uint8 bump_seen;                    // 1 表示已经确认进入颠簸路段
-    uint8 exited;                       // 1 表示已经确认离开颠簸路段
-} BumpExitParams_t;
-
 // WiFi SPI 图像叠加类型
 typedef enum
 {
@@ -308,16 +290,6 @@ uint8 camera_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bri
  * @return 1 已经确认离开单边桥 | 0 尚未离开或当前没有新帧
  */
 uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params);
-
-/**
- * 颠簸路段离开检测接口
- * 先确认检测区域内出现黑色凸起，允许出口检测后，再连续检测指定帧数的白色区域。
- * @param bump_exit_params 颠簸路段离开检测参数结构体
- * @param exit_check_enabled 1 允许判断白色出口 | 0 仅确认黑色凸起
- *
- * @return 1 已经确认离开颠簸路段 | 0 尚未离开或当前没有新帧
- */
-uint8 camera_bump_exit_processing(BumpExitParams_t *bump_exit_params, uint8 exit_check_enabled);
 
 /**
  * 跳跃检测接口

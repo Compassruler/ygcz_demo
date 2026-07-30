@@ -332,8 +332,16 @@ void pit0_ch0_isr()
         }
         else
         {
-          target_yaw_remote += vision_target_yaw * 0.003f;  // 正常处理方式
+          if (vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
+          {
+            target_yaw_remote = 0;  // 对齐之后航向角和发车相同
+          }
+          else
+          {
+            target_yaw_remote += vision_target_yaw * 0.003f;  // 正常处理方式
+          }
         }
+
 
         pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
       }

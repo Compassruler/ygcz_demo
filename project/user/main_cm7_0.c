@@ -7,13 +7,13 @@
 #define KEY3                    (P20_2)
 #define KEY4                    (P20_3)
 
-#define BRIDGE_ALIGNED_CONFIRM_COUNT    (2)        // 连续对齐确认次数
+#define BRIDGE_ALIGNED_CONFIRM_COUNT    (1)        // 连续对齐确认次数
 #define BRIDGE_ALIGN_START_Y            (35)       // 进入低速精确对齐区域的画面纵坐标
 
-#define BRIDGE_ALIGN_SPEED              (100)        // 距离较近且未对齐时的细调速度
+#define BRIDGE_ALIGN_SPEED              (30)        // 距离较近且未对齐时的细调速度
 #define BRIDGE_BLIND_RECOVERY_SPEED     (-80)        // 盲转超调后倒车寻找赛道的速度
-#define BRIDGE_CROSS_SPEED              (-400)       // 对齐后冲过单边桥的速度
-#define BUMP_CROSS_SPEED                (400)        // 通过颠簸路段时的固定速度
+#define BRIDGE_CROSS_SPEED              (200)       // 对齐后冲过单边桥的速度
+#define BUMP_CROSS_SPEED                (300)        // 通过颠簸路段时的固定速度
 
 
 char txt[128];
@@ -58,6 +58,10 @@ static void appipc_callback(uint32 data)
             bridge_force_blind_from_core1 = bridge_data.force_blind;
             bridge_blind_release_from_core1 = bridge_data.blind_release;
             bridge_fresh_target_from_core1 = bridge_data.fresh_target;
+            if(bridge_data.vision_bump_start)
+            {
+                vision_bump_start = 1;
+            }
             phase_exited_from_core1 = bridge_data.exited;
             bridge_bottom_y_from_core1 = bridge_data.bottom_y;
             bridge_control_from_core1 = bridge_data.control_value;
@@ -102,16 +106,18 @@ static void appipc_callback(uint32 data)
                 bridge_aligned_count = 0;
             }
         }
-        else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK) && phase_exited_from_core1)
+        else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK) && vision_bump_start)
         {
             phase_exited_from_core1 = 0;
-            vision_phase_bab = VISION_PHASE_BAB_BUMP_EXIT_CHECK;
+            vision_phase_bab = VISION_PHASE_BAB_BUMP_DISTANCE;
         }
-        else if((vision_phase_bab == VISION_PHASE_BAB_BUMP_EXIT_CHECK) && phase_exited_from_core1)
+        else if((vision_phase_bab == VISION_PHASE_BAB_BUMP_DISTANCE) && phase_exited_from_core1)
         {
             phase_exited_from_core1 = 0;
             vision_phase_bab = VISION_PHASE_BAB_COMPLETE;
             vision_phase_done_flag = 1;
+            vision_bump_start = 0;
+            vision_bump_finish = 0;
         }
 
         bridge_control_updated = 1;
@@ -319,7 +325,7 @@ int main(void)
         vision_detect_mode = VISION_IDLE;  // 空闲
     }
 
-    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, vision_phase_bab, remote_ch9_value);  // 发送车速、视觉状态和通道9数据到核1
+    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, vision_phase_bab, remote_ch9_value, vision_bump_finish);  // 发送车速、视觉状态、通道9和积分完成标志到核1
     
     //=========================== 跳跃模式 ===========================
         if(vision_detect_mode == VISION_JUMP)
@@ -391,8 +397,8 @@ int main(void)
                 vision_target_speed = BRIDGE_CROSS_SPEED;  // 保持对齐后的航向并冲过单边桥
                 vision_target_yaw = 0;
             }
-            // 如果状态为 离开颠簸路段检查阶段， 即冲刺过颠簸路段
-            else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_EXIT_CHECK)
+            // 如果状态为 颠簸路段距离积分阶段，即冲刺过颠簸路段
+            else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_DISTANCE)
             {
                 // sprintf(txt, "冲刺颠簸路段\n");
                 // wireless_uart_send_string(txt);

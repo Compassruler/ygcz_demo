@@ -26,6 +26,9 @@ volatile int vision_detect_mode = 0;
 volatile int32 vision_target_speed = 0;
 volatile int32 vision_target_yaw = 0;
 
+volatile uint8 vision_bump_start = 0;                // 核1确认离桥后置1，激活核0颠簸路段距离积分
+volatile uint8 vision_bump_finish = 0;               // 核0距离积分到位后置1，通知核1完成视觉阶段
+
 float KP_DIS;
 int MAX_SPEED = 1000;
 

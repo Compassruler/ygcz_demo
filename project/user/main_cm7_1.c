@@ -85,8 +85,8 @@
 #define BRIDGE_CONTROL_DIRECTION              (1.0f)            // 底盘控制方向
 #define BRIDGE_CONTROL_LIMIT                  (60)              // 底盘 angle 控制量限制
 
-#define BRIDGE_BLIND_TRIGGER_ANGLE_D10        (350)             // 允许准备盲转的最小中线角度，单位 0.1 度
-#define BRIDGE_FORCE_BLIND_TRIGGER_ANGLE_D10  (350)             // 强制 85 度盲转所需的最小可靠中线角度，单位 0.1 度
+#define BRIDGE_BLIND_TRIGGER_ANGLE_D10        (450)             // 允许准备盲转的最小中线角度，单位 0.1 度
+#define BRIDGE_FORCE_BLIND_TRIGGER_ANGLE_D10  (450)             // 强制 85 度盲转所需的最小可靠中线角度，单位 0.1 度
 #define BRIDGE_BLIND_RELEASE_ANGLE_D10        (150)             // 强制盲转提前结束允许的中线夹角，单位 0.1 度
 
 #define BRIDGE_BLIND_RELEASE_RESET_D10        (300)             // 超过该夹角后清除提前结束连续帧计数
@@ -110,17 +110,6 @@
 #define BRIDGE_EXIT_CONFIRM_FRAMES     (5)      // 连续满足要求的帧数
 #define BRIDGE_EXIT_CHECK_DELAY_MS     (4000)    // 冲桥后延迟开始离桥检测的时间
 
-//=========================== 颠簸路段离开检测参数 ===========================
-#define BUMP_EXIT_BINARY_THRESHOLD       (85)    // 颠簸路段检测固定二值化阈值（无效）
-#define BUMP_EXIT_CHECK_ROW              (100)    // 检测矩形起始行
-#define BUMP_EXIT_CHECK_ROW_COUNT        (25)     // 从起始行向上检查的行数
-#define BUMP_EXIT_CHECK_COLUMN           (55)     // 检测矩形起始列
-#define BUMP_EXIT_CHECK_COLUMN_COUNT     (73)     // 从起始列向右检查的列数
-#define BUMP_SEEN_BLACK_DOT_COUNT        (300)    // 确认看到黑色凸起所需的黑色像素数量
-#define BUMP_SEEN_CONFIRM_FRAMES         (0)      // 连续看到黑色凸起的帧数
-#define BUMP_EXIT_WHITE_DOT_COUNT        (1600)   // 判断驶出所需的白色像素数量
-#define BUMP_EXIT_CONFIRM_FRAMES         (5)      // 连续满足白色出口要求的帧数
-#define BUMP_EXIT_CHECK_DELAY_MS         (1500)   // 进入颠簸阶段后允许判断出口的最短时间
 
 //================================================================
 
@@ -130,6 +119,7 @@ volatile uint32 sys_ms                          = 0;                            
 static volatile uint16 core0_car_speed          = 0;                                // 实际车速
 static volatile uint8  core0_speed_updated      = 0;                                // 车速更新标志位
 static volatile uint8  core0_remote_ch9_value   = BRIDGE_BINARY_THRESHOLD;          // 核心0发送的通道9映射值
+static volatile uint8  core0_vision_bump_finish = 0;                                // 核心0距离积分完成标志
 
 // IPC 接收核0的车速和视觉工作模式
 static void appipc_speed_callback(uint32 data)
@@ -142,6 +132,7 @@ static void appipc_speed_callback(uint32 data)
         function_option = core0_data.vision_detect_mode;
         vision_phase_bab = core0_data.vision_phase_bab;
         core0_remote_ch9_value = core0_data.remote_ch9_value;
+        core0_vision_bump_finish = core0_data.vision_bump_finish;
         core0_speed_updated = 1;
     }
 }
@@ -236,22 +227,7 @@ int main(void)
         .continuous_frame_count   = 0,
         .exited                   = 0
     };
-    BumpExitParams_t bump_exit_params =
-    {
-        .binary_threshold             = BUMP_EXIT_BINARY_THRESHOLD,
-        .check_row                    = BUMP_EXIT_CHECK_ROW,
-        .check_row_count              = BUMP_EXIT_CHECK_ROW_COUNT,
-        .check_column                 = BUMP_EXIT_CHECK_COLUMN,
-        .check_column_count           = BUMP_EXIT_CHECK_COLUMN_COUNT,
-        .black_dot_count              = BUMP_SEEN_BLACK_DOT_COUNT,
-        .white_dot_count              = BUMP_EXIT_WHITE_DOT_COUNT,
-        .black_confirm_frame_count    = BUMP_SEEN_CONFIRM_FRAMES,
-        .white_confirm_frame_count    = BUMP_EXIT_CONFIRM_FRAMES,
-        .black_continuous_frame_count = 0,
-        .white_continuous_frame_count = 0,
-        .bump_seen                    = 0,
-        .exited                       = 0
-    };
+
     CameraBridgeParams_t bridge_params =
     {
         .binary_threshold          = BRIDGE_BINARY_THRESHOLD,
@@ -330,9 +306,8 @@ int main(void)
     uint8  actual_jump_count    = 0;                  // 实际跳跃次数计数
     uint8  last_vision_phase_bab = VISION_PHASE_BAB_BRIDGE_ALIGN; // 上一次执行的 BAB 子状态
     uint32 bridge_exit_start_ms  = 0;                 // 进入单边桥离开检测阶段的时间
-    uint32 bump_exit_start_ms    = 0;                 // 进入颠簸路段离开检测阶段的时间
-    uint8  bridge_exit_ipc_sent  = 0;                 // 单边桥离开信号是否发送成功
-    uint8  bump_exit_ipc_sent    = 0;                 // 颠簸路段离开信号是否发送成功
+    uint8  bridge_exit_ipc_sent  = 0;                 // 颠簸路段积分开始信号是否发送成功
+    uint8  bump_finish_ipc_sent  = 0;                 // 核心0积分完成后的视觉完成应答是否发送成功
     uint8  bridge_align_updated  = 0;                 // 当前帧对准控制计算是否有效
     uint8  force_blind_request   = 0;                 // 请求核心0使用 IMU 强制完成大角度盲转
     uint8  blind_release_request = 0;                 // 请求核心0提前结束强制盲转
@@ -365,7 +340,6 @@ int main(void)
     {
         bridge_params.binary_threshold = core0_remote_ch9_value;  // 固定阈值模式使用，自动阈值模式下作为备用值
         bridge_exit_params.binary_threshold = core0_remote_ch9_value;
-        bump_exit_params.binary_threshold = core0_remote_ch9_value;
 
         //=========================== 执行单边桥与颠簸路段检测程序 ===========================
         // 核心视觉步骤判断条件，目前有| 0 空闲 | 1 单边桥-颠簸路段 | 2 跳跃 | 后续可能增加的步骤：返回三级台阶
@@ -397,14 +371,9 @@ int main(void)
                     bridge_exit_params.exited = 0;
                     bridge_exit_ipc_sent = 0;
                 }
-                else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_EXIT_CHECK)
+                else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_DISTANCE)
                 {
-                    bump_exit_start_ms = sys_ms;  // 时间更新
-                    bump_exit_params.black_continuous_frame_count = 0;
-                    bump_exit_params.white_continuous_frame_count = 0;
-                    bump_exit_params.bump_seen = 0;
-                    bump_exit_params.exited = 0;
-                    bump_exit_ipc_sent = 0;
+                    bump_finish_ipc_sent = 0;
                 }
             }
             
@@ -510,7 +479,7 @@ int main(void)
                 ipc_result = appipc_send_bridge_data(
                     bridge_align_result.valid, bridge_align_result.aligned, 0,
                     (uint8)bridge_align_result.bottom_y, bridge_align_result.control_value,
-                    force_blind_request, blind_release_request, fresh_target);
+                    force_blind_request, blind_release_request, fresh_target, 0);
 
                 // 同时输出识别层和控制层状态，便于定位数据在哪一层失效
                 sprintf(txt, "Det %d |Est %d |Aret %d |Valid %d |Align %d |B %d |C %d,%d-%d,%d |E %d,%d |U %d |Type %s |Near %d |Blind %d |Force %d |Rel %d |Fresh %d |F %d\r\n",
@@ -553,26 +522,16 @@ int main(void)
                 // 已经离桥 并且 IPC 尚未成功发送时，尝试发送，一旦发送成功则立即停止，防止死循环
                 if(bridge_exit_params.exited && !bridge_exit_ipc_sent)
                 {
-                    bridge_exit_ipc_sent = (APPIPC_OK == appipc_send_bridge_data(0, 0, 1, 0, 0, 0, 0, 0)) ? 1 : 0;  // 发送一次后就不再发送
+                    bridge_exit_ipc_sent = (APPIPC_OK == appipc_send_bridge_data(0, 0, 0, 0, 0, 0, 0, 0, 1)) ? 1 : 0;  // 发送积分开始信号
                 }
             }
 
-            // 如果不是前两者，那么就应该判断是否进入 离开颠簸路段检测状态
-            else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_EXIT_CHECK)
+            // 核心0距离积分完成后，向核心0发送视觉阶段完成应答
+            else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_DISTANCE)
             {
-                // 离开颠簸路段检测部分
-                // 颠簸路段离开检测标志位为 非离开状态，即尚未离开 并且 摄像头有新帧
-                if(!bump_exit_params.exited && camera_has_frame())
+                if(core0_vision_bump_finish && !bump_finish_ipc_sent)
                 {
-                    independent_fps = camera_fps_counter_update(&camera_fps, sys_ms); 
-                    // 检测离开 颠簸路段的返回值修改在结构体中，目前支持延时检测和进入增强检测等多个检测方法
-                    camera_bump_exit_processing(&bump_exit_params, (uint8)((sys_ms - bump_exit_start_ms) >= BUMP_EXIT_CHECK_DELAY_MS));
-                }
-                
-                // 离开颠簸路段 IPC 发送部分
-                if(bump_exit_params.exited && !bump_exit_ipc_sent)
-                {
-                    bump_exit_ipc_sent = (APPIPC_OK == appipc_send_bridge_data(0, 0, 1, 0, 0, 0, 0, 0)) ? 1 : 0;
+                    bump_finish_ipc_sent = (APPIPC_OK == appipc_send_bridge_data(0, 0, 1, 0, 0, 0, 0, 0, 0)) ? 1 : 0;
                 }
             }
         }

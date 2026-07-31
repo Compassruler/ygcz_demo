@@ -647,9 +647,9 @@ void Track2_update(void)
     //--------------------------------------------------
     // 终点保护
     //--------------------------------------------------
-    if(path_index >= record_header.total_point_num)
+    if(path_index >= replay_point_num)
     {
-        path_index = record_header.total_point_num - 1;
+        path_index = replay_point_num - 1;
 
         target_speed = 0;
 
@@ -678,14 +678,17 @@ void Track2_update(void)
     //--------------------------------------------------
     // 航向误差
     //--------------------------------------------------
-    if(fabs(yaw_angle - angle) >= 30)
-    {
-        target_yaw = yaw_angle + 30;
-        target_speed = 0;
-        return;
+    if (yaw_angle - angle > 30 )
+    {target_yaw = yaw_angle - 30;
+      target_speed = 0;
+      return;
+    }else if (yaw_angle - angle < -30 ) {target_yaw = yaw_angle + 30;
+    target_speed = 0;
+      return;
     }
-    target_yaw = angle;
-    yaw_error = target_yaw - yaw_angle;
+    else target_yaw = angle;
+//    target_yaw = angle;
+//    yaw_error = target_yaw - yaw_angle;
 
     //--------------------------------------------------
     // 距离控制
@@ -758,7 +761,7 @@ void Track2_update(void)
     //--------------------------------------------------
     // 到终点判断
     //--------------------------------------------------
-    if(path_index >= record_header.total_point_num - 2)
+    if(path_index >= replay_point_num - 2)
     { 
         target_speed = 0;
         remote_right_01_now_flag = 2;

@@ -328,6 +328,7 @@ int main(void)
     uint8  actual_jump_count    = 0;                  // 实际跳跃次数计数
     uint8  last_vision_phase_bab = VISION_PHASE_BAB_BRIDGE_ALIGN; // 上一次执行的 BAB 子状态
     uint8  bridge_exit_ipc_sent  = 0;                 // 颠簸路段积分开始信号是否发送成功
+    uint8  bridge_failsafe_exit_latched = 0;            // 检测框全部为黑色后的保底离桥锁存标志
     uint8  bump_finish_ipc_sent  = 0;                 // 核心0积分完成后的视觉完成应答是否发送成功
     uint8  bridge_align_updated  = 0;                 // 当前帧对准控制计算是否有效
     uint8  back_lane_updated     = 0;                 // 当前帧返回阶段中线控制是否有效
@@ -375,6 +376,11 @@ int main(void)
                 back_align_count = 0;
                 back_yaw_locked = 0;
             }
+            else if(function_option == VISION_BRIDGE_BUMP)
+            {
+                bridge_failsafe_exit_latched = 0;
+                bridge_exit_ipc_sent = 0;
+            }
         }
 
         jump_params.binary_threshold = core0_binary_threshold;
@@ -404,6 +410,8 @@ int main(void)
                     blind_phase_seen = 0;
                     force_blind_start_ms = 0;
                     last_reliable_heading_d10 = 0;
+                    bridge_failsafe_exit_latched = 0;
+                    bridge_exit_ipc_sent = 0;
                 }
                 else if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
                 {
@@ -414,6 +422,7 @@ int main(void)
                 }
                 else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_DISTANCE)
                 {
+                    bridge_failsafe_exit_latched = 0;
                     bump_finish_ipc_sent = 0;
                 }
             }
@@ -421,6 +430,12 @@ int main(void)
             // 进入单边桥对齐状态 并且 单边桥对齐处理函数工作正常
             if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) && camera_bridge_processing(&bridge_params, &bridge_result))
             {
+                // 保底检测不依赖识别和对齐结果，检测框全黑后直接请求进入颠簸路段
+                if(camera_bridge_failsafe_exit_check(&bridge_exit_params))
+                {
+                    bridge_failsafe_exit_latched = 1;
+                }
+
                 // 根据中线预瞄目标计算转向控制量
                 independent_fps = camera_fps_counter_update(&camera_fps, sys_ms);  // 独立 FPS 计算
                 bridge_align_updated = camera_bridge_align_update(
@@ -520,7 +535,7 @@ int main(void)
                 ipc_result = appipc_send_bridge_data(
                     bridge_align_result.valid, bridge_align_result.aligned, 0,
                     (uint8)bridge_align_result.bottom_y, bridge_align_result.control_value,
-                    force_blind_request, blind_release_request, fresh_target, 0);
+                    force_blind_request, blind_release_request, fresh_target, bridge_failsafe_exit_latched);
 
                 // 同时输出识别层和控制层状态，便于定位数据在哪一层失效
                 sprintf(txt, "Det %d |Est %d |Aret %d |Valid %d |Align %d |B %d |C %d,%d-%d,%d |E %d,%d |U %d |Type %s |Near %d |Blind %d |Force %d |Rel %d |Fresh %d |F %d\r\n",

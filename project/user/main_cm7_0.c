@@ -121,9 +121,29 @@ static void appipc_callback(uint32 data)
             bridge_bottom_y_from_core1 = 0;
             bridge_control_from_core1 = 0;
         }
-
+        // 保底离桥信号优先于对齐状态，可从对准或冲桥阶段直接开始颠簸路段积分
+        if(vision_bump_start &&
+           ((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) ||
+            (vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)))
+        {
+            phase_exited_from_core1 = 0;
+            bridge_aligned_count = 0;
+            bridge_valid_from_core1 = 0;
+            bridge_aligned_from_core1 = 0;
+            bridge_force_blind_from_core1 = 0;
+            bridge_blind_release_from_core1 = 0;
+            bridge_fresh_target_from_core1 = 0;
+            bridge_forced_blind_active = 0;
+            bridge_blind_recovery_active = 0;
+            bridge_forced_blind_fault = 0;
+            bridge_bottom_y_from_core1 = 0;
+            bridge_control_from_core1 = 0;
+            vision_bump_finish = 0;
+            distance_recover = 0;
+            vision_phase_bab = VISION_PHASE_BAB_BUMP_DISTANCE;
+        }
         // 对齐阶段连续确认成功后，进入冲桥和离桥检测阶段
-        if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN)
+        else if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN)
         {
             if(bridge_force_blind_from_core1 ||
                bridge_blind_release_from_core1 ||
@@ -149,11 +169,6 @@ static void appipc_callback(uint32 data)
             {
                 bridge_aligned_count = 0;
             }
-        }
-        else if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK) && vision_bump_start)
-        {
-            phase_exited_from_core1 = 0;
-            vision_phase_bab = VISION_PHASE_BAB_BUMP_DISTANCE;
         }
         else if((vision_phase_bab == VISION_PHASE_BAB_BUMP_DISTANCE) && phase_exited_from_core1)
         {

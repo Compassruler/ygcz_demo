@@ -201,7 +201,7 @@ typedef struct
     uint8 white_confirm_frames;     // 确认白色区域所需的连续帧数
     uint8 white_frame_count;        // 当前连续检测到白色区域的帧数
     CameraBridgeExitStage_t stage;  // 当前离桥视觉检测阶段
-    uint8 exited;                   // 1 表示白色到黑色的变化已经确认
+    uint8 exited;                   // 1 表示常规离桥流程或全黑保底判断已经确认离桥
 } BridgeExitParams_t;
 
 // WiFi SPI 图像叠加类型
@@ -322,11 +322,20 @@ uint8 camera_processed_white_area_check(uint16 check_row, uint16 check_row_count
                                         uint32 white_dot_count);
 
 /**
+ * 检查当前已处理二值帧中的单边桥保底离开区域是否全部为黑色
+ * @param bridge_exit_params 单边桥离开检测参数结构体，复用其中的检测矩形
+ *
+ * @note 该函数不获取新帧，应在摄像头处理接口成功后对同一张二值图调用。
+ * @return 1 检测矩形全部为黑色 | 0 检测矩形未全部变黑或参数无效
+ */
+uint8 camera_bridge_failsafe_exit_check(const BridgeExitParams_t *bridge_exit_params);
+
+/**
  * 单边桥离开检测接口
- * 同一检测区域先连续确认白色，再检测大面积黑色并锁存离桥状态。
+ * 同一检测区域先连续确认白色，再检测大面积黑色并锁存离桥状态；区域全黑时直接保底确认离桥。
  * @param bridge_exit_params 单边桥离开检测参数结构体
  *
- * @return 1 已经确认白色到黑色的变化 | 0 尚未完成或当前没有新帧
+ * @return 1 已经确认离桥 | 0 尚未完成或当前没有新帧
  */
 uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params);
 

@@ -531,11 +531,12 @@ void flash_path_load(void)
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
     KP_DIS = 13.0;
-    TURN_CHECK_POINT = 50;
-    TURN_SPEED_LIMIT  = 250;
-    TURN_SPEED_SCALE = 0.1f;
-    MIN_SPEED = 250;
-    TURN_ANGLE_LIMIT = 10;
+    LOOK_AHEAD_DISTANCE = 0.20;
+    TURN_CHECK_POINT = 40;
+    TURN_SPEED_LIMIT  = 350;
+    TURN_SPEED_SCALE = 0.30f;
+    MIN_SPEED = 100;
+    TURN_ANGLE_LIMIT = 30;
     }
 
 
@@ -556,13 +557,12 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
-    KP_DIS = 4.5;
-//    KP_DIS = 9.0;
-    TURN_CHECK_POINT = 40;
-//    TURN_SPEED_LIMIT = 0;
-//    TURN_SPEED_SCALE = 0.25;
-//    MIN_SPEED = 0;
-    TURN_ANGLE_LIMIT = 90;
+    KP_DIS = 9.0;
+    TURN_CHECK_POINT = 30;
+    TURN_SPEED_LIMIT = 100;
+    TURN_SPEED_SCALE = 0.10;
+    MIN_SPEED = 100;
+    TURN_ANGLE_LIMIT = 60;
     }
 
 

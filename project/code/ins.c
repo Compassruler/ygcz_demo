@@ -1,6 +1,6 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
-#define LOOK_AHEAD_DISTANCE 0.15f   // 前视距离m
+float LOOK_AHEAD_DISTANCE = 0.20f;   // 前视距离m
 #define NEAREST_SELECT_NUM 10       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 #define MAX_ELEMENT_NUM 10              // 打断点数量
@@ -348,8 +348,8 @@ void Track_update(void)
 //    }
     yaw_error =  yaw_angle - angle;
 
-    if (yaw_angle - angle > 35 )target_yaw = yaw_angle - 35;
-    else if (yaw_angle - angle < -35 ) target_yaw = yaw_angle + 35;
+    if (yaw_angle - angle > 30 )target_yaw = yaw_angle - 30;
+    else if (yaw_angle - angle < -30 ) target_yaw = yaw_angle + 30;
     else target_yaw = angle;
     
 
@@ -371,12 +371,13 @@ if(future_turn_flag)
 {
     if(fabs(car_speed) > TURN_SPEED_LIMIT && next_index < future_turn_index)
     {
-      if(course_load_flag ==1 )
-      {
-        target_speed = 0;
-        return;
-      }      
-else target_v *= TURN_SPEED_SCALE;
+//      if(course_load_flag ==1 )
+//      {
+//        target_speed = 0;
+//        return;
+//      }      
+//else target_v *= TURN_SPEED_SCALE;
+      target_v *= TURN_SPEED_SCALE;
     }
 }
     

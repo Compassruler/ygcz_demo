@@ -239,6 +239,11 @@ int main(void)
     {
         button_update();                // 按键状态更新
         remote_update();                // 遥控器状态更新
+        
+        
+        
+//        sprintf(txt,"yaw_error:%f\r\n",yaw_error);
+//        wireless_uart_send_string(txt);
         if(remote_is_online())
         {
             vision_binary_threshold = remote_left_knob_ctrl(); // 遥控器在线时实时更新，离线时保留 Flash 读取值

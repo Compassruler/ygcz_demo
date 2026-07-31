@@ -1,15 +1,15 @@
 #include "zf_common_headfile.h"
 #define PIT_CH0_PRIORITY
-#define LOOK_AHEAD_DISTANCE 0.20f   // 前视距离m
+float LOOK_AHEAD_DISTANCE = 0.20f;   // 前视距离m
 #define NEAREST_SELECT_NUM 10       // 搜索最近点范围
 #define DISTANCE_STEP 0.01f  // 打点间距，单位 m（2cm）
 #define MAX_ELEMENT_NUM 10              // 打断点数量
-int TURN_CHECK_POINT = 40;          // 提前检测的点数  // 科一40
-#define TURN_ANGLE_LIMIT 30           // 检测判断转弯的角度
+int TURN_CHECK_POINT = 50;          // 提前检测的点数  // 科一50
+int TURN_ANGLE_LIMIT = 10;           // 检测判断转弯的角度
 #define MAX_PATH_POINT          (FLASH_PAGE_LENGTH * Use_page)             //最大点数
-int TURN_SPEED_LIMIT  =       350;                                      // 小于该速度则不允许减速 // 科一350
+int TURN_SPEED_LIMIT  = 250;   // 小于该速度则不允许减速 // 科一250
 
-float TURN_SPEED_SCALE = 0.30f; // 降速比例 科一0.3
+float TURN_SPEED_SCALE = 0.1f; // 降速比例 科一0.3
 
 uint16_t element_index[MAX_ELEMENT_NUM];        // 打断点索引
 
@@ -337,22 +337,28 @@ void Track_update(void)
     //--------------------------------------------------
     // 航向误差
     //--------------------------------------------------
-    if(fabs(yaw_angle - angle) >= 35)
-    {
-        target_yaw = yaw_angle + 35;
-        target_speed = 0;
-        return;
-    }
-    target_yaw = angle;
-    yaw_error = target_yaw - yaw_angle;
+//    if(fabs(yaw_angle - angle) >= 35)
+//    {
+//////      if(yaw_angle > angle)
+//////        target_yaw = yaw_angle + 35;
+//////      else target_yaw = yaw_angle - 35;
+//      target_yaw = yaw_angle - 35;
+//        target_speed = 0;
+//        return;
+//    }
+    yaw_error =  yaw_angle - angle;
+
+    if (yaw_angle - angle > 30 )target_yaw = yaw_angle - 30;
+    else if (yaw_angle - angle < -30 ) target_yaw = yaw_angle + 30;
+    else target_yaw = angle;
+    
 
     //--------------------------------------------------
     // 距离控制
     //--------------------------------------------------
     target_v = KP_DIS * distance;
 
-
-//检测未来转弯
+      //检测未来转弯
 check_future_turn(next_index);
 
 
@@ -365,10 +371,16 @@ if(future_turn_flag)
 {
     if(fabs(car_speed) > TURN_SPEED_LIMIT && next_index < future_turn_index)
     {
-        target_v *= TURN_SPEED_SCALE;
+//      if(course_load_flag ==1 )
+//      {
+//        target_speed = 0;
+//        return;
+//      }      
+//else target_v *= TURN_SPEED_SCALE;
+      target_v *= TURN_SPEED_SCALE;
     }
 }
-
+    
 //if(future_turn_flag)
 //{
 //    target_v *= TURN_SPEED_SCALE;

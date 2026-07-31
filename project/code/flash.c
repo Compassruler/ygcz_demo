@@ -268,7 +268,7 @@ void flash_path_store(void)
             record_path,
             mul_header.total_point_num
         );
-        flash_write_vision_threshold();
+//        flash_write_vision_threshold();
 
     }
     
@@ -536,6 +536,12 @@ void flash_path_load(void)
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
     KP_DIS = 13.0;
+    LOOK_AHEAD_DISTANCE = 0.20;
+    TURN_CHECK_POINT = 40;
+    TURN_SPEED_LIMIT  = 350;
+    TURN_SPEED_SCALE = 0.30f;
+    MIN_SPEED = 100;
+    TURN_ANGLE_LIMIT = 30;
     }
 
 
@@ -556,10 +562,12 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
-    KP_DIS = 9.5;
-    TURN_CHECK_POINT = 60;
+    KP_DIS = 9.0;
+    TURN_CHECK_POINT = 30;
     TURN_SPEED_LIMIT = 100;
-    TURN_SPEED_SCALE = 0.2;
+    TURN_SPEED_SCALE = 0.10;
+    MIN_SPEED = 100;
+    TURN_ANGLE_LIMIT = 60;
     }
 
 
@@ -585,9 +593,9 @@ void flash_path_load(void)
     replay_point_num = mul_header.total_point_num;
     segment_end_index = segment_header[0].point_num - 1;
     KP_DIS = 4.5;
-    flash_read_vision_threshold();
+//    flash_read_vision_threshold();
     }
-    yaw_angle = 0; // 发车航向角清0，防止歪了
+    yaw_angle = -3; // 发车航向角清0，防止歪了
     x = 0;
     y = 0;
     x_last = 0;

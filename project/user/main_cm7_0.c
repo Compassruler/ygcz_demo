@@ -176,6 +176,11 @@ int main(void)
     {
         button_update();                // 按键状态更新
         remote_update();                // 遥控器状态更新
+        
+        
+        
+//        sprintf(txt,"yaw_error:%f\r\n",yaw_error);
+//        wireless_uart_send_string(txt);
         if(remote_is_online())
         {
             remote_ch9_value = remote_left_knob_ctrl();

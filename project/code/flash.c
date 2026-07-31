@@ -209,7 +209,7 @@ void flash_write_all_points(PathPoint *path,uint32_t point_num)
 void flash_write_vision_threshold()
 {
     flash_buffer_clear(); // 清除缓冲区
-    flash_union_buffer[0].uint32_type = 二值化阈值;
+//    flash_union_buffer[0].uint32_type = 二值化阈值;
   
   flash_write_page_from_buffer(0,VISION_THRESHOLD_PAGE, 1);
  
@@ -270,7 +270,7 @@ void flash_path_store(void)
             record_path,
             mul_header.total_point_num
         );
-        flash_write_vision_threshold();
+//        flash_write_vision_threshold();
 
     }
     
@@ -506,7 +506,7 @@ void flash_read_all_points(PathPoint *path,uint32_t point_num)
 void flash_read_vision_threshold()
 {
   flash_read_page_to_buffer(0,VISION_THRESHOLD_PAGE,1);
-  二值化阈值 = flash_union_buffer[0].uint32_type;
+//  二值化阈值 = flash_union_buffer[0].uint32_type;
 }
 
 // flash读取总
@@ -531,6 +531,11 @@ void flash_path_load(void)
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
     KP_DIS = 13.0;
+    TURN_CHECK_POINT = 50;
+    TURN_SPEED_LIMIT  = 250;
+    TURN_SPEED_SCALE = 0.1f;
+    MIN_SPEED = 250;
+    TURN_ANGLE_LIMIT = 10;
     }
 
 
@@ -551,10 +556,13 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
-    KP_DIS = 9.5;
-    TURN_CHECK_POINT = 60;
-    TURN_SPEED_LIMIT = 100;
-    TURN_SPEED_SCALE = 0.2;
+    KP_DIS = 4.5;
+//    KP_DIS = 9.0;
+    TURN_CHECK_POINT = 40;
+//    TURN_SPEED_LIMIT = 0;
+//    TURN_SPEED_SCALE = 0.25;
+//    MIN_SPEED = 0;
+    TURN_ANGLE_LIMIT = 90;
     }
 
 
@@ -580,9 +588,9 @@ void flash_path_load(void)
     replay_point_num = mul_header.total_point_num;
     segment_end_index = segment_header[0].point_num - 1;
     KP_DIS = 4.5;
-    flash_read_vision_threshold();
+//    flash_read_vision_threshold();
     }
-    yaw_angle = 0; // 发车航向角清0，防止歪了
+    yaw_angle = -3; // 发车航向角清0，防止歪了
     x = 0;
     y = 0;
     x_last = 0;

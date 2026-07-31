@@ -26,9 +26,9 @@ float speed_to_x_offset, balance_to_y_offset;
 // Y 坐标:10mm 舵机:80度
 // Y 坐标:0mm  舵机:70度
 float X_left = 0.0f;
-float Y_left = 20.0f;
+float Y_left = 0.0f;
 float X_right = 0.0f;
-float Y_right = 20.0f;
+float Y_right = 0.0f;
 
 // 当前实际坐标（0为初始值）
 float XLeft = 0.0f, YLeft = 0.0f;

@@ -362,7 +362,7 @@ void pit0_ch0_isr()
         {
           if(yaw_lock_init == 0)
             {
-                yaw_angle = 0;        //只执行一次
+                yaw_angle = -3;        //只执行一次
                 target_yaw_remote = 0;
                 yaw_lock_init = 1;
              }

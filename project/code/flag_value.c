@@ -32,7 +32,7 @@ volatile uint8 vision_bump_finish = 0;               // 核0距离积分到位后置1，通
 float KP_DIS;
 int MAX_SPEED = 1000;
 
-int MIN_SPEED = 100;
+int MIN_SPEED = 250;
 float YAW_TH = 1.0f; 
 
 bool track_flag = false;  // 回放标志位（按钮四控制）true为开启回放

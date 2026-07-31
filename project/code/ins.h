@@ -79,6 +79,7 @@ extern float path_yaw_change;
 extern int TURN_CHECK_POINT;    // 提前减速的点
 extern int TURN_SPEED_LIMIT;  // 速度条件，低于该速度不减速
 extern float TURN_SPEED_SCALE;  // 降速比例
+extern int TURN_ANGLE_LIMIT; //降速判断角度
 // 初始化
 void ins_init(void);
 void track_init(void);

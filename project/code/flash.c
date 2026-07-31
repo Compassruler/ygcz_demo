@@ -562,12 +562,12 @@ void flash_path_load(void)
         );
     replay_point_num = single_header.point_num;
     segment_end_index = replay_point_num - 1;
-    KP_DIS = 9.0;
+    KP_DIS = 6.0;       
     TURN_CHECK_POINT = 30;
     TURN_SPEED_LIMIT = 100;
     TURN_SPEED_SCALE = 0.10;
     MIN_SPEED = 100;
-    TURN_ANGLE_LIMIT = 60;
+    TURN_ANGLE_LIMIT = 10;
     }
 
 

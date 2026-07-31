@@ -87,17 +87,17 @@ void flash_path_load(void);
 #define COURSE2_HEADER_PAGE       11                    // 写入flash头信息
 
 #define COURSE2_POINT_START_PAGE  12                    // 写入flash路径点起始页
-#define COURSE2_POINT_END_PAGE    20                    // 写入flash路径点结束页
+#define COURSE2_POINT_END_PAGE    30                    // 写入flash路径点结束页
 
 //======================
 // 科目3 Flash区域
 //======================
 
-#define COURSE3_HEADER_PAGE          26                    // 写入flash总头信息
+#define COURSE3_HEADER_PAGE          35                    // 写入flash总头信息
 
-#define COURSE3_SEGMENT_HEADER_PAGE  27                    // 写入flash段头信息
+#define COURSE3_SEGMENT_HEADER_PAGE  36                    // 写入flash段头信息
 
-#define COURSE3_POINT_START_PAGE     28                    // 写入flash路径点起始页
+#define COURSE3_POINT_START_PAGE     37                    // 写入flash路径点起始页
 
 #define COURSE3_POINT_END_PAGE       80                    // 写入flash路径点结束页
 

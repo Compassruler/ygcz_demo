@@ -59,20 +59,20 @@ void button_update(void)
     if(button_flag[0] == 1)
     {
       course_load_flag = 0;
-      buzzer_beep(1, 50);
+      // buzzer_beep(1, 50);
   
     }
     
     if(button_flag[1] == 1)
     {
       course_load_flag = 1;
-      buzzer_beep(2, 50);
+      // buzzer_beep(2, 50);
     }
     
     if(button_flag[2] == 1)
     {
       course_load_flag = 2;
-      buzzer_beep(3, 50);
+      // buzzer_beep(3, 50);
     }
     if(button_flag[3] == 1)
     {

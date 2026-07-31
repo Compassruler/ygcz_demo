@@ -466,7 +466,7 @@ if(target_speed < 0 && target_speed > -MIN_SPEED)
         road_memery_flag = 2;
         track_flag = false; 
         target_yaw_remote = target_yaw;
-        buzzer_beep(3,100);
+        // buzzer_beep(3,100);
     }
 }
 
@@ -767,6 +767,6 @@ void Track2_update(void)
         remote_right_01_now_flag = 2;
         road_memery_flag = 2;
         target_yaw_remote = target_yaw;
-        buzzer_beep(3,100);
+        // buzzer_beep(3,100);
     }
 }

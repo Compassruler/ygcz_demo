@@ -171,22 +171,22 @@ void remote_right_01_switch_ctrl(void)
    {
     course_record_flag = 2;
    }
-  if(beep_flag)
-  {
-    return;
-  }
-  switch(course_record_flag)
-  {case 0:
-      buzzer_beep(1, 50);
-      break;
-  case 1:
-    buzzer_beep(2, 50);
-      break;
-  case 2:
-    buzzer_beep(3, 50);
-      break;
-  }
-  beep_flag = true;
+//   if(beep_flag)
+//   {
+//     return;
+//   }
+//   switch(course_record_flag)
+//   {case 0:
+//       buzzer_beep(1, 50);
+//       break;
+//   case 1:
+//     buzzer_beep(2, 50);
+//       break;
+//   case 2:
+//     buzzer_beep(3, 50);
+//       break;
+//   }
+//   beep_flag = true;
          
 }
 

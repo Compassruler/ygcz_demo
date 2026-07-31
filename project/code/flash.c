@@ -205,14 +205,12 @@ void flash_write_all_points(PathPoint *path,uint32_t point_num)
     }
 
 }
-// flash 写入摄像头二值化阈值
+// 将统一图像二值化阈值写入 Flash
 void flash_write_vision_threshold()
 {
     flash_buffer_clear(); // 清除缓冲区
-//    flash_union_buffer[0].uint32_type = 二值化阈值;
-  
-  flash_write_page_from_buffer(0,VISION_THRESHOLD_PAGE, 1);
- 
+    flash_union_buffer[0].uint32_type = (uint32)vision_binary_threshold;
+    flash_write_page_from_buffer(0, VISION_THRESHOLD_PAGE, 1);
 }
 
 
@@ -502,11 +500,18 @@ void flash_read_all_points(PathPoint *path,uint32_t point_num)
 }
 
 
-// flash读取摄像头二值化阈值
-void flash_read_vision_threshold()
+// 从 Flash 读取统一图像二值化阈值
+void flash_read_vision_threshold(void)
 {
-  flash_read_page_to_buffer(0,VISION_THRESHOLD_PAGE,1);
-//  二值化阈值 = flash_union_buffer[0].uint32_type;
+    uint32 stored_threshold;
+
+    flash_read_page_to_buffer(0, VISION_THRESHOLD_PAGE, 1);
+    stored_threshold = flash_union_buffer[0].uint32_type;
+
+    if((stored_threshold >= 1u) && (stored_threshold <= 255u))
+    {
+        vision_binary_threshold = (uint8)stored_threshold;
+    }
 }
 
 // flash读取总

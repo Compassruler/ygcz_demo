@@ -12,6 +12,9 @@
 #define VISION_BLIND_RECOVERY_MIN_TIME_MS   (100u)                              // 倒车后允许重新前进的最短时间
 #define VISION_BLIND_RECOVERY_MAX_TIME_MS   (4000u)                             // 允许缓慢完成 15 度修正，并预留实际航向跟随时间
 #define VISION_BLIND_RECOVERY_COOLDOWN_MS   (300u)                              // 找回赛道后禁止再次强制盲转的时间
+#define VISION_BACK_YAW_GAIN                (0.003f)                             // 返回阶段每 5ms 对视觉控制量的航向积分系数
+#define VISION_BACK_CONTROL_DIRECTION       (1.0f)                              // 返回阶段转向方向，方向相反时改为 -1.0f
+#define VISION_BACK_YAW_LIMIT_DEG           (30.0f)                             // 返回阶段相对进入航向允许修正的最大角度
 extern volatile uint8 vision_phase_bab;                                         // 核心0当前的单边桥与颠簸路段子状态
 extern volatile uint8 bridge_force_blind_from_core1;                            // 核心1发送的强制盲转请求
 extern volatile uint8 bridge_blind_release_from_core1;                          // 核心1发送的提前结束盲转请求
@@ -46,8 +49,16 @@ void pit0_ch0_isr()
     static float blind_recovery_target_yaw = 0.0f;  // 倒车恢复的最终目标航向角
     static float blind_recovery_command_yaw = 0.0f; // 倒车恢复逐步使用的目标航向角
     static float blind_recovery_direction = 1.0f;   // 倒车恢复的航向修正方向
+    static uint8 back_yaw_control_active = 0;        // 返回阶段航向控制是否已经初始化
+    static float back_yaw_control_start = 0.0f;      // 进入返回阶段时的实际航向角
     float force_blind_progress = 0.0f;
     system_time ++;
+
+    if(vision_detect_mode != VISION_BACK)
+    {
+      back_yaw_control_active = 0;
+    }
+
     remote_update();
     imu_data_get();               // 原始数据
     imu_data_transition();        // 转换后数据
@@ -360,6 +371,34 @@ void pit0_ch0_isr()
       {
         // 跳跃暂时不用改变航向角
         pid_pos_calc(&banlance.yaw_angle_pid, 0, yaw_angle);
+      }
+      else if (vision_detect_mode == VISION_BACK) // 返回阶段实时跟随视觉拟合中线
+      {
+        if(!back_yaw_control_active)
+        {
+          back_yaw_control_active = 1;
+          back_yaw_control_start = yaw_angle;
+          target_yaw_remote = yaw_angle;
+        }
+
+        // 核心1确认锁定后保持最后的目标航向，不再继续积分视觉控制量
+        if(!bridge_aligned_from_core1)
+        {
+          target_yaw_remote +=
+              vision_target_yaw * VISION_BACK_YAW_GAIN *
+              VISION_BACK_CONTROL_DIRECTION;
+        }
+
+        if(target_yaw_remote > back_yaw_control_start + VISION_BACK_YAW_LIMIT_DEG)
+        {
+          target_yaw_remote = back_yaw_control_start + VISION_BACK_YAW_LIMIT_DEG;
+        }
+        else if(target_yaw_remote < back_yaw_control_start - VISION_BACK_YAW_LIMIT_DEG)
+        {
+          target_yaw_remote = back_yaw_control_start - VISION_BACK_YAW_LIMIT_DEG;
+        }
+
+        pid_pos_calc(&banlance.yaw_angle_pid, target_yaw_remote, yaw_angle);
       }
       else 
       {

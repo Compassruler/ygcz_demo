@@ -1,5 +1,6 @@
 #ifndef _FLAG_VALUE_H_
 #define _FLAG_VALUE_H_
+#define VISION_BINARY_THRESHOLD_DEFAULT (100u)       // 统一图像二值化阈值默认值
 #define FLASH_IDLE    (0);
 #define FLASH_STORE   (1);
 #define FLASH_LOAD    (2);
@@ -27,6 +28,7 @@ extern bool pause_flag;            // 惯导中断flag
 extern volatile int vision_detect_mode;     // 视觉识别类型 | 0 空状态 | 1 单边桥与颠簸路段 | 2 跳跃 |
 extern volatile int32 vision_target_speed;  // 视觉速度
 extern volatile int32 vision_target_yaw;    // 视觉航向角
+extern volatile uint8 vision_binary_threshold; // 统一图像二值化阈值
 
 extern volatile uint8 vision_bump_start;    // 核1确认离桥后置1，激活核0颠簸路段距离积分
 extern volatile uint8 vision_bump_finish;   // 核0距离积分到位后置1，通知核1完成视觉阶段

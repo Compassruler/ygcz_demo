@@ -1,4 +1,4 @@
-#ifndef _appipc_h_
+﻿#ifndef _appipc_h_
 #define _appipc_h_
 
 #include "zf_common_typedef.h"
@@ -45,7 +45,7 @@ typedef struct
     uint16 car_speed;          // 当前车速绝对值
     uint8 vision_detect_mode;  // 0 空闲，1 单边桥与颠簸路段，2 跳跃，3 三级台阶返回
     uint8 vision_phase_bab;    // 单边桥与颠簸路段工作子状态
-    uint8 remote_ch9_value;    // 遥控器通道 9 映射值，范围 1 ~ 255
+    uint8 vision_binary_threshold; // 当前统一图像二值化阈值，范围 1 ~ 255
     uint8 vision_bump_finish;  // 1 表示核心0距离积分已经确认通过颠簸路段
 } appipc_core0_data_t;
 
@@ -75,7 +75,7 @@ uint8 appipc_send_bridge_data(uint8 valid, uint8 aligned, uint8 exited, uint8 bo
 uint8 appipc_decode_bridge_data(uint32 data, appipc_bridge_data_t *bridge_data);
 
 // 初始化核心0状态接收端
-// 使用场景：核心1调用，用于接收核心0发送过来的车速、遥控器通道 9、视觉工作模式和 BAB 子状态。
+// 使用场景：核心1调用，用于接收核心0发送过来的车速、二值化阈值、视觉工作模式和 BAB 子状态。
 // 参数说明：callback 接收到状态数据后调用的回调函数。
 void  appipc_speed_rx_init(appipc_callback_t callback);
 
@@ -85,12 +85,12 @@ uint8 appipc_send_speed_u32(uint32 data);
 
 // 打包并发送核心0状态
 // 数据格式：bit31 为颠簸积分完成标志，bit30~28 为 BAB 子状态，bit27~24 为视觉工作模式，
-//           bit23~16 为遥控器通道 9 映射值，bit15~0 为 uint16 车速绝对值。
+//           bit23~16 为统一图像二值化阈值，bit15~0 为 uint16 车速绝对值。
 // 返回值：APPIPC_OK 表示发送成功，APPIPC_BUSY 表示通道忙。
 uint8 appipc_send_core0_data(uint16 car_speed, uint8 vision_detect_mode, uint8 vision_phase_bab,
-                             uint8 remote_ch9_value, uint8 vision_bump_finish);
+                             uint8 vision_binary_threshold, uint8 vision_bump_finish);
 
-// 解包核心0发送的车速、遥控器通道 9、视觉工作模式和 BAB 子状态
+// 解包核心0发送的车速、二值化阈值、视觉工作模式和 BAB 子状态
 // 返回值：1 表示解包成功，0 表示参数为空或状态值超出范围。
 uint8 appipc_decode_core0_data(uint32 data, appipc_core0_data_t *core0_data);
 

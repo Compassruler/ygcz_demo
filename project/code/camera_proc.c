@@ -1665,6 +1665,55 @@ uint8 camproc_bridge_align_update(
     return 1;
 }
 
+uint8 camproc_lane_follow_update(
+    uint32 time_ms,
+    const CameraBridgeResult_t *bridge_result,
+    const CameraBridgeAlignParams_t *align_params,
+    CameraBridgeAlignState_t *align_state,
+    CameraBridgeAlignResult_t *align_result)
+{
+    CameraBridgeAlignParams_t follow_params;
+    uint8 updated = 0;
+
+    if((NULL == align_params) || (NULL == align_state) || (NULL == align_result))
+    {
+        return 0;
+    }
+
+    // 连续跟踪只使用预瞄控制，不允许进入对准完成和盲转状态
+    follow_params = *align_params;
+    follow_params.complete_confirm_frames = 0xFFu;
+    follow_params.blind_reliable_frames = 0xFFu;
+
+    align_state->phase = CAMERA_BRIDGE_ALIGN_TRACK;
+    align_state->complete_frame_count = 0;
+    align_state->fallback_timer_active = 0;
+    align_state->fallback_start_time_ms = 0;
+    align_state->fallback_estimated_count = 0;
+    align_state->blind_reliable_count = 0;
+    align_state->blind_estimated_count = 0;
+    align_state->blind_reference_control = 0;
+    align_state->blind_control_value = 0;
+
+    updated = camproc_bridge_align_update(
+        time_ms, bridge_result, &follow_params, align_state, align_result);
+
+    // 防止长时间运行后计数到达上限，保证该接口始终保持连续跟踪
+    align_state->phase = CAMERA_BRIDGE_ALIGN_TRACK;
+    align_state->complete_frame_count = 0;
+    align_state->fallback_timer_active = 0;
+    align_state->fallback_start_time_ms = 0;
+    align_state->fallback_estimated_count = 0;
+    align_state->blind_reliable_count = 0;
+    align_state->blind_estimated_count = 0;
+    align_state->blind_reference_control = 0;
+    align_state->blind_control_value = 0;
+    align_result->aligned = 0;
+    align_result->phase = CAMERA_BRIDGE_ALIGN_TRACK;
+
+    return updated;
+}
+
 
 // ==================================================== 跳跃检测、过滤、切换函数 ====================================================
 static uint32 jump_trigger_count = 0;  // 已经触发的跳跃次数

@@ -10,7 +10,6 @@
 #include <string.h>
 
 #define LED1                                 (P19_0)                     // 摄像头初始化失败蓝色 LED
-#define CAMERA_BINARY_THRESHOLD_DEFAULT      (100u)                      // 默认 固定二值化 阈值
 #define CAMERA_WIFI_IMAGE_WIDTH              ((MT9V03X_W / 8u) * 8u)    // 二值图宽度必须为 8 的整数倍
 #define CAMERA_WIFI_IMAGE_HEIGHT             (MT9V03X_H)
 #define CAMERA_WIFI_IMAGE_X_OFFSET           ((MT9V03X_W - CAMERA_WIFI_IMAGE_WIDTH) / 2u)
@@ -589,6 +588,51 @@ uint8 camera_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bri
     return camproc_bridge_align_update(time_ms, bridge_result, align_params, align_state, align_result);
 }
 
+uint8 camera_lane_follow_update(uint32 time_ms, const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result)
+{
+    return camproc_lane_follow_update(time_ms, bridge_result, align_params, align_state, align_result);
+}
+
+uint8 camera_processed_white_area_check(uint16 check_row, uint16 check_row_count,
+                                        uint16 check_column, uint16 check_column_count,
+                                        uint32 white_dot_count)
+{
+    return camproc_pub_check_area(
+        image_copy,
+        check_row,
+        check_row_count,
+        check_column,
+        check_column_count,
+        white_dot_count,
+        CAMERA_IMAGE_DOT_WHITE);
+}
+
+uint8 camera_bridge_failsafe_exit_check(const BridgeExitParams_t *bridge_exit_params)
+{
+    uint32 black_dot_count;
+
+    if((NULL == bridge_exit_params) ||
+       (0 == bridge_exit_params->check_row_count) ||
+       (0 == bridge_exit_params->check_column_count))
+    {
+        return 0;
+    }
+
+    // 阈值等于检测矩形总像素数，只有全部为黑色时才会触发
+    black_dot_count =
+          (uint32)bridge_exit_params->check_row_count
+        * (uint32)bridge_exit_params->check_column_count;
+
+    return camproc_pub_check_area(
+        image_copy,
+        bridge_exit_params->check_row,
+        bridge_exit_params->check_row_count,
+        bridge_exit_params->check_column,
+        bridge_exit_params->check_column_count,
+        black_dot_count,
+        CAMERA_IMAGE_DOT_BLACK);
+}
+
 uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params)
 {
     uint8 white_detected = 0;  // 当前帧的白色像素是否达到阈值
@@ -610,6 +654,14 @@ uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params)
     if(!camera_frame_cpy_and_basic_processing(bridge_exit_params->binary_threshold))
     {
         return 0;
+    }
+
+    // 保底判断优先于原有白色到黑色流程，检测框全黑时立即确认已经离桥
+    if(camera_bridge_failsafe_exit_check(bridge_exit_params))
+    {
+        bridge_exit_params->stage = CAMERA_BRIDGE_EXIT_COMPLETE;
+        bridge_exit_params->exited = 1;
+        return 1;
     }
 
     // 对同一个检测区域分别统计白色和黑色像素
@@ -700,7 +752,7 @@ uint8 camera_jump_processing(uint32 time_ms, JumpDetectParams_t *jump_params)
     }
 
     // 是否有效进行 摄像头新帧复制并进行最基本二值化处理
-    if(!camera_frame_cpy_and_basic_processing(CAMERA_BINARY_THRESHOLD_DEFAULT))
+    if(!camera_frame_cpy_and_basic_processing(jump_params->binary_threshold))
     {
         return 0;
     }

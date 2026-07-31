@@ -25,8 +25,7 @@
 #define ADAPTIVE_ROW_COEFF      (-5)                            // 自适应 Row 系数，数字为正，更晚切换到低 Row，更偏高 Row，跳跃时间更早；数字为负，更早切换到低 Row，更偏低 Row，跳跃时间越晚
 
 //=========================== 单边桥识别参数 ===========================
-#define BRIDGE_BINARY_THRESHOLD              (136)             // 固定阈值，也是大津法失效时的备用阈值
-#define BRIDGE_USE_OTSU_THRESHOLD             (0)               // 1 使用 ROI 大津法 | 0 使用固定阈值
+#define BRIDGE_USE_OTSU_THRESHOLD             (0)               // 统一阈值方案保持为 0，设为 1 时单边桥将改用 ROI 大津法
 #define BRIDGE_THRESHOLD_FILTER_ALPHA         (0.70f)           // 自动阈值低通滤波旧值权重
 
 #define BRIDGE_ROI_TOP                        (15)               // 单边桥 ROI 最上行
@@ -101,7 +100,6 @@
 #define BRIDGE_BLIND_ESTIMATED_FRAMES         (2)               // 连续使用补线结果后允许盲转的帧数
 #define BRIDGE_BLIND_CONTROL_PERCENT          (90)              // 盲转控制量占可靠视觉控制量的百分比
 //=========================== 单边桥离开检测参数 ===========================
-#define BRIDGE_EXIT_BINARY_THRESHOLD   (136)    // 离桥检测固定二值化阈值(无效)
 #define BRIDGE_EXIT_CHECK_ROW          (115)    // 离桥检测矩形起始行
 #define BRIDGE_EXIT_CHECK_ROW_COUNT    (80)     // 从起始行向上检查的行数
 #define BRIDGE_EXIT_CHECK_COLUMN       (10)     // 离桥检测矩形起始列
@@ -109,6 +107,14 @@
 #define BRIDGE_EXIT_WHITE_DOT_COUNT    (10000)   // 确认白色区域所需的白色像素数量
 #define BRIDGE_EXIT_BLACK_DOT_COUNT    (10000)   // 确认颠簸路段所需的黑色像素数量
 #define BRIDGE_EXIT_WHITE_CONFIRM_FRAMES (5)    // 连续检测到白色区域的帧数
+
+//=========================== 返回阶段航向锁定参数 ===========================
+#define BACK_ALIGN_CONFIRM_FRAMES         (5)      // 中线连续进入对准框的确认帧数
+#define BACK_LOCK_CHECK_ROW               (115)    // 白色到位区域最下方行坐标
+#define BACK_LOCK_CHECK_ROW_COUNT         (80)     // 从起始行向上检查的行数
+#define BACK_LOCK_CHECK_COLUMN            (10)     // 白色到位区域最左侧列坐标
+#define BACK_LOCK_CHECK_COLUMN_COUNT      (160)    // 从起始列向右检查的列数
+#define BACK_LOCK_WHITE_DOT_COUNT         (10000)  // 立即锁定航向所需的白色像素数量
 
 
 //================================================================
@@ -118,7 +124,7 @@ volatile uint8 vision_phase_bab                 = VISION_PHASE_BAB_BRIDGE_ALIGN;
 volatile uint32 sys_ms                          = 0;                                // 毫秒计时器
 static volatile uint16 core0_car_speed          = 0;                                // 实际车速
 static volatile uint8  core0_speed_updated      = 0;                                // 车速更新标志位
-static volatile uint8  core0_remote_ch9_value   = BRIDGE_BINARY_THRESHOLD;          // 核心0发送的通道9映射值
+static volatile uint8  core0_binary_threshold   = VISION_BINARY_THRESHOLD_DEFAULT; // 核0发送的统一图像二值化阈值
 static volatile uint8  core0_vision_bump_finish = 0;                                // 核心0距离积分完成标志
 
 // IPC 接收核0的车速和视觉工作模式
@@ -131,7 +137,7 @@ static void appipc_speed_callback(uint32 data)
         core0_car_speed = core0_data.car_speed;
         function_option = core0_data.vision_detect_mode;
         vision_phase_bab = core0_data.vision_phase_bab;
-        core0_remote_ch9_value = core0_data.remote_ch9_value;
+        core0_binary_threshold = core0_data.vision_binary_threshold;
         core0_vision_bump_finish = core0_data.vision_bump_finish;
         core0_speed_updated = 1;
     }
@@ -175,6 +181,17 @@ void debug_image_screen_display(
         // screen_show_table_t3(bridge_exit_params, function_option, fps); // TFT180 暂不显示通用数据表
         #endif
     }
+    else if (function_option == VISION_BACK)
+    {
+        #if IMAGE_DEBUG_TYPE == 1
+        if(camera_debug_on_screen())
+        {
+            screen_show_bridge_roi(bridge_params);
+            screen_show_bridge_align_box(bridge_result, bridge_align_params);
+            screen_show_bridge_fitted_line(bridge_result);
+        }
+        #endif
+    }
 }
 
 // 将单边桥内部对准阶段转换为串口可读文本
@@ -201,6 +218,7 @@ int main(void)
     fps_counter_t camera_fps;                         // FPS 结构体初始化
     JumpDetectParams_t jump_params = 
     {
+        .binary_threshold         = VISION_BINARY_THRESHOLD_DEFAULT,
         .check_row                = 100,
         .check_row_count          = JUMP_ROW_TOTAL,
         .check_column             = JUMP_COLUMN,
@@ -217,7 +235,7 @@ int main(void)
     };                                                // 跳跃检测参数结构体
     BridgeExitParams_t bridge_exit_params =
     {
-        .binary_threshold         = BRIDGE_EXIT_BINARY_THRESHOLD,
+        .binary_threshold         = VISION_BINARY_THRESHOLD_DEFAULT,
         .check_row                = BRIDGE_EXIT_CHECK_ROW,
         .check_row_count          = BRIDGE_EXIT_CHECK_ROW_COUNT,
         .check_column             = BRIDGE_EXIT_CHECK_COLUMN,
@@ -232,7 +250,7 @@ int main(void)
 
     CameraBridgeParams_t bridge_params =
     {
-        .binary_threshold          = BRIDGE_BINARY_THRESHOLD,
+        .binary_threshold          = VISION_BINARY_THRESHOLD_DEFAULT,
         .use_otsu_threshold        = BRIDGE_USE_OTSU_THRESHOLD,
         .threshold_filter_alpha    = BRIDGE_THRESHOLD_FILTER_ALPHA,
         .roi_top                   = BRIDGE_ROI_TOP,
@@ -292,6 +310,8 @@ int main(void)
     CameraBridgeAlignState_t bridge_align_state = {0}; // 单边桥对准控制运行状态
     CameraBridgeResult_t bridge_result = {0};          // 单边桥识别结果结构体
     CameraBridgeAlignResult_t bridge_align_result = {0}; // 单边桥对准控制结果结构体
+    CameraBridgeAlignState_t back_lane_state = {0};    // 返回阶段中线跟踪运行状态
+    CameraBridgeAlignResult_t back_lane_result = {0};  // 返回阶段中线跟踪控制结果
     CameraWifiOverlay_t wifi_overlay =
     {
         .type                = CAMERA_WIFI_OVERLAY_NONE,
@@ -308,8 +328,13 @@ int main(void)
     uint8  actual_jump_count    = 0;                  // 实际跳跃次数计数
     uint8  last_vision_phase_bab = VISION_PHASE_BAB_BRIDGE_ALIGN; // 上一次执行的 BAB 子状态
     uint8  bridge_exit_ipc_sent  = 0;                 // 颠簸路段积分开始信号是否发送成功
+    uint8  bridge_failsafe_exit_latched = 0;            // 检测框全部为黑色后的保底离桥锁存标志
     uint8  bump_finish_ipc_sent  = 0;                 // 核心0积分完成后的视觉完成应答是否发送成功
     uint8  bridge_align_updated  = 0;                 // 当前帧对准控制计算是否有效
+    uint8  back_lane_updated     = 0;                 // 当前帧返回阶段中线控制是否有效
+    uint8  back_align_count      = 0;                 // 返回阶段连续对齐帧数
+    uint8  back_yaw_locked       = 0;                 // 返回阶段航向锁定标志
+    uint8  last_function_option  = VISION_IDLE;       // 上一次执行的视觉工作模式
     uint8  force_blind_request   = 0;                 // 请求核心0使用 IMU 强制完成大角度盲转
     uint8  blind_release_request = 0;                 // 请求核心0提前结束强制盲转
     uint8  force_blind_monitoring = 0;                // 是否正在监测强制盲转后的可靠中线
@@ -335,13 +360,33 @@ int main(void)
     appipc_speed_rx_init(appipc_speed_callback);      // IPC接收 初始化
     camera_fps_counter_init(&camera_fps, sys_ms);     // 独立 FPS 计算初始化
     camera_bridge_align_reset(&bridge_align_state);  // 单边桥对准控制状态初始化
+    camera_bridge_align_reset(&back_lane_state);     // 返回阶段中线跟踪状态初始化
 
 
     while(true)
     {
-        bridge_params.binary_threshold = core0_remote_ch9_value;  // 固定阈值模式使用，自动阈值模式下作为备用值
-        bridge_exit_params.binary_threshold= core0_remote_ch9_value;
-        sprintf(txt, "Bin: %d", core0_remote_ch9_value);
+        // 每次进入返回阶段时清除上一次中线跟踪状态
+        if(last_function_option != function_option)
+        {
+            last_function_option = function_option;
+
+            if(function_option == VISION_BACK)
+            {
+                camera_bridge_align_reset(&back_lane_state);
+                back_align_count = 0;
+                back_yaw_locked = 0;
+            }
+            else if(function_option == VISION_BRIDGE_BUMP)
+            {
+                bridge_failsafe_exit_latched = 0;
+                bridge_exit_ipc_sent = 0;
+            }
+        }
+
+        jump_params.binary_threshold = core0_binary_threshold;
+        bridge_params.binary_threshold = core0_binary_threshold;  // 固定阈值模式使用，自动阈值模式下作为备用值
+        bridge_exit_params.binary_threshold = core0_binary_threshold;
+        sprintf(txt, "Bin: %d", core0_binary_threshold);
         wireless_uart_send_string(txt);
         //=========================== 执行单边桥与颠簸路段检测程序 ===========================
         // 核心视觉步骤判断条件，目前有| 0 空闲 | 1 单边桥-颠簸路段 | 2 跳跃 | 后续可能增加的步骤：返回三级台阶
@@ -365,6 +410,8 @@ int main(void)
                     blind_phase_seen = 0;
                     force_blind_start_ms = 0;
                     last_reliable_heading_d10 = 0;
+                    bridge_failsafe_exit_latched = 0;
+                    bridge_exit_ipc_sent = 0;
                 }
                 else if(vision_phase_bab == VISION_PHASE_BAB_BRIDGE_EXIT_CHECK)
                 {
@@ -375,6 +422,7 @@ int main(void)
                 }
                 else if(vision_phase_bab == VISION_PHASE_BAB_BUMP_DISTANCE)
                 {
+                    bridge_failsafe_exit_latched = 0;
                     bump_finish_ipc_sent = 0;
                 }
             }
@@ -382,6 +430,12 @@ int main(void)
             // 进入单边桥对齐状态 并且 单边桥对齐处理函数工作正常
             if((vision_phase_bab == VISION_PHASE_BAB_BRIDGE_ALIGN) && camera_bridge_processing(&bridge_params, &bridge_result))
             {
+                // 保底检测不依赖识别和对齐结果，检测框全黑后直接请求进入颠簸路段
+                if(camera_bridge_failsafe_exit_check(&bridge_exit_params))
+                {
+                    bridge_failsafe_exit_latched = 1;
+                }
+
                 // 根据中线预瞄目标计算转向控制量
                 independent_fps = camera_fps_counter_update(&camera_fps, sys_ms);  // 独立 FPS 计算
                 bridge_align_updated = camera_bridge_align_update(
@@ -481,7 +535,7 @@ int main(void)
                 ipc_result = appipc_send_bridge_data(
                     bridge_align_result.valid, bridge_align_result.aligned, 0,
                     (uint8)bridge_align_result.bottom_y, bridge_align_result.control_value,
-                    force_blind_request, blind_release_request, fresh_target, 0);
+                    force_blind_request, blind_release_request, fresh_target, bridge_failsafe_exit_latched);
 
                 // 同时输出识别层和控制层状态，便于定位数据在哪一层失效
                 sprintf(txt, "Det %d |Est %d |Aret %d |Valid %d |Align %d |B %d |C %d,%d-%d,%d |E %d,%d |U %d |Type %s |Near %d |Blind %d |Force %d |Rel %d |Fresh %d |F %d\r\n",
@@ -531,6 +585,58 @@ int main(void)
                 {
                     bump_finish_ipc_sent = (APPIPC_OK == appipc_send_bridge_data(0, 0, 1, 0, 0, 0, 0, 0, 0)) ? 1 : 0;
                 }
+            }
+        }
+
+        //=========================== 执行返回阶段中线跟踪 ===========================
+        if(function_option == VISION_BACK)
+        {
+            if(camera_bridge_processing(&bridge_params, &bridge_result))
+            {
+                independent_fps = camera_fps_counter_update(&camera_fps, sys_ms);
+                back_lane_updated = camera_lane_follow_update(
+                    sys_ms, &bridge_result, &bridge_align_params, &back_lane_state, &back_lane_result);
+
+                // 尚未锁定时，连续确认中线入框，同时检测独立的白色到位区域
+                if(!back_yaw_locked)
+                {
+                    if(back_lane_updated &&
+                       back_lane_result.valid &&
+                       back_lane_result.point_inside &&
+                       !bridge_result.estimated)
+                    {
+                        if(back_align_count < BACK_ALIGN_CONFIRM_FRAMES)
+                        {
+                            back_align_count++;
+                        }
+                    }
+                    else
+                    {
+                        back_align_count = 0;
+                    }
+
+                    // 连续对齐达到要求，或者白色区域达到阈值，均立即锁存当前航向
+                    if((back_align_count >= BACK_ALIGN_CONFIRM_FRAMES) ||
+                       camera_processed_white_area_check(
+                           BACK_LOCK_CHECK_ROW,
+                           BACK_LOCK_CHECK_ROW_COUNT,
+                           BACK_LOCK_CHECK_COLUMN,
+                           BACK_LOCK_CHECK_COLUMN_COUNT,
+                           BACK_LOCK_WHITE_DOT_COUNT))
+                    {
+                        back_yaw_locked = 1;
+                    }
+                }
+
+                // 锁定后持续发送 aligned=1 和 control=0，直到退出 VISION_BACK
+                ipc_result = appipc_send_bridge_data(
+                    (uint8)(back_yaw_locked ||
+                            (back_lane_updated && back_lane_result.valid)),
+                    back_yaw_locked, 0,
+                    (uint8)back_lane_result.bottom_y,
+                    (!back_yaw_locked && back_lane_updated) ?
+                        back_lane_result.control_value : 0,
+                    0, 0, 0, 0);
             }
         }
 

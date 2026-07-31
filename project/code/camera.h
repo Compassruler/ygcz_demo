@@ -26,6 +26,7 @@ typedef struct
 // 跳跃检测参数
 typedef struct
 {
+    uint8 binary_threshold;         // 当前统一使用的固定二值化阈值
     uint16 check_row;               // 检测矩形的起始行，后续从该行向上检查
     uint16 check_row_count;         // 从起始行向上检查的行数量
     uint16 check_column;            // 检测矩形的起始列，后续从该列向右检查
@@ -200,7 +201,7 @@ typedef struct
     uint8 white_confirm_frames;     // 确认白色区域所需的连续帧数
     uint8 white_frame_count;        // 当前连续检测到白色区域的帧数
     CameraBridgeExitStage_t stage;  // 当前离桥视觉检测阶段
-    uint8 exited;                   // 1 表示白色到黑色的变化已经确认
+    uint8 exited;                   // 1 表示常规离桥流程或全黑保底判断已经确认离桥
 } BridgeExitParams_t;
 
 // WiFi SPI 图像叠加类型
@@ -293,11 +294,48 @@ void camera_bridge_align_reset(CameraBridgeAlignState_t *align_state);
 uint8 camera_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
 
 /**
+ * 根据赛道拟合中线持续计算航向控制量
+ * @param time_ms        当前系统毫秒时间
+ * @param bridge_result  当前帧赛道边线及中线识别结果
+ * @param align_params   中线跟踪控制参数
+ * @param align_state    中线跟踪控制运行状态
+ * @param align_result   中线跟踪控制结果输出地址
+ *
+ * @note 仅输出实时控制量，不判断是否对齐，也不进入盲转状态。
+ * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
+ */
+uint8 camera_lane_follow_update(uint32 time_ms, const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
+
+/**
+ * 检查当前已处理二值帧中指定矩形区域的白色像素数量
+ * @param check_row          检测矩形最下方行坐标
+ * @param check_row_count    从起始行向上检测的行数
+ * @param check_column       检测矩形最左侧列坐标
+ * @param check_column_count 从起始列向右检测的列数
+ * @param white_dot_count    触发所需的白色像素数量
+ *
+ * @note 该函数不获取新帧，应在摄像头处理接口成功后对同一张二值图调用。
+ * @return 1 白色像素数量达到阈值 | 0 未达到阈值
+ */
+uint8 camera_processed_white_area_check(uint16 check_row, uint16 check_row_count,
+                                        uint16 check_column, uint16 check_column_count,
+                                        uint32 white_dot_count);
+
+/**
+ * 检查当前已处理二值帧中的单边桥保底离开区域是否全部为黑色
+ * @param bridge_exit_params 单边桥离开检测参数结构体，复用其中的检测矩形
+ *
+ * @note 该函数不获取新帧，应在摄像头处理接口成功后对同一张二值图调用。
+ * @return 1 检测矩形全部为黑色 | 0 检测矩形未全部变黑或参数无效
+ */
+uint8 camera_bridge_failsafe_exit_check(const BridgeExitParams_t *bridge_exit_params);
+
+/**
  * 单边桥离开检测接口
- * 同一检测区域先连续确认白色，再检测大面积黑色并锁存离桥状态。
+ * 同一检测区域先连续确认白色，再检测大面积黑色并锁存离桥状态；区域全黑时直接保底确认离桥。
  * @param bridge_exit_params 单边桥离开检测参数结构体
  *
- * @return 1 已经确认白色到黑色的变化 | 0 尚未完成或当前没有新帧
+ * @return 1 已经确认离桥 | 0 尚未完成或当前没有新帧
  */
 uint8 camera_bridge_exit_processing(BridgeExitParams_t *bridge_exit_params);
 

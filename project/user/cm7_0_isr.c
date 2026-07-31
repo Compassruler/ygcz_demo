@@ -123,7 +123,7 @@ void pit0_ch0_isr()
       {
         pid_pos_calc(&banlance.speed_pid, vision_target_speed, car_speed);
       }
-      else if(road_memery_flag == 2)pid_pos_calc(&banlance.speed_pid, 0 , car_speed); // 回放结束速度给0
+      // else if(road_memery_flag == 2)pid_pos_calc(&banlance.speed_pid, 0 , car_speed); // 回放结束速度给0
       else // 遥控器 
       {
         pid_pos_calc(&banlance.speed_pid, remote_front_rear_ctrl() , car_speed);

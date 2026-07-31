@@ -25,6 +25,7 @@ bool pause_flag = true;           // ÖĞ¶Ï»Ø·Å±êÖ¾Î»£¨½öÓÃÓÚ¿ÆÄ¿Èı£©ÓÒ±ß¶şµµ²¦Å¥¿
 volatile int vision_detect_mode = 0;
 volatile int32 vision_target_speed = 0;
 volatile int32 vision_target_yaw = 0;
+volatile uint8 vision_binary_threshold = VISION_BINARY_THRESHOLD_DEFAULT;
 
 volatile uint8 vision_bump_start = 0;                // ºË1È·ÈÏÀëÇÅºóÖÃ1£¬¼¤»îºË0µßô¤Â·¶Î¾àÀë»ı·Ö
 volatile uint8 vision_bump_finish = 0;               // ºË0¾àÀë»ı·Öµ½Î»ºóÖÃ1£¬Í¨ÖªºË1Íê³ÉÊÓ¾õ½×¶Î

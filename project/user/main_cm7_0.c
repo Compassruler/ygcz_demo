@@ -1,3 +1,12 @@
+/**
+ * @todo ÊÓ¾õµ÷ÊÔ×¢ÒâÊÂÏî£º
+ *  1.  µ÷ÕûÉãÏñÍ· ¿ìÃÅ ºÍ ISO
+ *  2.  ¸Ä±äĞ¡³µ·¢³µ×ËÌ¬£¬¶æ»ú½Ç¶È
+ *  3.  ÊÇ·ñ¹Ø±ÕÆÁÄ»£¬´®¿Ú
+ *  4.  Ğ¡³µ´úÂëÉÕÂ¼
+ *  5.  Ğ¡³µËÙ¶Èµ÷Õû
+ */
+
 #include "zf_common_headfile.h"
 #define LED1                    (P19_0)     // SPI ä¸²å£ SPI ä¸¤ï¿½?ï¿½å± è¿™é‡Œå®å®šä¹‰å¡«ï¿?? IPS200_TYPE_SPI
 #define BUZZER_PIN              (P19_4)    
@@ -36,8 +45,43 @@ volatile uint8 bridge_aligned_count = 0;            // Á¬ĞøÊÕµ½Ê¶±ğÓĞĞ§ÇÒÒÑ¾­¶ÔÆ
 volatile uint8 phase_exited_from_core1 = 0;          // ºË1È·ÈÏÒÑ¾­Àë¿ªµ±Ç°½×¶ÎÂ·¶ÎµÄ±êÖ¾Î»
 volatile uint8 vision_phase_bab = VISION_PHASE_BAB_BRIDGE_ALIGN; // µ¥±ßÇÅÓëµßô¤Â·¶Î×Ó×´Ì¬£¬ÓÉºË0Í³Ò»¿ØÖÆ
 uint32 jump_count = 0;                              // ÌøÔ¾¼ÆÊı
-volatile uint8 vision_steps = 0;                             // ÊÓ¾õ²½Öè | 0 µ¥±ßÇÅ | 1 ÌøÔ¾ | 2 ÌøÔ¾·µ»Ø
 volatile uint8 vision_phase_done_flag = 0;                   // ÊÓ¾õµ¥²½ÖèÍê³É±êÖ¾Î»
+
+// ÊÓ¾õÄ£Ê½°´ÕÕÊı×éÖĞµÄÏÈºóË³ĞòÖ´ĞĞ£¬VISION_IDLE ²»²ÎÓëÁ÷³ÌÅÅĞò
+static uint8 vision_mode_plan[] =
+{
+    VISION_BACK,
+};
+
+#define VISION_MODE_PLAN_COUNT    ((uint8)(sizeof(vision_mode_plan) / sizeof(vision_mode_plan[0])))
+
+static uint8 vision_plan_index = 0;  // µ±Ç°Ö´ĞĞµÄÄ£Ê½Êı×éÏÂ±ê
+
+// ´ÓµÚÒ»¸öÊÓ¾õÄ£Ê½ÖØĞÂ¿ªÊ¼
+static void vision_mode_plan_reset(void)
+{
+    vision_plan_index = 0;
+}
+
+// »ñÈ¡µ±Ç°Ó¦¸ÃÖ´ĞĞµÄÊÓ¾õÄ£Ê½£¬Êı×éÖ´ĞĞ½áÊøºó·µ»Ø¿ÕÏĞÄ£Ê½
+static uint8 vision_mode_plan_get_current(void)
+{
+    if(vision_plan_index < VISION_MODE_PLAN_COUNT)
+    {
+        return vision_mode_plan[vision_plan_index];
+    }
+
+    return VISION_IDLE;
+}
+
+// µ±Ç°ÊÓ¾õÄ£Ê½Íê³ÉºóÒÆ¶¯µ½Êı×éÖĞµÄÏÂÒ»¸öÄ£Ê½
+static void vision_mode_plan_move_next(void)
+{
+    if(vision_plan_index < VISION_MODE_PLAN_COUNT)
+    {
+        vision_plan_index++;
+    }
+}
 
 // ½ÓÊÕºËĞÄ1·¢ËÍµÄÊı¾İ
 static void appipc_callback(uint32 data)
@@ -122,6 +166,25 @@ static void appipc_callback(uint32 data)
 
         bridge_control_updated = 1;
     }
+    else if(vision_detect_mode == VISION_BACK)
+    {
+        appipc_bridge_data_t lane_data;
+
+        if(appipc_decode_bridge_data(data, &lane_data))
+        {
+            bridge_valid_from_core1 = lane_data.valid;
+            bridge_aligned_from_core1 = lane_data.aligned;
+            bridge_control_from_core1 = lane_data.control_value;
+        }
+        else
+        {
+            bridge_valid_from_core1 = 0;
+            bridge_aligned_from_core1 = 0;
+            bridge_control_from_core1 = 0;
+        }
+
+        bridge_control_updated = 1;
+    }
 }
 
 
@@ -147,13 +210,13 @@ int main(void)
   buzzer_init();                                        // ·äÃùÆ÷³õÊ¼»¯
 
   appipc_rx_init(appipc_callback);                      // IPC ³õÊ¼»¯
+  vision_mode_plan_reset();                             // ÊÓ¾õÄ£Ê½Êı×é³õÊ¼»¯
     //==========================
     // ±äÁ¿
     //==========================
     int i = 0;
     static int j = 0;
     int pause_time = 0; // ±ãÓÚµ÷ÊÔ¹ßµ¼´ò¶Ï»Ö¸´Âß¼­
-    uint8 remote_ch9_value = 100;  // Í¨µÀ9Ó³ÉäÖµ£¬Ò£¿ØÆ÷µôÏßÊ±±£³ÖÉÏÒ»´ÎÓĞĞ§Öµ
 
     screen_data_item_t remote_table[] =
 {
@@ -178,7 +241,7 @@ int main(void)
         remote_update();                // Ò£¿ØÆ÷×´Ì¬¸üĞÂ
         if(remote_is_online())
         {
-            remote_ch9_value = remote_left_knob_ctrl();
+            vision_binary_threshold = remote_left_knob_ctrl(); // Ò£¿ØÆ÷ÔÚÏßÊ±ÊµÊ±¸üĞÂ£¬ÀëÏßÊ±±£Áô Flash ¶ÁÈ¡Öµ
         }
         remote_left_02_switch_ctrl();   // ×ó²à2±£»¤¿ª¹Ø³õÊ¼»¯
         remote_right_02_switch_ctrl();  // ÓÒ²à2ÌøÔ¾¿ª¹Ø³õÊ¼»¯
@@ -271,8 +334,8 @@ int main(void)
             
             if (vision_phase_done_flag)
             {
-                vision_phase_done_flag = 0;  // ÌøÔ¾Íê³É±êÖ¾Î»ÖÃ 0
-                vision_steps++;  // ½øÈëÏÂÒ»ÊÓ¾õ½×¶Î£¬µÈ´ı pause_flag ÔÙ´ÎÎª false
+                vision_phase_done_flag = 0;
+                vision_mode_plan_move_next();  // ½øÈëÊı×éÖĞµÄÏÂÒ»ÊÓ¾õ½×¶Î
 
                 vision_target_speed = 0;
                 vision_target_yaw = 0;
@@ -303,29 +366,13 @@ int main(void)
 
      if (pause_flag == false)
     {
-        // ÊÓ¾õ²½ÖèÇĞ»»
-        switch (vision_steps)
-        {
-        case 0:
-            vision_detect_mode = VISION_BRIDGE_BUMP;  // µ¥±ßÇÅºÍµßô¤Â·¶Î
-            break;
-
-        case 1:
-            vision_detect_mode = VISION_JUMP;  // ÌøÔ¾
-            break;
-        
-        case 2:
-            vision_detect_mode = VISION_BACK;  // Èı¼¶Ì¨½×·µ»Ø
-            break;
-
-        }
+        vision_detect_mode = vision_mode_plan_get_current();  // °´Êı×éË³ĞòÑ¡ÔñÊÓ¾õÄ£Ê½
     }
     else
     {
         vision_detect_mode = VISION_IDLE;  // ¿ÕÏĞ
     }
-
-    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, vision_phase_bab, remote_ch9_value, vision_bump_finish);  // ·¢ËÍ³µËÙ¡¢ÊÓ¾õ×´Ì¬¡¢Í¨µÀ9ºÍ»ı·ÖÍê³É±êÖ¾µ½ºË1
+    appipc_send_core0_data((uint16)fabsf(car_speed), (uint8)vision_detect_mode, vision_phase_bab, vision_binary_threshold, vision_bump_finish);  // ·¢ËÍ³µËÙ¡¢ÊÓ¾õ×´Ì¬¡¢Í³Ò»¶şÖµ»¯ãĞÖµºÍ»ı·ÖÍê³É±êÖ¾µ½ºË1
     
     //=========================== ÌøÔ¾Ä£Ê½ ===========================
         if(vision_detect_mode == VISION_JUMP)
@@ -476,6 +523,27 @@ int main(void)
                 {
                     vision_target_speed = BRIDGE_ALIGN_SPEED;  // Ê¶±ğ¶ªÊ§£ºÂıÂıÏòÇ°Ñ°ÕÒÄ¿±ê
                     vision_target_yaw = 0;
+                }
+            }
+        }
+        //=========================== ·µ»Ø½×¶ÎÖĞÏß¸ú×ÙÄ£Ê½ =========================
+        else if(vision_detect_mode == VISION_BACK)
+        {
+            if(bridge_control_updated)
+            {
+                bridge_control_updated = 0;
+
+                vision_target_speed = 180;
+
+                // º½ÏòËø¶¨ºóÍ£Ö¹½ÓÊÜĞÂµÄÊÓ¾õĞŞÕıÁ¿
+                if(bridge_aligned_from_core1)
+                {
+                    vision_target_yaw = 0;
+                }
+                else
+                {
+                    vision_target_yaw = bridge_valid_from_core1 ?
+                        bridge_control_from_core1 : 0;
                 }
             }
         }

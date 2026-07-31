@@ -34,8 +34,8 @@ void flash_write_segment_header(SegmentHeader *header);
 void flash_write_all_points(PathPoint *path, uint32_t point_num); //path：开始位置 point_num：该段点数
 
 
-// flash 写入摄像头二值化阈值
-void flash_write_vision_threshold();
+// 将统一图像二值化阈值写入 Flash
+void flash_write_vision_threshold(void);
 
 // flash写入总
 void flash_path_store(void);
@@ -49,8 +49,8 @@ void flash_read_segment_headers(void);
 // flash读取路径点
 void flash_read_all_points(PathPoint *path,uint32_t point_num);
 
-// flash读取摄像头二值化阈值
-void flash_read_vision_threshold();
+// 从 Flash 读取统一图像二值化阈值
+void flash_read_vision_threshold(void);
 
 //flash读取总
 void flash_path_load(void);

@@ -26,6 +26,7 @@ typedef struct
 // 跳跃检测参数
 typedef struct
 {
+    uint8 binary_threshold;         // 当前统一使用的固定二值化阈值
     uint16 check_row;               // 检测矩形的起始行，后续从该行向上检查
     uint16 check_row_count;         // 从起始行向上检查的行数量
     uint16 check_column;            // 检测矩形的起始列，后续从该列向右检查
@@ -291,6 +292,34 @@ void camera_bridge_align_reset(CameraBridgeAlignState_t *align_state);
  * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
  */
 uint8 camera_bridge_align_update(uint32 time_ms, const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
+
+/**
+ * 根据赛道拟合中线持续计算航向控制量
+ * @param time_ms        当前系统毫秒时间
+ * @param bridge_result  当前帧赛道边线及中线识别结果
+ * @param align_params   中线跟踪控制参数
+ * @param align_state    中线跟踪控制运行状态
+ * @param align_result   中线跟踪控制结果输出地址
+ *
+ * @note 仅输出实时控制量，不判断是否对齐，也不进入盲转状态。
+ * @return 1 当前帧控制结果有效 | 0 识别无效或参数非法
+ */
+uint8 camera_lane_follow_update(uint32 time_ms, const CameraBridgeResult_t *bridge_result, const CameraBridgeAlignParams_t *align_params, CameraBridgeAlignState_t *align_state, CameraBridgeAlignResult_t *align_result);
+
+/**
+ * 检查当前已处理二值帧中指定矩形区域的白色像素数量
+ * @param check_row          检测矩形最下方行坐标
+ * @param check_row_count    从起始行向上检测的行数
+ * @param check_column       检测矩形最左侧列坐标
+ * @param check_column_count 从起始列向右检测的列数
+ * @param white_dot_count    触发所需的白色像素数量
+ *
+ * @note 该函数不获取新帧，应在摄像头处理接口成功后对同一张二值图调用。
+ * @return 1 白色像素数量达到阈值 | 0 未达到阈值
+ */
+uint8 camera_processed_white_area_check(uint16 check_row, uint16 check_row_count,
+                                        uint16 check_column, uint16 check_column_count,
+                                        uint32 white_dot_count);
 
 /**
  * 单边桥离开检测接口

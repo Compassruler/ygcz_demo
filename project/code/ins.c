@@ -636,3 +636,134 @@ void check_turn_finish(void)
     }
 
 }
+
+// 科目二回放代码
+void Track2_update(void)
+{
+    // 当前位置
+    x_now = x;
+    y_now = y;
+
+    //--------------------------------------------------
+    // 终点保护
+    //--------------------------------------------------
+    if(path_index >= record_header.total_point_num)
+    {
+        path_index = record_header.total_point_num - 1;
+
+        target_speed = 0;
+
+        remote_right_01_now_flag = 2;
+
+        return;
+    }
+//    segment_check(); // 检测当前段是否结束
+//    if(!pause_flag) return; // 如果暂停标志为false，则不进行路径回放
+    find_lookahead_point(find_nearest_point(path_index));
+
+
+    //--------------------------------------------------
+    // 计算距离
+    //--------------------------------------------------
+    dx = target_x - x_now;
+    dy = target_y - y_now;
+      
+    distance = sqrtf(dx * dx + dy * dy);
+    
+    float target_move_yaw = atan2f(dy, dx) * 180.0f / PI; //目标运动方向
+    //--------------------------------------------------
+    // 目标角度：直接使用记录的连续 yaw
+    //--------------------------------------------------
+    float angle = replay_point[path_index].yaw;
+    //--------------------------------------------------
+    // 航向误差
+    //--------------------------------------------------
+    if(fabs(yaw_angle - angle) >= 30)
+    {
+        target_yaw = yaw_angle + 30;
+        target_speed = 0;
+        return;
+    }
+    target_yaw = angle;
+    yaw_error = target_yaw - yaw_angle;
+
+    //--------------------------------------------------
+    // 距离控制
+    //--------------------------------------------------
+    target_v = 4.5 * distance;
+    //--------------------------------------------------
+    // 后退逻辑（滞回区）
+    //--------------------------------------------------
+
+    // 将目标方向调整到当前连续yaw附近
+    float move_error = target_move_yaw - yaw_angle;
+
+    while(move_error > 180)
+    {
+        move_error -= 360;
+    }
+
+    while(move_error < -180)
+    {
+        move_error += 360;
+    }
+
+
+    float move_error_abs = fabs(move_error);
+
+
+    // 当前前进状态
+    if(dir == 0)
+    {
+        // 偏差超过120°才进入倒车
+        if(move_error_abs > 120)
+        {
+            dir = 1;
+        }
+    }
+    // 当前倒车状态
+    else
+    {
+        // 偏差小于60°才退出倒车
+        if(move_error_abs < 60)
+        {
+            dir = 0;
+        }
+    }
+
+
+    // 根据状态决定速度方向
+    if(dir)
+    {
+        target_v = -target_v;
+    }
+
+
+    //--------------------------------------------------
+    // 转 rpm
+    //--------------------------------------------------
+    target_speed = truetorpm(target_v);
+
+
+    //--------------------------------------------------
+    // 限幅
+    //--------------------------------------------------
+    if(target_speed > MAX_SPEED)        
+        target_speed = MAX_SPEED;
+
+    if(target_speed < -MAX_SPEED)
+        target_speed = -MAX_SPEED;
+
+
+    //--------------------------------------------------
+    // 到终点判断
+    //--------------------------------------------------
+    if(path_index >= record_header.total_point_num - 2)
+    { 
+        target_speed = 0;
+        remote_right_01_now_flag = 2;
+        road_memery_flag = 2;
+        target_yaw_remote = target_yaw;
+        buzzer_beep(3,100);
+    }
+}

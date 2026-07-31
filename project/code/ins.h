@@ -120,4 +120,7 @@ void check_future_turn(uint32_t index);
 
 // 出弯检测
 void check_turn_finish(void);
+
+// 科目二回放代码
+void Track2_update(void);
 #endif

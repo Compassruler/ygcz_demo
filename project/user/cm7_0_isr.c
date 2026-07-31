@@ -107,8 +107,16 @@ void pit0_ch0_isr()
       
       if (track_flag && pause_flag)
       {
-        Track_update();
-        pid_pos_calc(&banlance.speed_pid, target_speed, car_speed);
+        if(course_load_flag == 1)  // 科目二回放
+        {
+          Track2_update();
+          pid_pos_calc(&banlance.speed_pid, target_speed, car_speed);
+        }
+        else
+        {
+          Track_update();
+          pid_pos_calc(&banlance.speed_pid, target_speed, car_speed);
+        }
         
       }
       else if (vision_detect_mode != VISION_IDLE)  // 视觉控制模式

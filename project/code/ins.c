@@ -659,7 +659,9 @@ void Track2_update(void)
     }
 //    segment_check(); // 检测当前段是否结束
 //    if(!pause_flag) return; // 如果暂停标志为false，则不进行路径回放
-    find_lookahead_point(find_nearest_point(path_index));
+    int next_index = find_nearest_point(path_index);
+    find_lookahead_point(next_index);
+//    find_lookahead_point(find_nearest_point(path_index));
 
 
     //--------------------------------------------------
@@ -694,6 +696,21 @@ void Track2_update(void)
     // 距离控制
     //--------------------------------------------------
     target_v = 4.5 * distance;
+          //检测未来转弯
+check_future_turn(next_index);
+
+
+//检测是否通过转弯点
+check_turn_finish();
+
+
+//如果前方有转弯，降速
+if(!future_turn_flag)
+{
+   
+      target_v *= (1+TURN_SPEED_SCALE);
+    
+}
     //--------------------------------------------------
     // 后退逻辑（滞回区）
     //--------------------------------------------------
